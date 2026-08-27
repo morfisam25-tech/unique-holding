@@ -1,37 +1,262 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Unique Holding | Istanbul</title>
-<meta name="theme-color" content="#050607">
-<style>
-html,body{margin:0;background:#050708;min-height:100%;}
-body{font-family:Arial,Helvetica,sans-serif;color:#fff;}
-#status{padding:24px;text-align:center;color:#ddd;font-size:14px;}
-#home{display:none;width:100%;height:auto;margin:0 auto;}
-</style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#070809">
+  <meta name="description" content="Unique Holding is an Istanbul-based group active in industrial trade, petrochemicals and specialist business ventures.">
+  <title>Unique Holding | Istanbul</title>
+  <link rel="stylesheet" href="assets/site.css">
 </head>
 <body>
-<div id="status">Loading Unique Holding…</div>
-<img id="home" alt="Unique Holding homepage">
-<script>
-(async function(){
-  const status=document.getElementById('status');
-  const img=document.getElementById('home');
-  try{
-    const parts=await Promise.all([1,2,3,4,5].map(async i=>{
-      const r=await fetch(`chunks/exact${i}.txt?v=final2`,{cache:'no-store'});
-      if(!r.ok) throw new Error(`chunk ${i} (${r.status})`);
-      return (await r.text()).trim();
-    }));
-    img.onload=()=>{status.remove();img.style.display='block';};
-    img.onerror=()=>{status.textContent='Image decode failed — please refresh.';};
-    img.src='data:image/jpeg;base64,'+parts.join('');
-  }catch(e){
-    status.textContent='Load failed: '+e.message;
-  }
-})();
-</script>
+  <header class="site-header">
+    <div class="container nav">
+      <a class="brand" href="index.html" aria-label="Unique Holding home">
+        <span class="brand-mark" aria-hidden="true"></span>
+        UNIQUE HOLDING
+      </a>
+
+      <button class="nav-toggle" type="button" aria-label="Open navigation" aria-expanded="false" aria-controls="main-navigation"><span></span></button>
+
+      <nav class="nav-links" id="main-navigation" aria-label="Primary navigation">
+        <a href="corporate.html">Corporate</a>
+        <a href="energy.html">Energy &amp; Petrochemicals</a>
+        <a href="products.html">Products</a>
+        <a href="ventures.html">Group Ventures</a>
+        <a href="#contact">Contact</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero" aria-labelledby="hero-title">
+      <div class="container hero-content">
+        <div class="hero-label">Istanbul · Türkiye</div>
+        <h1 id="hero-title">
+          <span>Trade.</span>
+          <span>Energy.</span>
+          <span>Intelligence.</span>
+        </h1>
+
+        <div class="hero-bottom">
+          <p class="hero-copy">An Istanbul-based group active in industrial trade, petrochemicals and specialist business ventures.</p>
+          <div class="hero-actions">
+            <a class="btn btn-primary" href="#activities">Our Activities</a>
+            <a class="btn btn-ghost" href="corporate.html">About Unique Holding</a>
+          </div>
+        </div>
+      </div>
+      <div class="hero-scroll" aria-hidden="true">Scroll to explore</div>
+    </section>
+
+    <section class="section section-dark" id="activities">
+      <div class="container">
+        <div class="section-heading" data-reveal>
+          <div>
+            <p class="kicker">Activity Fields</p>
+            <h2>Two operating directions. One group structure.</h2>
+          </div>
+          <p>Unique Holding combines its industrial trading activity with selected specialist ventures. Each activity remains distinct, while the group provides a clear corporate framework.</p>
+        </div>
+
+        <div class="activities-grid">
+          <article class="activity-card activity-energy" data-reveal>
+            <div class="activity-content">
+              <span class="activity-number">01 · Core Activity</span>
+              <h3>Energy &amp;<br>Petrochemicals</h3>
+              <p>Industrial chemical and petrochemical trade covering import, domestic supply, export and re-export, subject to commercially confirmed supply and offered-lot specifications.</p>
+              <a class="activity-link" href="energy.html">Explore activity <span>↗</span></a>
+            </div>
+          </article>
+
+          <article class="activity-card activity-intelligence" data-reveal>
+            <div class="axis-mark" aria-hidden="true"></div>
+            <div class="activity-content">
+              <span class="activity-number">02 · Group Venture</span>
+              <h3>Evidence<br>Axis</h3>
+              <p>A specialist competitive-intelligence business focused on evidence-backed decision support for founders, product teams and executives in fast-moving B2B markets.</p>
+              <a class="activity-link" href="ventures.html">View group venture <span>↗</span></a>
+              <a class="activity-link" href="https://evidenceaxis.com" target="_blank" rel="noopener">Visit Evidence Axis <span>↗</span></a>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="facts" aria-label="Corporate facts">
+      <div class="container facts-grid">
+        <article class="fact" data-reveal>
+          <span class="fact-label">Operating since</span>
+          <div>
+            <strong class="accent">2020</strong>
+            <p>Current Turkish corporate entity.</p>
+          </div>
+        </article>
+
+        <article class="fact" data-reveal>
+          <span class="fact-label">Operating base</span>
+          <div>
+            <strong>Istanbul,<br>Türkiye</strong>
+          </div>
+        </article>
+
+        <article class="fact" data-reveal>
+          <span class="fact-label">Trade flows</span>
+          <div>
+            <strong>Import · Supply<br>Export · Re-export</strong>
+          </div>
+        </article>
+
+        <article class="fact" data-reveal>
+          <span class="fact-label">Market intelligence</span>
+          <div>
+            <strong>Specialist<br>market access</strong>
+            <p>Historical paid access includes S&amp;P Global Platts market intelligence services.</p>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="section section-soft" id="operations">
+      <div class="container">
+        <div class="section-heading" data-reveal>
+          <div>
+            <p class="kicker">Real Operations</p>
+            <h2>Trade moves through physical operations.</h2>
+          </div>
+          <p>The media shown here is drawn from company-supplied operational material. Additional verified media can be added without changing the page structure.</p>
+        </div>
+
+        <div class="operations-layout">
+          <div class="operations-media" data-reveal>
+            <video autoplay muted loop playsinline preload="metadata" aria-label="Unique Holding operations footage">
+              <source src="assets/operations.mp4" type="video/mp4">
+            </video>
+            <div class="media-caption">Company-supplied operations footage.</div>
+          </div>
+
+          <div>
+            <div class="operations-list">
+              <article class="operation-item" data-reveal>
+                <span>01</span>
+                <h3>Maritime Operations</h3>
+              </article>
+              <article class="operation-item" data-reveal>
+                <span>02</span>
+                <h3>Land Logistics</h3>
+              </article>
+              <article class="operation-item" data-reveal>
+                <span>03</span>
+                <h3>Cargo Handling</h3>
+              </article>
+            </div>
+            <p class="operation-note">Public media is intentionally limited to material supplied or approved for use by the company.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-dark" id="products">
+      <div class="container">
+        <div class="section-heading" data-reveal>
+          <div>
+            <p class="kicker">Products</p>
+            <h2>Selected industrial materials.</h2>
+          </div>
+          <p>Initial public product coverage is limited to technical data currently cleared for publication. Producer identities and country-of-origin references are not published here.</p>
+        </div>
+
+        <div class="products-row">
+          <article class="product-card" data-reveal>
+            <span class="product-index">01 · Fertilizer</span>
+            <h3>Urea 46</h3>
+            <ul class="spec-list">
+              <li><span>Nitrogen</span><span>min. 46% wt</span></li>
+              <li><span>Biuret</span><span>max. 0.8% wt</span></li>
+              <li><span>Moisture</span><span>max. 0.3% wt</span></li>
+              <li><span>Particle size 2–4 mm</span><span>90%</span></li>
+            </ul>
+            <a class="product-link" href="products.html">Full specification →</a>
+          </article>
+
+          <article class="product-card" data-reveal>
+            <span class="product-index">02 · Industrial Chemical</span>
+            <h3>Caustic Soda<br>Solid</h3>
+            <ul class="spec-list">
+              <li><span>Product</span><span>Sodium Hydroxide</span></li>
+              <li><span>CAS</span><span>1310-73-2</span></li>
+              <li><span>NaOH</span><span>approx. 98.8%</span></li>
+              <li><span>UN / Class</span><span>1823 / 8</span></li>
+            </ul>
+            <a class="product-link" href="products.html">Full specification →</a>
+          </article>
+
+          <article class="product-card" data-reveal>
+            <span class="product-index">03 · Industrial Chemical</span>
+            <h3>Sodium Sulphate<br>Anhydrous</h3>
+            <ul class="spec-list">
+              <li><span>Na₂SO₄</span><span>99.20%</span></li>
+              <li><span>Water insoluble matter</span><span>0.02%</span></li>
+              <li><span>Moisture</span><span>0.05%</span></li>
+              <li><span>Whiteness</span><span>91%</span></li>
+            </ul>
+            <a class="product-link" href="products.html">Full specification →</a>
+          </article>
+        </div>
+
+        <p class="product-disclaimer">Final specification, packing and commercial terms are subject to the offered lot and confirmation at the time of inquiry.</p>
+      </div>
+    </section>
+
+    <section class="corporate-band">
+      <div class="container corporate-inner" data-reveal>
+        <div>
+          <p class="kicker">Corporate</p>
+          <h2>Industrial trade is the operating foundation.</h2>
+        </div>
+        <div class="corporate-copy">
+          <p>Unique Holding operates from Istanbul, Türkiye, with a commercial focus on industrial and petrochemical materials and selected specialist ventures developed alongside the core trading activity.</p>
+          <a class="btn btn-ghost" href="corporate.html">Corporate Profile</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer" id="contact">
+    <div class="container">
+      <div class="footer-top">
+        <div class="footer-brand">
+          Unique Holding
+          <small>An Istanbul-based group active in industrial trade, petrochemicals and specialist business ventures.</small>
+        </div>
+
+        <div class="footer-col">
+          <h3>Contact</h3>
+          <a href="tel:+902127272222">+90 212 727 22 22</a>
+          <a href="tel:+905393809197">+90 539 380 91 97</a>
+          <a href="mailto:farahmand@uniqueholding.com.tr">farahmand@uniqueholding.com.tr</a>
+          <a href="https://www.instagram.com/UNIQUE_HOLDING/" target="_blank" rel="noopener">@UNIQUE_HOLDING ↗</a>
+        </div>
+
+        <div class="footer-col">
+          <h3>Istanbul Office</h3>
+          <address>
+            Unique Otomotiv Kimya Sanayi Limited Şirketi<br>
+            29 Ekim Cad. Yenibosna Merkez Mah.<br>
+            İstanbul Vizyon Park Plazaları A1 Blok<br>
+            Kat: 9, Daire: 98<br>
+            Bahçelievler / İstanbul, Türkiye
+          </address>
+        </div>
+      </div>
+
+      <div class="footer-bottom">
+        <span>© 2026 Unique Holding</span>
+        <span>Industrial Trade · Petrochemicals · Group Ventures</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="assets/site.js" defer></script>
 </body>
 </html>
