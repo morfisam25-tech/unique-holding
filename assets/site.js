@@ -1,41 +1,30 @@
 (() => {
+  const header = document.querySelector('.site-header');
   const toggle = document.querySelector('.nav-toggle');
-  const links = document.querySelector('.nav-links');
-
-  if (toggle && links) {
-    const closeMenu = () => {
-      toggle.setAttribute('aria-expanded', 'false');
-      links.classList.remove('is-open');
-      document.body.classList.remove('nav-open');
-    };
-
+  const nav = document.querySelector('.nav-links');
+  const close = () => {
+    if (!toggle || !nav) return;
+    toggle.setAttribute('aria-expanded','false');
+    nav.classList.remove('is-open');
+    document.body.classList.remove('nav-open');
+  };
+  if (toggle && nav) {
     toggle.addEventListener('click', () => {
-      const open = toggle.getAttribute('aria-expanded') === 'true';
-      toggle.setAttribute('aria-expanded', String(!open));
-      links.classList.toggle('is-open', !open);
-      document.body.classList.toggle('nav-open', !open);
+      const next = toggle.getAttribute('aria-expanded') !== 'true';
+      toggle.setAttribute('aria-expanded', String(next));
+      nav.classList.toggle('is-open', next);
+      document.body.classList.toggle('nav-open', next);
     });
-
-    links.querySelectorAll('a').forEach((link) => link.addEventListener('click', closeMenu));
-    document.addEventListener('keydown', (event) => {
-      if (event.key === 'Escape') closeMenu();
-    });
+    nav.querySelectorAll('a').forEach(a => a.addEventListener('click', close));
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
   }
-
-  const revealItems = document.querySelectorAll('[data-reveal]');
-  if (!('IntersectionObserver' in window)) {
-    revealItems.forEach((item) => item.classList.add('is-visible'));
-    return;
-  }
-
-  const observer = new IntersectionObserver((entries, io) => {
-    entries.forEach((entry) => {
-      if (entry.isIntersecting) {
-        entry.target.classList.add('is-visible');
-        io.unobserve(entry.target);
-      }
-    });
-  }, { threshold: 0.12 });
-
-  revealItems.forEach((item) => observer.observe(item));
+  const onScroll = () => header?.classList.toggle('is-scrolled', window.scrollY > 40);
+  onScroll();
+  window.addEventListener('scroll', onScroll, {passive:true});
+  const items = document.querySelectorAll('[data-reveal]');
+  if (!('IntersectionObserver' in window)) { items.forEach(el => el.classList.add('is-visible')); return; }
+  const io = new IntersectionObserver(entries => entries.forEach(entry => {
+    if (entry.isIntersecting) { entry.target.classList.add('is-visible'); io.unobserve(entry.target); }
+  }), {threshold:.1});
+  items.forEach(el => io.observe(el));
 })();
