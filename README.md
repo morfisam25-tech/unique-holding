@@ -1,21 +1,16 @@
 # Unique Holding
 
-Official website source for Unique Holding, Istanbul, Türkiye.
+Official corporate website source for Unique Holding.
 
-## Current website
-- `index.html` — main corporate website
-- `assets/hero-approved.jpg` — approved orange maritime hero artwork
-- `assets/operations.mp4` — real-operations video loop
+## Current website structure
+- Home: `index.html`
+- Corporate: `corporate.html`
+- Energy & Petrochemicals: `energy.html`
+- Products: `products.html`
+- Group Ventures: `ventures.html`
 
-## Source of truth
-The `main` branch is the canonical source for the Unique Holding website. Hosting should pull directly from this repository so images/video and HTML remain versioned together.
+## Deployment
+Primary deployment source is the `main` branch. GitHub Pages workflow is included under `.github/workflows/pages.yml`.
 
-## Content guardrails
-- Do not publish producer names or country-of-origin references on product pages unless specifically approved.
-- Product specifications are described as typical/available specifications, not guaranteed future-lot specifications.
-- Final specification, packing and commercial terms are subject to the offered lot and confirmation at the time of inquiry.
-- Public claims must remain evidence-backed; unsupported scale metrics should not be added.
-- Evidence Axis is presented as a group business venture and links to `https://evidenceaxis.com`.
-
-## Current contact
-Unique Holding operates from Istanbul, Türkiye.
+## Media
+Hero and operational media are stored under `assets/` and referenced with relative paths so the site can run from GitHub Pages or any static host.
