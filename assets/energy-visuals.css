@@ -1,0 +1,8 @@
+/* Energy visual test: Petrochemical Products only. Raw decorative photography; no embedded UI/text. */
+.energy-product-card--petrochemical{position:relative;isolation:isolate;overflow:hidden;background-color:#0e1214;background-image:url('https://images.unsplash.com/photo-1780752849375-fd8df4632dae?auto=format&fit=crop&fm=jpg&ixlib=rb-4.1.0&q=78&w=1800');background-size:cover;background-position:center;}
+.energy-product-card--petrochemical::before{content:"";position:absolute;inset:0;z-index:0;background:linear-gradient(180deg,rgba(5,8,9,.28) 0%,rgba(5,8,9,.58) 48%,rgba(5,8,9,.92) 100%);pointer-events:none;}
+.energy-product-card--petrochemical>*{position:relative;z-index:1;}
+.energy-product-card--petrochemical h3{color:#f2eee7;text-shadow:0 2px 18px rgba(0,0,0,.58);}
+.energy-product-card--petrochemical p{color:#d2d6d7;}
+.energy-product-card--petrochemical:hover{filter:brightness(1.06);}
+@media(max-width:720px){.energy-product-card--petrochemical{background-position:center;}}
