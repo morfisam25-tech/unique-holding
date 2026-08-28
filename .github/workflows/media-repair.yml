@@ -1,0 +1,70 @@
+name: Media Repair Diagnostics
+on:
+  push:
+    branches: ["media-repair"]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install media tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg python3-pil imagemagick
+      - name: Diagnose and attempt repair
+        run: |
+          mkdir -p media-repair-output
+          {
+            echo '=== FILE ==='
+            file assets/hero-approved.jpg assets/operations.mp4 || true
+            echo '=== SIZES ==='
+            stat -c '%n %s bytes' assets/hero-approved.jpg assets/operations.mp4 || true
+            echo '=== JPEG HEX HEAD/TAIL ==='
+            xxd -l 32 assets/hero-approved.jpg || true
+            tail -c 32 assets/hero-approved.jpg | xxd || true
+            echo '=== IMAGEMAGICK ==='
+            identify -verbose assets/hero-approved.jpg 2>&1 | head -80 || true
+            echo '=== FFPROBE ==='
+            ffprobe -v error -show_format -show_streams assets/operations.mp4 2>&1 || true
+          } | tee media-repair-output/diagnostics.txt
+
+          python3 - <<'PY'
+          from PIL import Image, ImageFile
+          from pathlib import Path
+          out = Path('media-repair-output')
+          src = Path('assets/hero-approved.jpg')
+          lines=[]
+          try:
+              im=Image.open(src); lines.append(f'normal-open format={im.format} size={im.size} mode={im.mode}')
+              im.load(); lines.append('normal-load=SUCCESS')
+              im.convert('RGB').save(out/'hero-repaired.jpg', quality=92, optimize=True)
+              lines.append('normal-resave=SUCCESS')
+          except Exception as e:
+              lines.append(f'normal-load=FAIL {type(e).__name__}: {e}')
+              try:
+                  ImageFile.LOAD_TRUNCATED_IMAGES=True
+                  im=Image.open(src); lines.append(f'truncated-open format={im.format} size={im.size} mode={im.mode}')
+                  im.load(); lines.append('truncated-load=SUCCESS')
+                  im.convert('RGB').save(out/'hero-repaired.jpg', quality=92, optimize=True)
+                  lines.append('truncated-resave=SUCCESS')
+              except Exception as e2:
+                  lines.append(f'truncated-load=FAIL {type(e2).__name__}: {e2}')
+          (out/'pillow.txt').write_text('\n'.join(lines)+'\n')
+          print('\n'.join(lines))
+          PY
+
+          ffmpeg -v warning -err_detect ignore_err -i assets/operations.mp4 -map 0 -c copy -movflags +faststart media-repair-output/operations-remux.mp4 2>media-repair-output/ffmpeg-remux.txt || true
+          if [ -s media-repair-output/operations-remux.mp4 ]; then
+            ffprobe -v error -show_entries format=duration,size -show_entries stream=codec_name,width,height -of json media-repair-output/operations-remux.mp4 > media-repair-output/remux-probe.json 2>&1 || true
+          fi
+      - name: Upload diagnostics
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: media-repair-output
+          path: media-repair-output/
+          if-no-files-found: error
