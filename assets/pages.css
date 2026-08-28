@@ -1,13 +1,13 @@
 /* Internal page hero / sections */
-.page-hero{position:relative;min-height:66svh;display:flex;align-items:flex-end;overflow:hidden;background:#121416}
-.page-hero.media{background:#121416 url('hero-approved.jpg') center/cover no-repeat}
+.page-hero{position:relative;min-height:66vh;min-height:66svh;display:flex;align-items:flex-end;overflow:hidden;background:#121416}
+.page-hero.media{background-color:#121416;background-image:url('hero-approved.jpg'),radial-gradient(circle at 72% 36%,rgba(240,106,36,.16),transparent 29%),linear-gradient(140deg,#1b2022,#0b0d0f 64%);background-position:center,center,center;background-size:cover,cover,cover;background-repeat:no-repeat}
 .page-hero::after{content:"";position:absolute;inset:0;background:linear-gradient(0deg,rgba(4,5,6,.86),rgba(4,5,6,.18) 68%),linear-gradient(90deg,rgba(4,5,6,.58),transparent 68%)}
 .page-hero-inner{position:relative;z-index:2;padding:170px 0 64px;width:100%}
 .page-hero h1{margin:0;max-width:1050px;font-size:clamp(58px,7vw,105px);line-height:.9}
 .page-hero .lead{max-width:780px;margin:26px 0 0;color:#d5d2cc;font-size:18px;line-height:1.75}
 .editorial{padding:var(--section) 0;background:var(--paper);color:var(--dark-text)}
 .editorial-grid{display:grid;grid-template-columns:.55fr 1.45fr;gap:clamp(50px,9vw,150px)}
-.editorial-aside{font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#686d6e}
+.editorial-aside{font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#656a6b}
 .editorial-main h2{margin:0 0 26px;font-size:clamp(42px,5vw,72px);line-height:.98}
 .editorial-main>p{margin:0;color:var(--dark-muted);font-size:17px;line-height:1.8;max-width:850px}
 .editorial-blocks{margin-top:52px;border-top:1px solid var(--dark-line)}
@@ -27,13 +27,12 @@
 .product-detail:first-child{border-top:1px solid var(--dark-line)}
 .product-detail-head{display:grid;grid-template-columns:90px .7fr 1.3fr;gap:30px;margin-bottom:30px}
 .product-detail h2{margin:0;font-size:clamp(36px,4.3vw,62px);line-height:.98}
-.product-detail .category{font-size:10px;color:#6f7475;letter-spacing:.14em;text-transform:uppercase;padding-top:7px}
-.spec-table{margin-left:calc(90px + .7fr)}
+.product-detail .category{font-size:10px;color:#656a6b;letter-spacing:.14em;text-transform:uppercase;padding-top:7px}
 .specs{display:grid;grid-template-columns:repeat(2,1fr);gap:0 44px}
 .specs div{display:flex;justify-content:space-between;gap:20px;padding:12px 0;border-bottom:1px solid rgba(10,12,13,.12);font-size:13px}
 .specs dt{color:#656a6b}.specs dd{margin:0;text-align:right;color:#17191a}
 .venture-stage{position:relative;overflow:hidden;min-height:620px;padding:70px 0;background:radial-gradient(circle at 78% 22%,rgba(240,106,36,.24),transparent 24%),#111416}
-.venture-stage::before{content:"";position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.045) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.045) 1px,transparent 1px);background-size:72px 72px;mask-image:linear-gradient(to left,#000,transparent 80%)}
+.venture-stage::before{content:"";position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.045) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.045) 1px,transparent 1px);background-size:72px 72px;-webkit-mask-image:linear-gradient(to left,#000,transparent 80%);mask-image:linear-gradient(to left,#000,transparent 80%)}
 .venture-grid{position:relative;display:grid;grid-template-columns:1fr .8fr;gap:80px;align-items:end;min-height:480px}
 .venture-grid h2{margin:0 0 24px;font-size:clamp(58px,7vw,108px);line-height:.88}
 .venture-grid p{margin:0 0 28px;color:#c3c7c8;font-size:17px;line-height:1.75;max-width:650px}
@@ -44,7 +43,7 @@
 .contact-title{margin:0;font-size:clamp(50px,6vw,86px);line-height:.96}
 .contact-details{border-top:1px solid var(--dark-line)}
 .contact-line{display:grid;grid-template-columns:160px 1fr;gap:25px;padding:18px 0;border-bottom:1px solid var(--dark-line)}
-.contact-line span:first-child{font-size:10px;font-weight:700;letter-spacing:.13em;text-transform:uppercase;color:#777b7c}
-.contact-line a:hover{color:#c75115}
+.contact-line span:first-child{font-size:10px;font-weight:700;letter-spacing:.13em;text-transform:uppercase;color:#656a6b}
+.contact-line a:hover{color:#b34712}
 .address-card{margin-top:50px;padding:36px;border:1px solid var(--dark-line)}
 .address-card h2{margin:0 0 18px;font-size:30px}.address-card address{font-style:normal;color:var(--dark-muted);line-height:1.8}
