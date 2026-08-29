@@ -1,0 +1,64 @@
+import fs from 'node:fs';
+import path from 'node:path';
+
+const root=process.cwd();
+const errors=[];
+const read=p=>fs.readFileSync(path.join(root,p),'utf8');
+const walk=(dir='.')=>fs.readdirSync(path.join(root,dir),{withFileTypes:true}).flatMap(e=>{const rel=path.join(dir,e.name);if(e.name==='.git'||e.name==='node_modules')return[];return e.isDirectory()?walk(rel):[rel.replaceAll('\\','/')]});
+const files=walk();
+const htmlFiles=files.filter(f=>f.endsWith('.html'));
+const cssFiles=files.filter(f=>f.endsWith('.css'));
+const jsFiles=files.filter(f=>f.endsWith('.js')&&!f.startsWith('.github/'));
+const attr=(tag,name)=>{const m=tag.match(new RegExp(`${name}=["']([^"']+)["']`,'i'));return m?.[1]||''};
+const noindex=html=>/<meta[^>]+name=["']robots["'][^>]+content=["'][^"']*noindex/i.test(html);
+
+for(const file of htmlFiles){
+  const html=read(file);
+  if(!/<html[^>]+lang=["'][a-z-]+["']/i.test(html))errors.push(`${file}: missing html lang`);
+  if(!/<main\b/i.test(html))errors.push(`${file}: missing main landmark`);
+  if(!/<title>[^<]{2,}<\/title>/i.test(html))errors.push(`${file}: missing title`);
+  const indexable=file!=='404.html'&&!noindex(html);
+  if(indexable){
+    if(!/<meta[^>]+name=["']description["'][^>]+content=["'][^"']{20,}["']/i.test(html))errors.push(`${file}: missing/short meta description`);
+    const can=html.match(/<link[^>]+rel=["']canonical["'][^>]+href=["']([^"']+)["']/i)?.[1];
+    if(!can)errors.push(`${file}: missing canonical`);else if(!can.startsWith('https://www.uniqueholding.com.tr/'))errors.push(`${file}: canonical outside target domain`);
+  }
+  for(const tag of html.match(/<a\b[^>]*href=["'][^"']+["'][^>]*>/gi)||[]){
+    const href=attr(tag,'href');
+    if(!href||href.startsWith('#')||/^(mailto:|tel:|https?:|javascript:)/i.test(href))continue;
+    const clean=decodeURIComponent(href.split('#')[0].split('?')[0]);
+    if(!clean)continue;
+    const target=path.normalize(path.join(path.dirname(file),clean)).replaceAll('\\','/');
+    if(!fs.existsSync(path.join(root,target)))errors.push(`${file}: broken local link -> ${href}`);
+    if(/target=["']_blank["']/i.test(tag)&&!/rel=["'][^"']*noopener/i.test(tag))errors.push(`${file}: target=_blank without noopener -> ${href}`);
+  }
+  for(const tag of html.match(/<img\b[^>]*>/gi)||[])if(!/\balt=["'][^"']*["']/i.test(tag))errors.push(`${file}: img without alt`);
+  for(const block of html.matchAll(/<script(?![^>]*type=["']application\/ld\+json["'])[^>]*>([\s\S]*?)<\/script>/gi)){
+    const code=block[1].trim();if(code){try{new Function(code)}catch(e){errors.push(`${file}: inline JS syntax error: ${e.message}`)}}
+  }
+}
+
+if(!noindex(read('404.html')))errors.push('404.html: must be noindex');
+if(!noindex(read('product.html')))errors.push('product.html: dynamic inquiry shell must be noindex');
+
+for(const file of jsFiles){try{new Function(read(file))}catch(e){errors.push(`${file}: JS syntax error: ${e.message}`)}}
+for(const file of cssFiles){const css=read(file).replace(/\/\*[\s\S]*?\*\//g,'');let depth=0;for(const ch of css){if(ch==='{')depth++;if(ch==='}')depth--;if(depth<0)break}if(depth!==0)errors.push(`${file}: unbalanced CSS braces`)}
+
+const sitemap=read('sitemap.xml');
+const urls=[...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map(m=>m[1]);
+for(const url of urls){
+  if(!url.startsWith('https://www.uniqueholding.com.tr/'))errors.push(`sitemap: wrong domain ${url}`);
+  const u=new URL(url);let rel=u.pathname.replace(/^\//,'');if(!rel)rel='index.html';
+  if(!fs.existsSync(path.join(root,rel)))errors.push(`sitemap: missing file ${rel}`);else if(rel.endsWith('.html')&&noindex(read(rel)))errors.push(`sitemap: noindex URL included ${rel}`);
+}
+for(const required of ['urea-46.html','caustic-soda-solid.html','sodium-sulphate-anhydrous.html'])if(!urls.some(u=>u.endsWith('/'+required)))errors.push(`sitemap: missing ${required}`);
+
+const index=read('index.html');
+for(const token of ['og:title','og:description','og:image','twitter:card'])if(!index.includes(token))errors.push(`index.html: missing ${token}`);
+if(!index.includes('application/ld+json'))errors.push('index.html: missing structured data');
+if(!read('robots.txt').includes('https://www.uniqueholding.com.tr/sitemap.xml'))errors.push('robots.txt: sitemap declaration missing');
+if(!files.includes('assets/favicon.svg'))errors.push('favicon missing');
+if(!files.includes('assets/performance.css'))errors.push('performance override missing');
+
+if(errors.length){console.error('\nTECHNICAL QA FAILED');for(const e of errors)console.error(' - '+e);process.exit(1)}
+console.log(`TECHNICAL QA PASS — ${htmlFiles.length} HTML, ${jsFiles.length} JS, ${cssFiles.length} CSS files checked; ${urls.length} sitemap URLs verified.`);
