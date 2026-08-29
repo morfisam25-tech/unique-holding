@@ -32,6 +32,7 @@
     .hero-film-button{appearance:none;border:1px solid rgba(255,255,255,.44);background:rgba(7,9,10,.62);backdrop-filter:blur(12px);color:#fff;padding:11px 15px;cursor:pointer;font-size:9px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;transition:background .2s,border-color .2s,color .2s}
     .hero-film-button:hover,.hero-film-button:focus-visible{background:#ece8df;color:#080a0b;border-color:#ece8df;outline:none}
     .hero-film-button.sound-on{border-color:rgba(238,106,36,.8);color:#ffd7c1}
+    .hero-film::cue{background:rgba(5,7,8,.82);color:#fff;font-family:Arial,Helvetica,sans-serif;font-size:clamp(15px,1.25vw,22px);line-height:1.35;text-shadow:0 1px 2px rgba(0,0,0,.75)}
     .hero-film-hero .scroll-cue{bottom:35px}
     @media(max-width:760px){.hero-film-controls{left:18px;right:18px;bottom:20px;gap:8px}.hero-film-button{padding:10px 11px;font-size:8px}.hero-film-hero .scroll-cue{display:none}.hero-film{object-position:center center}}
   </style>
@@ -64,6 +65,7 @@
       <div class="hero-film-shell">
         <video id="holding-film" class="hero-film" autoplay muted playsinline preload="metadata" poster="https://images.unsplash.com/photo-1784911542546-7891c4d7abba?auto=format&fit=crop&fm=jpg&ixlib=rb-4.1.0&q=60&w=2000" aria-label="Unique Holding corporate film">
           <source src="assets/media/unique-holding-film-720p.mp4" type="video/mp4">
+          <track kind="captions" src="assets/media/unique-holding-caption.vtt" srclang="en" label="English" default>
         </video>
         <div class="hero-film-vignette" aria-hidden="true"></div>
       </div>
@@ -172,6 +174,9 @@
       const sound=document.querySelector('[data-film-sound]');
       const replay=document.querySelector('[data-film-replay]');
       if(!video||!sound||!replay)return;
+      const forceCaptions=()=>{if(video.textTracks&&video.textTracks.length){video.textTracks[0].mode='showing';}};
+      forceCaptions();
+      video.addEventListener('loadedmetadata',forceCaptions);
       const syncSound=()=>{
         const audible=!video.muted;
         sound.textContent=audible?'Sound off':'Sound on';
