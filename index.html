@@ -28,26 +28,32 @@
     .hero-film{width:100%;height:100%;display:block;object-fit:cover;object-position:center;background:#050607}
     .hero-film-vignette{position:absolute;inset:0;pointer-events:none;background:linear-gradient(180deg,rgba(5,7,8,.32) 0%,rgba(5,7,8,0) 22%,rgba(5,7,8,0) 72%,rgba(5,7,8,.5) 100%)}
     .hero-film-heading{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
-    .hero-film-controls{position:absolute;z-index:7;left:max(32px,calc((100vw - var(--max))/2));bottom:28px;width:min(980px,calc(100vw - max(64px,calc((100vw - var(--max))/2)) - 220px));display:grid;gap:9px}
+    .hero-film-controls{position:absolute;inset:0;z-index:7;pointer-events:none}
+    .hero-film-controls>*{pointer-events:auto}
     .hero-film-sound-cta,.hero-film-button{appearance:none;border:1px solid rgba(255,255,255,.42);background:rgba(7,9,10,.72);backdrop-filter:blur(12px);color:#fff;cursor:pointer;font-weight:700;letter-spacing:.12em;text-transform:uppercase;transition:background .2s,border-color .2s,color .2s}
-    .hero-film-sound-cta{justify-self:start;min-height:46px;padding:0 18px;border-color:rgba(238,106,36,.86);background:rgba(7,9,10,.82);color:#ffe0cf;font-size:10px;letter-spacing:.15em}
+    .hero-film-sound-cta{position:absolute;left:max(32px,calc((100vw - var(--max))/2));bottom:74px;min-height:44px;padding:0 16px;border-color:rgba(238,106,36,.86);background:rgba(7,9,10,.78);color:#ffe0cf;font-size:9px;letter-spacing:.15em}
     .hero-film-sound-cta:hover,.hero-film-sound-cta:focus-visible{background:#ee6a24;color:#080a0b;border-color:#ee6a24;outline:2px solid #fff;outline-offset:2px}
-    .hero-film-controlbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px;background:rgba(7,9,10,.72);border:1px solid rgba(255,255,255,.18);backdrop-filter:blur(14px)}
-    .hero-film-button{min-height:38px;padding:0 11px;font-size:10px;white-space:nowrap}
+    .hero-film-controlbar{display:contents}
+    .hero-film-button{position:absolute;bottom:24px;min-height:36px;padding:0 10px;font-size:9px;white-space:nowrap}
     .hero-film-button:hover,.hero-film-button:focus-visible{background:#ece8df;color:#080a0b;border-color:#ece8df;outline:2px solid #ee6a24;outline-offset:2px}
     .hero-film-button[aria-pressed="true"]{border-color:rgba(238,106,36,.8);color:#ffd7c1}
-    .hero-film-time{min-width:92px;color:#e4e0d8;font-size:11px;font-variant-numeric:tabular-nums;text-align:center}
+    .hero-film-time{position:absolute;left:max(154px,calc((100vw - var(--max))/2 + 122px));bottom:34px;min-width:88px;color:#e4e0d8;font-size:10px;font-variant-numeric:tabular-nums;text-align:left}
     .hero-film-range{appearance:none;height:4px;border-radius:0;background:rgba(255,255,255,.26);accent-color:#ee6a24;cursor:pointer}
     .hero-film-range:focus-visible{outline:2px solid #ee6a24;outline-offset:5px}
-    .hero-film-progress{flex:1 1 260px;min-width:160px}
-    .hero-film-volume{flex:0 1 105px;min-width:76px;max-width:120px}
+    .hero-film-progress{position:absolute;left:max(24px,calc((100vw - var(--max))/2));right:max(24px,calc((100vw - var(--max))/2));bottom:7px;width:auto;min-width:0}
+    .hero-film-volume{position:absolute;left:max(330px,calc((100vw - var(--max))/2 + 298px));bottom:39px;width:94px;min-width:76px;max-width:110px}
+    .hero-film-button[data-film-play]{left:max(32px,calc((100vw - var(--max))/2))}
+    .hero-film-button[data-film-mute]{left:max(248px,calc((100vw - var(--max))/2 + 216px))}
+    .hero-film-button[data-film-captions]{left:max(438px,calc((100vw - var(--max))/2 + 406px))}
+    .hero-film-button[data-film-fullscreen]{right:max(112px,calc((100vw - var(--max))/2 + 80px))}
+    .hero-film-button[data-film-replay]{right:max(24px,calc((100vw - var(--max))/2))}
     .hero-film-status{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
     .hero-film::cue{background:rgba(5,7,8,.82);color:#fff;font-family:Arial,Helvetica,sans-serif;font-size:clamp(15px,1.25vw,22px);line-height:1.35;text-shadow:0 1px 2px rgba(0,0,0,.75)}
     .hero-film-hero .scroll-cue{bottom:35px}
     [hidden]{display:none!important}
-    @media(max-width:980px){.hero-film-controls{right:24px;width:auto}.hero-film-hero .scroll-cue{display:none}}
-    @media(max-width:760px){.hero-film-controls{left:18px;right:18px;bottom:18px;width:auto}.hero-film-controlbar{gap:6px}.hero-film-progress{order:-2;flex-basis:100%;width:100%}.hero-film-time{order:-1;min-width:auto;margin-right:auto}.hero-film-volume{flex:1 1 82px;max-width:110px}.hero-film-button{min-height:40px;padding:0 9px;font-size:9px}.hero-film-sound-cta{min-height:44px;padding:0 15px;font-size:9px}.hero-film{object-position:center center}}
-    @media(max-width:430px){.hero-film-fullscreen-label{display:none}.hero-film-button[data-film-fullscreen]{width:40px;padding:0}.hero-film-time{font-size:10px}.hero-film-volume{min-width:64px;max-width:90px}}
+    @media(max-width:980px){.hero-film-hero .scroll-cue{display:none}}
+    @media(max-width:760px){.hero-film-sound-cta{left:12px;bottom:112px;min-height:40px;padding:0 12px;font-size:8px}.hero-film-button{bottom:20px;min-height:34px;padding:0 8px;font-size:8px}.hero-film-time{left:12px;bottom:64px;min-width:76px;font-size:9px}.hero-film-volume{left:92px;bottom:69px;width:66px;min-width:66px;max-width:66px}.hero-film-button[data-film-play]{left:12px}.hero-film-button[data-film-mute]{left:68px}.hero-film-button[data-film-captions]{left:126px}.hero-film-button[data-film-fullscreen]{right:76px}.hero-film-button[data-film-replay]{right:12px}.hero-film-progress{left:12px;right:12px;bottom:6px}.hero-film{object-position:center center}}
+    @media(max-width:430px){.hero-film-fullscreen-label{display:none}.hero-film-button[data-film-fullscreen]{width:38px;padding:0}.hero-film-button[data-film-replay]{max-width:62px;overflow:hidden}.hero-film-time{font-size:9px}}
     @media(prefers-reduced-motion:reduce){.hero-film-sound-cta,.hero-film-button{transition:none}}
   </style>
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","name":"Unique Otomotiv Kimya Sanayi Limited Şirketi","url":"https://www.uniqueholding.com.tr/","brand":{"@type":"Brand","name":"Unique Holding"},"description":"Istanbul-based industrial trading activity in petrochemicals and chemicals, alongside specialist technology and intelligence ventures.","address":{"@type":"PostalAddress","streetAddress":"29 Ekim Cad. Yenibosna Merkez Mah., İstanbul Vizyon Park Plazaları A1 Blok, Kat 9, Daire 98","addressLocality":"Bahçelievler","addressRegion":"İstanbul","addressCountry":"TR"},"telephone":"+90 212 727 22 22","email":"farahmand@uniqueholding.com.tr","contactPoint":[{"@type":"ContactPoint","contactType":"industrial sales","telephone":"+90 212 727 22 22","email":"sales@uniqueholding.com.tr"}]}</script>
@@ -77,7 +83,7 @@
     <section class="hero hero-film-hero" id="top" aria-labelledby="hero-title">
       <h1 class="hero-film-heading" id="hero-title">Unique Holding — Technology, Intelligence and Global Trade</h1>
       <div class="hero-film-shell">
-        <video id="holding-film" class="hero-film" autoplay playsinline preload="metadata" poster="https://images.unsplash.com/photo-1784911542546-7891c4d7abba?auto=format&fit=crop&fm=jpg&ixlib=rb-4.1.0&q=60&w=2000" aria-label="Unique Holding corporate film">
+        <video id="holding-film" class="hero-film" playsinline preload="metadata" poster="https://images.unsplash.com/photo-1784911542546-7891c4d7abba?auto=format&fit=crop&fm=jpg&ixlib=rb-4.1.0&q=60&w=2000" aria-label="Unique Holding corporate film">
           <source src="assets/media/unique-holding-film-720p.mp4" type="video/mp4">
           <track kind="captions" src="assets/media/unique-holding-caption.vtt" srclang="en" label="English" default>
         </video>
