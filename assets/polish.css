@@ -1,0 +1,75 @@
+/* Phase 10 — corporate visual polish layer */
+:root{--polish-focus:#ff7a2e;--polish-soft:#aeb4b5;--polish-border:rgba(255,255,255,.18)}
+body{text-rendering:optimizeLegibility}
+a,button{transition-property:color,background-color,border-color,opacity,transform;transition-duration:.2s;transition-timing-function:ease}
+a:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid var(--polish-focus);outline-offset:4px}
+.brand-symbol{filter:drop-shadow(0 0 12px rgba(238,106,36,.1))}.brand-type small,.sub-brand small{font-size:9px}.primary-nav{font-size:10px;letter-spacing:.09em}.primary-nav a{padding-top:13px;padding-bottom:13px}
+.eyebrow,.section-index,.subsite-label,.section-cap .num,.world-meta,.world-copy p,.world-action,.axis-kicker,.relationship-frame span,.route-card .k,.process span,.product-link small,.product-link span,.detail-back,.detail-box small,.button-link,.venture-card .status,.method-line small,.case-card span,.footer-brand span,.footer-top h3{font-size:10px}
+.hero-copy>p:last-child,.section-intro>div>p,.section-cap p,.feature-copy p,.relationships-copy p:last-child,.corporate-grid>div>p{font-size:15px}
+.footer-top a{font-size:13px}.footer-office{font-size:11px}
+
+/* Internal pages: less empty hero height, stronger editorial rhythm */
+@media(min-width:901px){
+  .subsite-hero{min-height:clamp(620px,72svh,760px)}
+  .subsite-hero .inner{padding-top:168px;padding-bottom:64px}
+  .subsite-hero .back{bottom:64px}
+  .subsite-section{padding-top:96px;padding-bottom:96px}
+  .section-cap{grid-template-columns:.28fr minmax(0,1.05fr) minmax(280px,.67fr);gap:46px;margin-bottom:48px}
+  .section-cap p{max-width:56ch}
+}
+
+/* Legal/privacy should not repeat the same corporate stock image. */
+body[data-page="privacy"] .subsite-hero.corporate:before,
+body[data-page="legal"] .subsite-hero.corporate:before{background-image:radial-gradient(circle at 78% 28%,rgba(238,106,36,.16),transparent 24%),linear-gradient(135deg,#111719 0%,#080a0b 58%,#15100d 100%)}
+body[data-page="privacy"] .subsite-hero.corporate:after,
+body[data-page="legal"] .subsite-hero.corporate:after{background:linear-gradient(90deg,rgba(3,5,6,.28),rgba(3,5,6,.04) 65%),linear-gradient(0deg,rgba(3,5,6,.7),transparent 62%)}
+
+/* Replace repetitive SaaS-like four-card walls with a calmer editorial grid. */
+@media(min-width:1101px){
+  .route-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .route-grid>.route-card:last-child:nth-child(odd){grid-column:1/-1}
+  .route-card{min-height:224px;padding:32px 36px}
+  .route-card h3{margin:38px 0 14px;font-size:32px}
+}
+.route-card{border:0;transform:none}.route-card:hover{transform:none;background:#151b1d;box-shadow:inset 3px 0 0 #ee6a24}.paper .route-card:hover{background:#f0ebe3;box-shadow:inset 3px 0 0 #a34b1d}.route-card p{font-size:14px;color:#a5acae}.paper .route-card p{color:#4f5253}
+.product-link:hover{transform:none;box-shadow:inset 0 -3px 0 #ee6a24}.product-link p{font-size:12px}.process p{font-size:13px;color:#a2a9ab}.process h3{margin-top:38px}.detail-box p{color:#a1a8aa}.case-card p{color:#4f5253}.sales-panel p,.sales-panel address{color:#b0b6b7}
+
+/* Homepage polish without changing the approved full-screen hero. */
+.world{min-height:min(72vh,820px)}.world-copy h3{max-width:620px}.world-action{padding-top:16px}.relationship-frame>div{min-height:132px}.technology-preview{min-height:820px}.axis-visual{min-height:820px}.industrial-grid{min-height:640px}.industrial-paths a:hover{box-shadow:inset 3px 0 0 #ee6a24}.corporate-links a:hover{color:#ee6a24}
+
+/* Tablet: never hide arbitrary navigation items; switch cleanly to the menu. */
+@media(max-width:1180px){
+  .site-header,.site-header.is-scrolled{height:74px}
+  .nav-shell{width:calc(100% - 40px)}
+  .menu-toggle{display:block;z-index:3}
+  .primary-nav{position:fixed;inset:0;background:rgba(8,10,11,.985);padding:104px 30px 40px;display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-start;gap:0;transform:translateX(100%);transition:transform .32s ease;font-size:10px;overflow-y:auto}
+  .primary-nav.is-open{transform:none}
+  .primary-nav a,.primary-nav a:nth-child(6),.primary-nav a:nth-child(7){display:block!important;width:100%;padding:14px 0;border-bottom:1px solid var(--polish-border);font-family:Georgia,'Times New Roman',serif;font-size:24px;text-transform:none;letter-spacing:-.02em;white-space:normal}
+  .primary-nav .sales-link{margin-top:18px;border:1px solid var(--polish-border);font-family:Arial,Helvetica,sans-serif;font-size:10px;text-transform:uppercase;letter-spacing:.12em;padding:15px!important;width:auto}
+  .footer-top{gap:34px}
+}
+
+@media(max-width:900px){
+  .subsite-hero{min-height:max(560px,68svh)}
+  .subsite-hero .inner{width:calc(100% - 40px);padding:142px 0 62px}
+  .subsite-hero .intro{font-size:15px;max-width:620px}
+  .subsite-hero .back{position:static;display:inline-block;margin-top:30px}
+  .subsite-section{padding:76px 20px}
+  .section-cap{margin-bottom:40px}
+  .route-grid{grid-template-columns:1fr 1fr}
+  .route-card{min-height:210px;padding:28px}.route-card h3{margin:34px 0 12px;font-size:28px}
+  .technology-preview,.axis-visual{min-height:0}.axis-visual{min-height:56vh}
+  .world{min-height:68vh}.industrial-visual{min-height:50vh}
+}
+
+@media(max-width:680px){
+  .nav-shell{width:calc(100% - 32px)}
+  .primary-nav{padding-left:22px;padding-right:22px}.primary-nav a,.primary-nav a:nth-child(6),.primary-nav a:nth-child(7){font-size:22px}
+  .route-grid{grid-template-columns:1fr}.route-grid>.route-card:last-child:nth-child(odd){grid-column:auto}.route-card{min-height:190px;padding:25px}.route-card h3{font-size:27px}
+  .subsite-section{padding-top:68px;padding-bottom:68px}
+  .section-cap h2{font-size:clamp(38px,11vw,54px)}
+  .sales-panel>div{padding:30px 24px}
+  .footer-top{gap:28px}.footer-top a{font-size:13px}.footer-office{font-size:11px}
+}
+
+@media(prefers-reduced-motion:reduce){.route-card,.product-link,.primary-nav,.industrial-paths a{transition:none}}
