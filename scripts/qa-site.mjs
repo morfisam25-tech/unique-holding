@@ -11,9 +11,14 @@ const cssFiles=files.filter(f=>f.endsWith('.css'));
 const jsFiles=files.filter(f=>f.endsWith('.js')&&!f.startsWith('.github/'));
 const attr=(tag,name)=>{const m=tag.match(new RegExp(`${name}=["']([^"']+)["']`,'i'));return m?.[1]||''};
 const noindex=html=>/<meta[^>]+name=["']robots["'][^>]+content=["'][^"']*noindex/i.test(html);
+const forbiddenPublicPhrases=['real private codebase','current evidence base','current corporate evidence base','verified public wording','automated quotation engine behind this page','public positioning remains intentionally limited','development status is kept separate','maturity determines visibility','does not invent a generic specification','evidence-backed public operating profile'];
+
+for(const artifact of ['FIX_DEPLOY_NOTE.txt','FIX_DEPLOY_NOTE_2.txt'])if(files.includes(artifact))errors.push(`${artifact}: temporary deployment artifact must not ship`);
 
 for(const file of htmlFiles){
   const html=read(file);
+  const lower=html.toLowerCase();
+  for(const phrase of forbiddenPublicPhrases)if(lower.includes(phrase))errors.push(`${file}: internal/development wording -> ${phrase}`);
   if(!/<html[^>]+lang=["'][a-z-]+["']/i.test(html))errors.push(`${file}: missing html lang`);
   if(!/<main\b/i.test(html))errors.push(`${file}: missing main landmark`);
   if(!/<title>[^<]{2,}<\/title>/i.test(html))errors.push(`${file}: missing title`);
