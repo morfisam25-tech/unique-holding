@@ -23,6 +23,18 @@
   <meta name="twitter:image" content="https://images.unsplash.com/photo-1784911542546-7891c4d7abba?auto=format&fit=crop&ixlib=rb-4.1.0&q=76&w=1200&h=630">
   <title>Unique Holding | Istanbul</title>
   <link rel="stylesheet" href="assets/site.css">
+  <style>
+    .hero-film-shell{position:absolute;inset:0;z-index:0;background:#050607}
+    .hero-film{width:100%;height:100%;display:block;object-fit:cover;object-position:center;background:#050607}
+    .hero-film-vignette{position:absolute;inset:0;pointer-events:none;background:linear-gradient(180deg,rgba(5,7,8,.32) 0%,rgba(5,7,8,0) 22%,rgba(5,7,8,0) 72%,rgba(5,7,8,.5) 100%)}
+    .hero-film-heading{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
+    .hero-film-controls{position:absolute;z-index:7;left:max(32px,calc((100vw - var(--max))/2));bottom:32px;display:flex;align-items:center;gap:10px}
+    .hero-film-button{appearance:none;border:1px solid rgba(255,255,255,.44);background:rgba(7,9,10,.62);backdrop-filter:blur(12px);color:#fff;padding:11px 15px;cursor:pointer;font-size:9px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;transition:background .2s,border-color .2s,color .2s}
+    .hero-film-button:hover,.hero-film-button:focus-visible{background:#ece8df;color:#080a0b;border-color:#ece8df;outline:none}
+    .hero-film-button.sound-on{border-color:rgba(238,106,36,.8);color:#ffd7c1}
+    .hero-film-hero .scroll-cue{bottom:35px}
+    @media(max-width:760px){.hero-film-controls{left:18px;right:18px;bottom:20px;gap:8px}.hero-film-button{padding:10px 11px;font-size:8px}.hero-film-hero .scroll-cue{display:none}.hero-film{object-position:center center}}
+  </style>
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","name":"Unique Otomotiv Kimya Sanayi Limited Şirketi","url":"https://www.uniqueholding.com.tr/","brand":{"@type":"Brand","name":"Unique Holding"},"description":"Istanbul-based industrial trading activity in petrochemicals and chemicals, alongside specialist technology and intelligence ventures.","address":{"@type":"PostalAddress","streetAddress":"29 Ekim Cad. Yenibosna Merkez Mah., İstanbul Vizyon Park Plazaları A1 Blok, Kat 9, Daire 98","addressLocality":"Bahçelievler","addressRegion":"İstanbul","addressCountry":"TR"},"telephone":"+90 212 727 22 22","email":"farahmand@uniqueholding.com.tr","contactPoint":[{"@type":"ContactPoint","contactType":"industrial sales","telephone":"+90 212 727 22 22","email":"sales@uniqueholding.com.tr"}]}</script>
 </head>
 <body>
@@ -47,17 +59,17 @@
   </header>
 
   <main id="main">
-    <section class="hero" id="top" aria-labelledby="hero-title">
-      <div class="hero-media" aria-hidden="true"><div class="hero-image"></div></div>
-      <div class="hero-shade"></div>
-      <div class="hero-copy">
-        <p class="eyebrow">Unique Holding · Istanbul</p>
-        <h1 id="hero-title"><span>Trade.</span><span>Energy.</span><span>Intelligence.</span></h1>
-        <p>An Istanbul-based group with roots in industrial trade and petrochemicals, alongside specialist technology and intelligence ventures.</p>
-        <div style="display:flex;gap:22px;flex-wrap:wrap;align-items:center">
-          <a class="text-link" href="#worlds">Our activities <span>↗</span></a>
-          <a class="text-link" href="sales.html">Industrial sales <span>↗</span></a>
-        </div>
+    <section class="hero hero-film-hero" id="top" aria-labelledby="hero-title">
+      <h1 class="hero-film-heading" id="hero-title">Unique Holding — Technology, Intelligence and Global Trade</h1>
+      <div class="hero-film-shell">
+        <video id="holding-film" class="hero-film" autoplay muted playsinline preload="metadata" poster="https://images.unsplash.com/photo-1784911542546-7891c4d7abba?auto=format&fit=crop&fm=jpg&ixlib=rb-4.1.0&q=60&w=2000" aria-label="Unique Holding corporate film">
+          <source src="assets/media/unique-holding-film-720p.mp4" type="video/mp4">
+        </video>
+        <div class="hero-film-vignette" aria-hidden="true"></div>
+      </div>
+      <div class="hero-film-controls" role="group" aria-label="Corporate film controls">
+        <button class="hero-film-button" type="button" data-film-sound aria-pressed="false">Sound on</button>
+        <button class="hero-film-button" type="button" data-film-replay>↻ Replay from start</button>
       </div>
       <a class="scroll-cue" href="#worlds"><span>Explore activities</span><i aria-hidden="true"></i></a>
     </section>
@@ -154,5 +166,33 @@
     <div class="footer-office"><address>Unique Otomotiv Kimya Sanayi Limited Şirketi<br>29 Ekim Cad. Yenibosna Merkez Mah.<br>İstanbul Vizyon Park Plazaları A1 Blok, Kat 9, Daire 98<br>Bahçelievler / İstanbul, Türkiye</address><span>© 2026 Unique Holding</span></div>
   </footer>
   <script src="assets/site.js" defer></script>
+  <script>
+    (()=>{
+      const video=document.getElementById('holding-film');
+      const sound=document.querySelector('[data-film-sound]');
+      const replay=document.querySelector('[data-film-replay]');
+      if(!video||!sound||!replay)return;
+      const syncSound=()=>{
+        const audible=!video.muted;
+        sound.textContent=audible?'Sound off':'Sound on';
+        sound.setAttribute('aria-pressed',String(audible));
+        sound.classList.toggle('sound-on',audible);
+      };
+      sound.addEventListener('click',()=>{
+        video.muted=!video.muted;
+        if(video.paused)video.play().catch(()=>{});
+        syncSound();
+      });
+      replay.addEventListener('click',()=>{
+        video.currentTime=0;
+        video.play().catch(()=>{});
+        replay.textContent='↻ Replay from start';
+      });
+      video.addEventListener('ended',()=>{replay.textContent='↻ Watch again';});
+      const attempt=video.play();
+      if(attempt&&typeof attempt.catch==='function')attempt.catch(()=>{replay.textContent='▶ Play film';});
+      syncSound();
+    })();
+  </script>
 </body>
 </html>
