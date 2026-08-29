@@ -1,25 +1,27 @@
-/* Technology Overview card photography. Raw image sources only; text remains real HTML. */
-#overview .tech-overview-card{position:relative;isolation:isolate;overflow:hidden;min-height:340px;background-color:#0b0e0f;background-repeat:no-repeat;background-size:cover;background-position:center;}
-#overview .tech-overview-card::before{content:"";position:absolute;inset:0;z-index:0;background:linear-gradient(180deg,rgba(3,5,6,.24) 0%,rgba(3,5,6,.52) 43%,rgba(3,5,6,.94) 100%),linear-gradient(90deg,rgba(3,5,6,.38),transparent 68%);pointer-events:none;}
-#overview .tech-overview-card>*{position:relative;z-index:1;}
-#overview .tech-overview-card .k{color:#ff7a32;text-shadow:0 1px 12px rgba(0,0,0,.55);}
-#overview .tech-overview-card h3{color:#f4f0e8;text-shadow:0 2px 18px rgba(0,0,0,.72);margin-top:auto;padding-top:84px;}
-#overview .tech-overview-card p{color:#d0d4d5;text-shadow:0 1px 12px rgba(0,0,0,.7);}
-#overview .tech-overview-card b{color:#ff7a32;}
-#overview .tech-overview-card:hover{filter:brightness(1.06);}
+/* Technology card photography and hierarchy. Existing four image sources retained. */
+.tech-overview-card{position:relative;isolation:isolate;overflow:hidden;min-height:340px;background-color:#0b0e0f;background-repeat:no-repeat;background-size:cover;background-position:center;}
+.tech-overview-card::before{content:"";position:absolute;inset:0;z-index:0;background:linear-gradient(180deg,rgba(3,5,6,.24) 0%,rgba(3,5,6,.52) 43%,rgba(3,5,6,.94) 100%),linear-gradient(90deg,rgba(3,5,6,.38),transparent 68%);pointer-events:none;}
+.tech-overview-card>*{position:relative;z-index:1;}
+.tech-overview-card .k{color:#ff7a32;text-shadow:0 1px 12px rgba(0,0,0,.55);}
+.tech-overview-card h3{color:#f4f0e8;text-shadow:0 2px 18px rgba(0,0,0,.72);margin-top:auto;padding-top:84px;}
+.tech-overview-card p{color:#d0d4d5;text-shadow:0 1px 12px rgba(0,0,0,.7);}
+.tech-overview-card b{color:#ff7a32;}
+.route-card.tech-overview-card:hover{filter:brightness(1.06);}
 
-#overview .route-card.tech-card--evidence-axis,
-#overview .route-card.tech-card--evidence-axis:hover{background-image:url('https://images.unsplash.com/photo-1782330299430-9aa9e8f3bc39?auto=format&fit=crop&fm=jpg&ixlib=rb-4.1.0&q=82&w=1800');background-position:center 48%;}
-#overview .tech-card--evidence-axis::after{content:"EVIDENCE AXIS  /  VERIFIED INTELLIGENCE";position:absolute;z-index:1;right:22px;top:24px;max-width:170px;color:rgba(244,240,232,.72);font-size:7px;line-height:1.45;letter-spacing:.22em;text-align:right;text-transform:uppercase;padding-right:12px;border-right:1px solid rgba(255,122,50,.75);pointer-events:none;}
+.route-card.tech-card--evidence-axis,
+.route-card.tech-card--evidence-axis:hover{background-image:url('https://images.unsplash.com/photo-1782330299430-9aa9e8f3bc39?auto=format&fit=crop&fm=jpg&ixlib=rb-4.1.0&q=82&w=1800');background-position:center 48%;}
+.tech-card--evidence-axis::after{content:"EVIDENCE AXIS  /  SPECIALIST INTELLIGENCE";position:absolute;z-index:1;right:22px;top:24px;max-width:180px;color:rgba(244,240,232,.72);font-size:7px;line-height:1.45;letter-spacing:.22em;text-align:right;text-transform:uppercase;padding-right:12px;border-right:1px solid rgba(255,122,50,.75);pointer-events:none;}
 
-#overview .route-card.tech-card--digital-products,
-#overview .route-card.tech-card--digital-products:hover{background-image:url('https://images.unsplash.com/photo-1771923082503-0a3381c46cef?auto=format&fit=crop&fm=jpg&ixlib=rb-4.1.0&q=82&w=1800');background-position:center 50%;}
+.tech-card--digital-products{background-image:url('https://images.unsplash.com/photo-1771923082503-0a3381c46cef?auto=format&fit=crop&fm=jpg&ixlib=rb-4.1.0&q=82&w=1800');background-position:center 50%;}
+.tech-card--advisory{background-image:url('https://images.unsplash.com/photo-1758876202980-0a28b744fb24?auto=format&fit=crop&fm=jpg&ixlib=rb-4.1.0&q=82&w=1800');background-position:center 44%;}
+.tech-card--content{background-image:url('https://images.unsplash.com/photo-1627244714766-94dab62ed964?auto=format&fit=crop&fm=jpg&ixlib=rb-4.1.0&q=82&w=1800');background-position:center 52%;}
 
-#overview .route-card.tech-card--advisory,
-#overview .route-card.tech-card--advisory:hover{background-image:url('https://images.unsplash.com/photo-1758876202980-0a28b744fb24?auto=format&fit=crop&fm=jpg&ixlib=rb-4.1.0&q=82&w=1800');background-position:center 44%;}
+.tech-primary-grid .tech-overview-card{min-height:390px;}
+.tech-capability-grid .tech-overview-card{min-height:280px;}
+.tech-capability-grid .tech-overview-card h3{padding-top:48px;font-size:30px;}
+.tech-capability-grid .tech-overview-card::before{background:linear-gradient(180deg,rgba(3,5,6,.38) 0%,rgba(3,5,6,.64) 45%,rgba(3,5,6,.96) 100%);}
+.tech-product-visual{min-height:520px;border-left:1px solid rgba(255,255,255,.14);}
+.tech-product-visual::after{content:"VENTURE DEVELOPMENT  /  SELECTIVE PRODUCT BUILDING";position:absolute;z-index:1;right:22px;top:24px;max-width:190px;color:rgba(244,240,232,.72);font-size:7px;line-height:1.45;letter-spacing:.22em;text-align:right;text-transform:uppercase;padding-right:12px;border-right:1px solid rgba(255,122,50,.75);}
 
-#overview .route-card.tech-card--content,
-#overview .route-card.tech-card--content:hover{background-image:url('https://images.unsplash.com/photo-1627244714766-94dab62ed964?auto=format&fit=crop&fm=jpg&ixlib=rb-4.1.0&q=82&w=1800');background-position:center 52%;}
-
-@media(max-width:1100px){#overview .tech-overview-card{min-height:320px;}#overview .tech-overview-card h3{padding-top:70px;}}
-@media(max-width:720px){#overview .tech-overview-card{min-height:300px;background-position:center;}#overview .tech-overview-card h3{padding-top:64px;}#overview .tech-card--evidence-axis::after{right:18px;top:20px;max-width:145px;font-size:6px;}}
+@media(max-width:1100px){.tech-overview-card{min-height:320px}.tech-overview-card h3{padding-top:70px}.tech-primary-grid .tech-overview-card{min-height:350px}.tech-product-visual{min-height:420px}}
+@media(max-width:760px){.tech-overview-card,.tech-primary-grid .tech-overview-card,.tech-capability-grid .tech-overview-card{min-height:300px;background-position:center}.tech-overview-card h3,.tech-capability-grid .tech-overview-card h3{padding-top:64px}.tech-card--evidence-axis::after{right:18px;top:20px;max-width:150px;font-size:6px}.tech-product-visual{min-height:320px;border-left:0;border-top:1px solid rgba(255,255,255,.14)}}
