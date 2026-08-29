@@ -1,0 +1,60 @@
+name: Add homepage film captions
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/add-homepage-captions.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  add-captions:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Add default English captions to homepage film
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+
+          source = '          <source src="assets/media/unique-holding-film-720p.mp4" type="video/mp4">\n'
+          track = '          <track kind="captions" src="assets/media/unique-holding-caption.vtt" srclang="en" label="English" default>\n'
+          if track not in s:
+              if source not in s:
+                  raise SystemExit('Homepage video source marker not found')
+              s = s.replace(source, source + track, 1)
+
+          cue_css = '    .hero-film::cue{background:rgba(5,7,8,.82);color:#fff;font-family:Arial,Helvetica,sans-serif;font-size:clamp(15px,1.25vw,22px);line-height:1.35;text-shadow:0 1px 2px rgba(0,0,0,.75)}\n'
+          css_marker = '    .hero-film-button.sound-on{border-color:rgba(238,106,36,.8);color:#ffd7c1}\n'
+          if cue_css not in s:
+              if css_marker not in s:
+                  raise SystemExit('Homepage film CSS marker not found')
+              s = s.replace(css_marker, css_marker + cue_css, 1)
+
+          js_marker = "      if(!video||!sound||!replay)return;\n"
+          js_caption = "      const forceCaptions=()=>{if(video.textTracks&&video.textTracks.length){video.textTracks[0].mode='showing';}};\n      forceCaptions();\n      video.addEventListener('loadedmetadata',forceCaptions);\n"
+          if js_caption not in s:
+              if js_marker not in s:
+                  raise SystemExit('Homepage film JS marker not found')
+              s = s.replace(js_marker, js_marker + js_caption, 1)
+
+          p.write_text(s, encoding='utf-8')
+          PY
+
+      - name: Commit homepage caption integration
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git diff --cached --quiet && exit 0
+          git commit -m "Enable captions on homepage corporate film"
+          git push origin main
