@@ -62,3 +62,9 @@ window.UNIQUE_PRODUCTS=[
 {slug:'cfo',name:'Cracked Fuel Oil',abbr:'CFO',category:'Energy & Hydrocarbon Products',family:'Special Hydrocarbon Streams',summary:'Hydrocarbon stream presented for specification-based industrial inquiry.'},
 {slug:'raffinate',name:'Raffinate Streams',abbr:'',category:'Energy & Hydrocarbon Products',family:'Special Hydrocarbon Streams',summary:'Raffinate streams handled through offered-lot specification and commercial review.'}
 ];
+
+window.UNIQUE_CORE_PRODUCTS=[
+{slug:'urea-46',name:'Urea 46',abbr:'Urea 46',category:'Core Industrial Products',family:'Fertilizer / Industrial Feedstock',summary:'A core industrial material with a verified reference specification. Commercial inquiries should identify the required prilled, granular or industrial route.',variants:['Agricultural Urea 46 — Prilled','Agricultural Urea 46 — Granular','Industrial Urea 46'],specs:[['Nitrogen Content','min 46% wt'],['Biuret','max 0.8% wt'],['Formaldehyde','max 0.55% wt'],['Moisture','max 0.3% wt'],['Particle size 2–4 mm','90%']]},
+{slug:'caustic-soda-solid',name:'Caustic Soda Solid',abbr:'NaOH',category:'Core Industrial Products',family:'Industrial Chemicals',summary:'Solid sodium hydroxide with verified reference technical and transport classification data.',specs:[['Chemical name','Sodium Hydroxide'],['CAS','1310-73-2'],['NaOH','approx. 98.8%'],['Dry basis','99.3%'],['UN number','1823'],['Class','8'],['Packing Group','II']]},
+{slug:'sodium-sulphate-anhydrous',name:'Sodium Sulphate Anhydrous',abbr:'Na₂SO₄',category:'Core Industrial Products',family:'Industrial Chemicals',summary:'Anhydrous sodium sulphate with a verified reference specification for commercial inquiry.',specs:[['Na₂SO₄','99.20%'],['Water Insoluble Matter','0.02%'],['Ca & Mg','0.02%'],['Chloride','0.30%'],['Fe','0.0003%'],['Moisture','0.05%'],['Whiteness','91%']]}
+];
