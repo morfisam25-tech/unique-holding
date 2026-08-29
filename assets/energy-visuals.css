@@ -1,3 +1,4 @@
+@layer page{
 /* Decorative Energy page photography. Raw image assets only; no embedded UI/text. */
 .energy-visual-card{position:relative;isolation:isolate;overflow:hidden;background-color:#0e1214;background-size:cover;background-position:center;transition:transform .28s ease,filter .28s ease;}
 .energy-visual-card::before{content:"";position:absolute;inset:0;z-index:0;background:linear-gradient(180deg,rgba(5,8,9,.24) 0%,rgba(5,8,9,.56) 48%,rgba(5,8,9,.92) 100%);pointer-events:none;}
@@ -17,3 +18,5 @@
 #trading .energy-visual-card{min-height:300px;padding-top:32px;padding-bottom:32px;}
 @media(max-width:1100px){#trading .energy-visual-card{min-height:250px;}}
 @media(max-width:720px){.energy-visual-card{background-position:center;}.energy-product-card--fertilizer{background-position:center 58%;}}
+
+}

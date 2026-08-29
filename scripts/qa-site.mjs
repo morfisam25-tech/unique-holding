@@ -64,6 +64,18 @@ if(!index.includes('application/ld+json'))errors.push('index.html: missing struc
 if(!read('robots.txt').includes('https://www.uniqueholding.com.tr/sitemap.xml'))errors.push('robots.txt: sitemap declaration missing');
 if(!files.includes('assets/favicon.svg'))errors.push('favicon missing');
 if(!files.includes('assets/performance.css'))errors.push('performance override missing');
+const siteCss=read('assets/site.css');
+for(const token of ["@layer tokens,base,components,page,polish,performance;","@import url('polish.css') layer(polish);","@import url('performance.css') layer(performance);",'--text-micro:10px','--space-8:32px','--layout-max:1540px','--color-focus:#ff7a2e'])if(!siteCss.includes(token))errors.push(`assets/site.css: Phase 02 architecture regression -> ${token}`);
+if(!read('assets/internal.css').startsWith('@layer components{'))errors.push('assets/internal.css: components layer missing');
+for(const file of ['assets/energy-visuals.css','assets/technology-visuals.css'])if(!read(file).startsWith('@layer page{'))errors.push(`${file}: page layer missing`);
+const siteJs=read('assets/site.js');
+if(/addHeadLink\(\s*['"]stylesheet/i.test(siteJs))errors.push('assets/site.js: runtime stylesheet injection is forbidden');
+const filmTag=index.match(/<video[^>]+id=["']holding-film["'][^>]*>/i)?.[0]||'';
+if(!filmTag)errors.push('index.html: approved film element missing');
+if(/\bautoplay\b/i.test(filmTag))errors.push('index.html: native autoplay must remain absent for reduced-motion gating');
+if(!/\bplaysinline\b/i.test(filmTag))errors.push('index.html: approved film must preserve playsinline');
+for(const filmToken of ['assets/media/unique-holding-film-720p.mp4','assets/media/unique-holding-caption.vtt','data-film-sound','data-film-play','data-film-progress','data-film-time','data-film-mute','data-film-volume','data-film-captions','data-film-fullscreen','data-film-replay'])if(!index.includes(filmToken))errors.push(`index.html: Phase 01 film regression -> ${filmToken}`);
+for(const logicToken of ["const reducedMotion=window.matchMedia('(prefers-reduced-motion: reduce)').matches","if(reducedMotion){","const audibleStarted=await playSafely()","const mutedStarted=await playSafely()","if(!manualPaused&&!video.ended&&!reducedMotion)playSafely()"])if(!index.includes(logicToken))errors.push(`index.html: Phase 01 playback logic regression -> ${logicToken}`);
 
 if(errors.length){console.error('\nTECHNICAL QA FAILED');for(const e of errors)console.error(' - '+e);process.exit(1)}
 console.log(`TECHNICAL QA PASS — ${htmlFiles.length} HTML, ${jsFiles.length} JS, ${cssFiles.length} CSS files checked; ${urls.length} sitemap URLs verified.`);

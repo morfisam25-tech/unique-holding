@@ -1,3 +1,4 @@
+@layer page{
 /* Technology card photography and hierarchy. Existing four image sources retained. */
 .tech-overview-card{position:relative;isolation:isolate;overflow:hidden;min-height:340px;background-color:#0b0e0f;background-repeat:no-repeat;background-size:cover;background-position:center;}
 .tech-overview-card::before{content:"";position:absolute;inset:0;z-index:0;background:linear-gradient(180deg,rgba(3,5,6,.24) 0%,rgba(3,5,6,.52) 43%,rgba(3,5,6,.94) 100%),linear-gradient(90deg,rgba(3,5,6,.38),transparent 68%);pointer-events:none;}
@@ -25,3 +26,4 @@
 
 @media(max-width:1100px){.tech-overview-card{min-height:320px}.tech-overview-card h3{padding-top:70px}.tech-primary-grid .tech-overview-card{min-height:350px}.tech-product-visual{min-height:420px}}
 @media(max-width:760px){.tech-overview-card,.tech-primary-grid .tech-overview-card,.tech-capability-grid .tech-overview-card{min-height:300px;background-position:center}.tech-overview-card h3,.tech-capability-grid .tech-overview-card h3{padding-top:64px}.tech-card--evidence-axis::after{right:18px;top:20px;max-width:150px;font-size:6px}.tech-product-visual{min-height:320px;border-left:0;border-top:1px solid rgba(255,255,255,.14)}}
+}

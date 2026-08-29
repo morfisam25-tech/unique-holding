@@ -1,11 +1,11 @@
 /* Phase 10 — corporate visual polish layer */
-:root{--polish-focus:#ff7a2e;--polish-soft:#aeb4b5;--polish-border:rgba(255,255,255,.18)}
+:root{--polish-focus:var(--color-focus);--polish-soft:var(--color-text-soft);--polish-border:rgba(255,255,255,.18)}
 body{text-rendering:optimizeLegibility}
 a,button{transition-property:color,background-color,border-color,opacity,transform;transition-duration:.2s;transition-timing-function:ease}
-a:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid var(--polish-focus);outline-offset:4px}
+a:focus-visible,button:focus-visible,input:focus-visible{outline:var(--focus-width) solid var(--polish-focus);outline-offset:var(--focus-offset)}
 .brand-symbol{filter:drop-shadow(0 0 12px rgba(238,106,36,.1))}.brand-type small,.sub-brand small{font-size:9px}.primary-nav{font-size:10px;letter-spacing:.09em}.primary-nav a{padding-top:13px;padding-bottom:13px}
-.eyebrow,.section-index,.subsite-label,.section-cap .num,.world-meta,.world-copy p,.world-action,.axis-kicker,.relationship-frame span,.route-card .k,.process span,.product-link small,.product-link span,.detail-back,.detail-box small,.button-link,.venture-card .status,.method-line small,.case-card span,.footer-brand span,.footer-top h3{font-size:10px}
-.hero-copy>p:last-child,.section-intro>div>p,.section-cap p,.feature-copy p,.relationships-copy p:last-child,.corporate-grid>div>p{font-size:15px}
+.eyebrow,.section-index,.subsite-label,.section-cap .num,.world-meta,.world-copy p,.world-action,.axis-kicker,.relationship-frame span,.route-card .k,.process span,.product-link small,.product-link span,.detail-back,.detail-box small,.button-link,.venture-card .status,.method-line small,.case-card span,.footer-brand span,.footer-top h3{font-size:var(--text-micro)}
+.hero-copy>p:last-child,.section-intro>div>p,.section-cap p,.feature-copy p,.relationships-copy p:last-child,.corporate-grid>div>p{font-size:var(--text-body-sm)}
 .footer-top a{font-size:13px}.footer-office{font-size:11px}
 
 /* Internal pages: less empty hero height, stronger editorial rhythm */
