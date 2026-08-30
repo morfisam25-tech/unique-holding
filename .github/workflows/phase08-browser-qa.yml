@@ -1,0 +1,173 @@
+name: Phase 08 browser visual QA
+
+on:
+  push:
+    branches:
+      - phase08-browser-qa-runner
+
+permissions:
+  contents: read
+
+jobs:
+  render-energy:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout Phase 08 snapshot
+        uses: actions/checkout@v4
+
+      - name: Verify immutable product snapshot
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD^)" = "4ca464131e2e0d3ce2ba98aeda385c5d6162f34f"
+          git diff --name-only 4ca464131e2e0d3ce2ba98aeda385c5d6162f34f..HEAD | grep -Fx '.github/workflows/phase08-browser-qa.yml'
+          test "$(git diff --name-only 4ca464131e2e0d3ce2ba98aeda385c5d6162f34f..HEAD | wc -l)" -eq 1
+
+      - name: Install browser driver only
+        shell: bash
+        run: |
+          CHROME="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || command -v chromium-browser || true)"
+          test -n "$CHROME"
+          echo "CHROME=$CHROME" >> "$GITHUB_ENV"
+          npm install --no-save --ignore-scripts puppeteer-core@24.16.0
+
+      - name: Render Energy page at three viewports
+        shell: bash
+        run: |
+          mkdir -p phase08-browser-qa
+          python3 -m http.server 8000 --bind 127.0.0.1 >phase08-browser-qa/server.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID || true' EXIT
+          sleep 1
+          cat > /tmp/phase08-browser-qa.cjs <<'NODE'
+          const fs = require('fs');
+          const puppeteer = require('puppeteer-core');
+
+          const cases = [
+            {name:'desktop', width:1440, height:1000},
+            {name:'tablet', width:1024, height:1366},
+            {name:'mobile', width:390, height:844}
+          ];
+
+          async function sweepLazy(page){
+            await page.evaluate(async () => {
+              await new Promise(resolve => {
+                let y = 0;
+                const step = 650;
+                const tick = () => {
+                  const max = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight);
+                  y += step;
+                  window.scrollTo(0, Math.min(y, max));
+                  if (y >= max) {
+                    setTimeout(() => { window.scrollTo(0, 0); resolve(); }, 350);
+                  } else {
+                    setTimeout(tick, 90);
+                  }
+                };
+                tick();
+              });
+            });
+          }
+
+          (async () => {
+            const browser = await puppeteer.launch({
+              headless: true,
+              executablePath: process.env.CHROME,
+              args: ['--no-sandbox','--disable-dev-shm-usage']
+            });
+            const report = {sha:'4ca464131e2e0d3ce2ba98aeda385c5d6162f34f', cases:{}};
+
+            for (const c of cases) {
+              const page = await browser.newPage();
+              const consoleErrors = [];
+              const pageErrors = [];
+              const requestFailures = [];
+              page.on('console', msg => { if (msg.type() === 'error') consoleErrors.push(msg.text()); });
+              page.on('pageerror', err => pageErrors.push(String(err)));
+              page.on('requestfailed', req => requestFailures.push({url:req.url(), error:req.failure()?.errorText || ''}));
+              await page.setViewport({width:c.width,height:c.height,deviceScaleFactor:1});
+              const response = await page.goto('http://127.0.0.1:8000/energy.html',{waitUntil:'networkidle0',timeout:30000});
+              await page.evaluate(() => document.fonts?.ready || Promise.resolve());
+              await sweepLazy(page);
+              await new Promise(r => setTimeout(r, 500));
+
+              const metrics = await page.evaluate(() => {
+                const vw = document.documentElement.clientWidth;
+                const overflow = [];
+                for (const el of document.querySelectorAll('body *')) {
+                  const s = getComputedStyle(el);
+                  if (s.position === 'fixed' || s.position === 'sticky') continue;
+                  const r = el.getBoundingClientRect();
+                  if (!r.width || !r.height) continue;
+                  if (r.right > vw + 2 || r.left < -2) {
+                    overflow.push({
+                      tag: el.tagName.toLowerCase(),
+                      id: el.id || '',
+                      class: typeof el.className === 'string' ? el.className : '',
+                      left: Math.round(r.left), right: Math.round(r.right), width: Math.round(r.width)
+                    });
+                    if (overflow.length >= 30) break;
+                  }
+                }
+                const images = [...document.images].map(img => ({
+                  src: img.getAttribute('src') || '',
+                  complete: img.complete,
+                  naturalWidth: img.naturalWidth,
+                  naturalHeight: img.naturalHeight,
+                  renderedWidth: Math.round(img.getBoundingClientRect().width),
+                  renderedHeight: Math.round(img.getBoundingClientRect().height)
+                }));
+                const sections = [...document.querySelectorAll('main > section, main > figure')].map(el => {
+                  const r = el.getBoundingClientRect();
+                  return {tag:el.tagName.toLowerCase(), class:el.className || '', top:Math.round(r.top + scrollY), height:Math.round(r.height)};
+                });
+                return {
+                  viewportWidth: vw,
+                  viewportHeight: innerHeight,
+                  scrollWidth: document.documentElement.scrollWidth,
+                  scrollHeight: document.documentElement.scrollHeight,
+                  horizontalOverflow: document.documentElement.scrollWidth > vw + 2,
+                  overflow,
+                  images,
+                  sections
+                };
+              });
+
+              report.cases[c.name] = {
+                status: response?.status() || null,
+                ...metrics,
+                consoleErrors,
+                pageErrors,
+                requestFailures
+              };
+              await page.screenshot({path:`phase08-browser-qa/energy-${c.name}-full.png`,fullPage:true});
+              await page.close();
+            }
+            fs.writeFileSync('phase08-browser-qa/report.json', JSON.stringify(report,null,2));
+            await browser.close();
+          })().catch(err => { console.error(err); process.exit(1); });
+          NODE
+          node /tmp/phase08-browser-qa.cjs
+          cat phase08-browser-qa/report.json
+
+      - name: Enforce browser sanity gates
+        shell: bash
+        run: |
+          node <<'NODE'
+          const r=require('./phase08-browser-qa/report.json');
+          for(const [name,c] of Object.entries(r.cases)){
+            if(c.status!==200) throw new Error(`${name}: HTTP ${c.status}`);
+            if(c.horizontalOverflow) throw new Error(`${name}: horizontal overflow ${c.scrollWidth}/${c.viewportWidth}`);
+            const broken=c.images.filter(i=>!i.complete||i.naturalWidth<1||i.naturalHeight<1);
+            if(broken.length) throw new Error(`${name}: broken images ${JSON.stringify(broken)}`);
+            if(c.pageErrors.length) throw new Error(`${name}: page errors ${JSON.stringify(c.pageErrors)}`);
+            if(c.requestFailures.length) throw new Error(`${name}: request failures ${JSON.stringify(c.requestFailures)}`);
+          }
+          console.log('PHASE08_BROWSER_SANITY_PASS');
+          NODE
+
+      - name: Upload browser QA packet
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase08-browser-qa
+          path: phase08-browser-qa/
+          if-no-files-found: error
