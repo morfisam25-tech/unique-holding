@@ -70,6 +70,13 @@ if(!read('assets/internal.css').startsWith('@layer components{'))errors.push('as
 for(const file of ['assets/energy-visuals.css','assets/technology-visuals.css'])if(!read(file).startsWith('@layer page{'))errors.push(`${file}: page layer missing`);
 const siteJs=read('assets/site.js');
 if(/addHeadLink\(\s*['"]stylesheet/i.test(siteJs))errors.push('assets/site.js: runtime stylesheet injection is forbidden');
+for(const token of ["{key:'corporate',label:'Corporate',href:'corporate.html'}","{key:'energy',label:'Energy & Trade',href:'energy.html'}","{key:'technology',label:'Technology',href:'technology.html'}","{key:'portfolio',label:'Portfolio',href:'ventures.html'}","{key:'contact',label:'Contact',href:'contact.html'}","Industrial Sales","global-footer-shell","Footer navigation","evidence-axis.html","privacy.html","legal.html"])if(!siteJs.includes(token))errors.push(`assets/site.js: Phase 03 shared-shell regression -> ${token}`);
+for(const token of ["requestAnimationFrame(()=>nav.querySelector('a[href]')?.focus())","if(event.key==='Escape')","if(event.key!=='Tab')return","event.shiftKey&&current===first","!event.shiftKey&&current===last","menu.focus()","document.body.classList.add('nav-open')","setInert(main,true)","setInert(footer,true)"])if(!siteJs.includes(token))errors.push(`assets/site.js: Phase 03 focus-management regression -> ${token}`);
+for(const route of ['corporate.html','energy.html','technology.html','ventures.html','contact.html','sales.html','products.html','evidence-axis.html','privacy.html','legal.html'])if(!fs.existsSync(path.join(root,route)))errors.push(`Phase 03: shared-shell route missing -> ${route}`);
+for(const file of htmlFiles){const html=read(file);if(!html.includes('assets/site.js'))errors.push(`${file}: shared shell script missing`)}
+for(const token of ["document.createElement('header')","document.createElement('footer')","header.dataset.header=''","footer.className='site-footer'"])if(!siteJs.includes(token))errors.push(`assets/site.js: Phase 03 shell fallback regression -> ${token}`);
+for(const token of ['.site-header .primary-nav .nav-cta','.global-footer-shell','body.nav-open','@media(max-width:1180px)','@media(prefers-reduced-motion:reduce)'])if(!siteCss.includes(token))errors.push(`assets/site.css: Phase 03 shell styling regression -> ${token}`);
+
 const filmTag=index.match(/<video[^>]+id=["']holding-film["'][^>]*>/i)?.[0]||'';
 if(!filmTag)errors.push('index.html: approved film element missing');
 if(/\bautoplay\b/i.test(filmTag))errors.push('index.html: native autoplay must remain absent for reduced-motion gating');
