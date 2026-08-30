@@ -200,16 +200,17 @@ const corporateH1s=corporateMain.match(/<h1\b/gi)||[];
 if(corporateH1s.length!==1)errors.push(`corporate.html: expected exactly one H1, found ${corporateH1s.length}`);
 for(const token of [
   'Unique Holding is an Istanbul-based corporate identity spanning industrial trade, technology, intelligence and venture development.',
-  'The industrial activity published on this site is conducted through Unique Otomotiv Kimya Sanayi Limited Şirketi.',
+  'The industrial activity published on this site is conducted through UNIQE OTOMOTİV KİMYA SANAYİ LİMİTED ŞİRKETİ.',
   '01 / Corporate Identity','02 / Business Structure','03 / History','04 / Industrial Operating Company','05 / Operating Base',
   'This describes business areas and portfolio activity; it is not a legal ownership chart.',
-  'Turkish corporate operations established.','Unique Otomotiv Kimya Sanayi Limited Şirketi',
+  'Turkish corporate operations established.','UNIQE OTOMOTİV KİMYA SANAYİ LİMİTED ŞİRKETİ',
   '29 Ekim Cad. Yenibosna Merkez Mah.','İstanbul Vizyon Park Plazaları A1 Blok','Bahçelievler / İstanbul, Türkiye',
   '+90 212 727 22 22','+90 539 380 91 97','farahmand@uniqueholding.com.tr','sales@uniqueholding.com.tr',
   'A specialist venture within the Unique Holding portfolio, focused on competitive intelligence for B2B SaaS decisions.'
 ])if(!corporate.includes(token))errors.push(`corporate.html: Phase 05 required corporate statement missing -> ${token}`);
 for(const forbidden of [/Group Structure/i,/\bcorporate group\b/i,/\bparent company\b/i,/\bsubsidiar(?:y|ies)\b/i,/\bwholly owned\b/i,/\baffiliate\b/i,/\bsister company\b/i,/\blegal holding company\b/i,/\bcontrolling entity\b/i,/\bconsolidated group\b/i,/\bcorporate umbrella\b/i])if(forbidden.test(corporateMain))errors.push(`corporate.html: unsupported legal-relationship wording -> ${forbidden}`);
 if(/S&P|Platts/i.test(corporateMain))errors.push('corporate.html: S&P/Platts must not remain in the Phase 05 principal corporate narrative');
+if(/Unique Otomotiv Kimya Sanayi Limited Şirketi/.test(corporateMain))errors.push('corporate.html: outdated operating-company spelling remains in Phase 05 main content');
 if(/MERS[Iİ]S|Ticaret Sicil|Trade Registry|Tax Number|Vergi (?:No|Numara)|\bVKN\b|\b240294\b/i.test(corporateMain))errors.push('corporate.html: registration identifier published without source-lock approval');
 for(const phrase of ['documented milestones','supported by the records','public timeline focuses','current evidence base','verified','evidence available'])if(corporateMain.toLowerCase().includes(phrase.toLowerCase()))errors.push(`corporate.html: internal/audit-memo wording returned -> ${phrase}`);
 const corporateHeader=corporate.match(/<header class=["']site-header["'][\s\S]*?<\/header>/i)?.[0]||'';
