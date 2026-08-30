@@ -156,7 +156,7 @@ jobs:
           node <<'NODE'
           const r=require('./phase08-browser-qa/report.json');
           for(const [name,c] of Object.entries(r.cases)){
-            if(c.status!==200) throw new Error(`${name}: HTTP ${c.status}`);
+            if(![200,304].includes(c.status)) throw new Error(`${name}: HTTP ${c.status}`);
             if(c.horizontalOverflow) throw new Error(`${name}: horizontal overflow ${c.scrollWidth}/${c.viewportWidth}`);
             const broken=c.images.filter(i=>!i.complete||i.naturalWidth<1||i.naturalHeight<1);
             if(broken.length) throw new Error(`${name}: broken images ${JSON.stringify(broken)}`);
@@ -167,6 +167,7 @@ jobs:
           NODE
 
       - name: Upload browser QA packet
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: phase08-browser-qa
