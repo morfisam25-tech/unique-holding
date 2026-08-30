@@ -147,7 +147,7 @@ jobs:
             await browser.close();
           })().catch(err => { console.error(err); process.exit(1); });
           NODE
-          node /tmp/phase08-browser-qa.cjs
+          NODE_PATH="$PWD/node_modules" node /tmp/phase08-browser-qa.cjs
           cat phase08-browser-qa/report.json
 
       - name: Enforce browser sanity gates
