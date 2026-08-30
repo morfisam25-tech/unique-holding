@@ -20,7 +20,7 @@ if(page==='index'&&!document.querySelector('script[data-org-schema]')){
   s.type='application/ld+json';
   s.dataset.orgSchema='true';
   s.textContent=JSON.stringify({
-    '@context':'https://schema.org','@type':'Organization','name':'Unique Otomotiv Kimya Sanayi Limited Şirketi','url':'https://www.uniqueholding.com.tr/',
+    '@context':'https://schema.org','@type':'Organization','name':'UNIQE OTOMOTİV KİMYA SANAYİ LİMİTED ŞİRKETİ','url':'https://www.uniqueholding.com.tr/',
     'brand':{'@type':'Brand','name':'Unique Holding'},
     'description':'Istanbul-based industrial trading activity in petrochemicals and chemicals, alongside specialist technology and intelligence ventures.',
     'address':{'@type':'PostalAddress','streetAddress':'29 Ekim Cad. Yenibosna Merkez Mah., İstanbul Vizyon Park Plazaları A1 Blok, Kat 9, Daire 98','addressLocality':'Bahçelievler','addressRegion':'İstanbul','addressCountry':'TR'},

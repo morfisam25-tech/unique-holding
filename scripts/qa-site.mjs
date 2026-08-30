@@ -30,13 +30,14 @@ const webpDimensions=file=>{
 };
 const forbiddenPublicPhrases=['real private codebase','current evidence base','current corporate evidence base','verified public wording','automated quotation engine behind this page','public positioning remains intentionally limited','development status is kept separate','maturity determines visibility','does not invent a generic specification','evidence-backed public operating profile'];
 const primaryNavRoutes=[['corporate.html','Corporate'],['energy.html','Energy &amp; Trade'],['technology.html','Technology'],['ventures.html','Portfolio'],['contact.html','Contact'],['sales.html','Industrial Sales']];
-const footerRequired=['global-footer-shell','Footer navigation','energy.html','technology.html','ventures.html','evidence-axis.html','corporate.html','contact.html','products.html','sales.html','privacy.html','legal.html','Privacy &amp; Cookies','Legal Notice','Unique Otomotiv Kimya Sanayi Limited Şirketi'];
+const footerRequired=['global-footer-shell','Footer navigation','energy.html','technology.html','ventures.html','evidence-axis.html','corporate.html','contact.html','products.html','sales.html','privacy.html','legal.html','Privacy &amp; Cookies','Legal Notice','UNIQE OTOMOTİV KİMYA SANAYİ LİMİTED ŞİRKETİ'];
 
 for(const artifact of ['FIX_DEPLOY_NOTE.txt','FIX_DEPLOY_NOTE_2.txt','_ignore'])if(files.includes(artifact))errors.push(`${artifact}: temporary artifact must not ship`);
 
 for(const file of htmlFiles){
   const html=read(file);
   const lower=html.toLowerCase();
+  if(html.includes('Unique Otomotiv Kimya Sanayi Limited Şirketi'))errors.push(`${file}: obsolete operating-company spelling is forbidden`);
   for(const phrase of forbiddenPublicPhrases)if(lower.includes(phrase))errors.push(`${file}: internal/development wording -> ${phrase}`);
   if(!/<html[^>]+lang=["'][a-z-]+["']/i.test(html))errors.push(`${file}: missing html lang`);
   if(!/<main\b/i.test(html))errors.push(`${file}: missing main landmark`);
@@ -120,6 +121,8 @@ for(const file of ['assets/energy-visuals.css','assets/technology-visuals.css'])
 for(const token of ['.site-header .primary-nav .nav-cta','.global-footer-shell','body.nav-open','@media(max-width:1180px)','@media(prefers-reduced-motion:reduce)','html:not(.js) .site-header .primary-nav'])if(!siteCss.includes(token))errors.push(`assets/site.css: Phase 03 shell styling regression -> ${token}`);
 
 const siteJs=read('assets/site.js');
+if(siteJs.includes('Unique Otomotiv Kimya Sanayi Limited Şirketi'))errors.push('assets/site.js: obsolete operating-company spelling is forbidden in runtime structured data');
+if(siteJs.includes("'@type':'Organization'")&&!siteJs.includes("'name':'UNIQE OTOMOTİV KİMYA SANAYİ LİMİTED ŞİRKETİ'"))errors.push('assets/site.js: runtime Organization name must use official operating-company spelling');
 if(/addHeadLink\(\s*['"]stylesheet/i.test(siteJs))errors.push('assets/site.js: runtime stylesheet injection is forbidden');
 for(const forbidden of [/\bnav\.innerHTML\s*=/,/\bfooter\.innerHTML\s*=/,/document\.createElement\(\s*['"]header['"]\s*\)/,/document\.createElement\(\s*['"]footer['"]\s*\)/])if(forbidden.test(siteJs))errors.push(`assets/site.js: runtime shared-shell construction is forbidden -> ${forbidden}`);
 for(const token of ["requestAnimationFrame(()=>nav.querySelector('a[href]')?.focus())","if(event.key==='Escape')","if(event.key!=='Tab')return","event.shiftKey&&current===first","!event.shiftKey&&current===last","menu.focus()","document.body.classList.add('nav-open')","setInert(main,true)","setInert(footer,true)"])if(!siteJs.includes(token))errors.push(`assets/site.js: Phase 03 focus-management regression -> ${token}`);
@@ -167,7 +170,7 @@ const footerStart=index.indexOf('  <footer class="site-footer"');
 const footerEnd=footerStart>=0?index.indexOf('</footer>',footerStart):-1;
 const homepageFooter=footerStart>=0&&footerEnd>=0?index.slice(footerStart,footerEnd+'</footer>'.length):'';
 if(sha256(homepageHeader)!=='42d6bee4ef6d7c4abfd4216dbbb17fc11a6aa4ad43b6aa89c7c0a46d8c82aed9')errors.push('index.html: protected Phase 03 static header changed');
-if(sha256(homepageFooter)!=='d0178f35973403716959980aa038c91d833b0966406fed1483d21d374fab03cb')errors.push('index.html: protected Phase 03 static footer changed');
+if(sha256(homepageFooter)!=='5a19b25f3e134903731910b7f57ec4f9d066039e7fbbfed77ccb162c52ccd486')errors.push('index.html: protected Phase 03 static footer changed');
 
 const phase04Required=['home-thesis','home-operating-world--trade','home-operating-world--tech','home-mindset','home-proof','home-commercial','home-routes','home-close','Two operating worlds. One execution mindset.','Intelligence</em> to understand.','Technology to build.','Commerce to execute.','Physical markets. Commercial execution.','Research that informs. Products that move into build.','Understand → Build → Execute','Since<br>2020','Start with the requirement.','For partners, teams and new opportunities.','From intelligence to <em>execution.</em>','assets/phase04/film-still-logistics.webp','assets/phase04/film-still-intelligence.webp','Intercom vs Zendesk','9</b> checked sources','Checked 19 August 2026'];
 for(const token of phase04Required)if(!index.includes(token))errors.push(`index.html: Phase 04 homepage regression -> ${token}`);
@@ -216,7 +219,7 @@ for(const phrase of ['documented milestones','supported by the records','public 
 const corporateHeader=corporate.match(/<header class=["']site-header["'][\s\S]*?<\/header>/i)?.[0]||'';
 const corporateFooter=corporate.match(/<footer class=["']site-footer["'][\s\S]*?<\/footer>/i)?.[0]||'';
 if(sha256(corporateHeader)!=='c502644dc6c6446ed266fd7b5cc7f0a9ec6cb2ecdf4e6ff5dc485d2353f5a919')errors.push('corporate.html: protected Phase 03 static header changed');
-if(sha256(corporateFooter)!=='efc00de823c029b6d2801404cd12966ef01d299e3c6c602565282b22fdfdab34')errors.push('corporate.html: protected Phase 03 static footer changed');
+if(sha256(corporateFooter)!=='fb78cdce26ad95e93209faaec99e957f7fd2f882d3e5a6a83ecd781db170045a')errors.push('corporate.html: protected Phase 03 static footer changed');
 if(!/<style>[\s\S]*?@layer\s+page\s*\{[\s\S]*?<\/style>/i.test(corporate.slice(0,corporate.indexOf('</head>'))))errors.push('corporate.html: Phase 05 page CSS must load deterministically in head');
 if(/<style\b/i.test(corporateMain))errors.push('corporate.html: page styles must not appear inside main');
 
