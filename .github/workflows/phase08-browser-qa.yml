@@ -49,6 +49,8 @@ jobs:
             {name:'mobile', width:390, height:844}
           ];
 
+          async function settle(ms=350){ return new Promise(r => setTimeout(r, ms)); }
+
           async function sweepLazy(page){
             await page.evaluate(async () => {
               await new Promise(resolve => {
@@ -67,6 +69,20 @@ jobs:
                 tick();
               });
             });
+          }
+
+          async function captureAt(page, caseName, label, selector=null){
+            if(selector){
+              await page.evaluate(sel => {
+                const el=document.querySelector(sel);
+                if(!el) throw new Error(`Missing screenshot target ${sel}`);
+                el.scrollIntoView({block:'center', inline:'nearest'});
+              }, selector);
+            } else {
+              await page.evaluate(() => window.scrollTo(0,0));
+            }
+            await settle(450);
+            await page.screenshot({path:`phase08-browser-qa/energy-${caseName}-${label}.png`});
           }
 
           (async () => {
@@ -88,8 +104,9 @@ jobs:
               await page.setViewport({width:c.width,height:c.height,deviceScaleFactor:1});
               const response = await page.goto('http://127.0.0.1:8000/energy.html',{waitUntil:'networkidle0',timeout:30000});
               await page.evaluate(() => document.fonts?.ready || Promise.resolve());
+              await captureAt(page,c.name,'hero');
               await sweepLazy(page);
-              await new Promise(r => setTimeout(r, 500));
+              await settle(500);
 
               const metrics = await page.evaluate(() => {
                 const vw = document.documentElement.clientWidth;
@@ -140,6 +157,11 @@ jobs:
                 pageErrors,
                 requestFailures
               };
+
+              await captureAt(page,c.name,'film','.energy-visual-moment--film');
+              await captureAt(page,c.name,'context','.energy-context');
+              await captureAt(page,c.name,'rfq','.energy-rfq');
+              await captureAt(page,c.name,'hero');
               await page.screenshot({path:`phase08-browser-qa/energy-${c.name}-full.png`,fullPage:true});
               await page.close();
             }
