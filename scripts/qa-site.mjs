@@ -63,7 +63,14 @@ for(const file of htmlFiles){
     if(!fs.existsSync(path.join(root,target)))errors.push(`${file}: broken local link -> ${href}`);
     if(/target=["']_blank["']/i.test(tag)&&!/rel=["'][^"']*noopener/i.test(tag))errors.push(`${file}: target=_blank without noopener -> ${href}`);
   }
-  for(const tag of html.match(/<img\b[^>]*>/gi)||[])if(!/\balt=["'][^"']*["']/i.test(tag))errors.push(`${file}: img without alt`);
+  for(const tag of html.match(/<img\b[^>]*>/gi)||[]){
+    if(!/\balt=["'][^"']*["']/i.test(tag))errors.push(`${file}: img without alt`);
+    const src=attr(tag,'src');
+    if(src&&!/^(https?:|data:)/i.test(src)){
+      const target=path.normalize(path.join(path.dirname(file),src)).replaceAll('\\','/');
+      if(!fs.existsSync(path.join(root,target)))errors.push(`${file}: broken local image -> ${src}`);
+    }
+  }
   for(const block of html.matchAll(/<script(?![^>]*type=["']application\/ld\+json["'])[^>]*>([\s\S]*?)<\/script>/gi)){
     const code=block[1].trim();if(code){try{new Function(code)}catch(e){errors.push(`${file}: inline JS syntax error: ${e.message}`)}}
   }
@@ -113,7 +120,7 @@ for(const logicToken of ["const reducedMotion=window.matchMedia('(prefers-reduce
 const styleStart=index.indexOf('  <style>');
 const styleEnd=styleStart>=0?index.indexOf('  </style>',styleStart):-1;
 const heroStart=index.indexOf('    <section class="hero hero-film-hero"');
-const heroEnd=heroStart>=0?index.indexOf('    <section class="worlds"',heroStart):-1;
+const heroEnd=heroStart>=0?index.indexOf('    <style>',heroStart):-1;
 const filmScriptMarker='  <script src="assets/site.js" defer></script>';
 const markerPos=index.indexOf(filmScriptMarker);
 const markerEnd=markerPos>=0?markerPos+filmScriptMarker.length:-1;
@@ -126,5 +133,15 @@ const protectedSlices=[
 ];
 for(const [label,value,expected] of protectedSlices){if(!value)errors.push(`index.html: protected Phase 01 ${label} missing`);else if(sha256(value)!==expected)errors.push(`index.html: protected Phase 01 ${label} changed`)}
 
+const phase04Required=['home-thesis','home-operating-world--trade','home-operating-world--tech','home-mindset','home-proof','home-commercial','home-routes','home-close','Intelligence</em> to understand.','Technology to build.','Commerce to execute.','assets/phase04/film-still-logistics.webp','assets/phase04/film-still-intelligence.webp','Intercom vs Zendesk','9</b> checked sources','Checked 19 August 2026'];
+for(const token of phase04Required)if(!index.includes(token))errors.push(`index.html: Phase 04 homepage regression -> ${token}`);
+for(const removed of ['<section class="worlds"','<section class="relationships"','<section class="industrial gateway"','<section class="technology-preview"','<section class="corporate-gateway"'])if(index.includes(removed))errors.push(`index.html: legacy homepage section returned -> ${removed}`);
+const postHero=heroEnd>=0?index.slice(heroEnd,index.indexOf('  </main>',heroEnd)):'';
+if(/images\.unsplash\.com/i.test(postHero))errors.push('index.html: Phase 04 below-film narrative must not add remote Unsplash imagery');
+for(const asset of ['assets/phase04/film-still-logistics.webp','assets/phase04/film-still-intelligence.webp']){
+  if(!files.includes(asset))errors.push(`Phase 04 asset missing -> ${asset}`);
+  else if(fs.statSync(path.join(root,asset)).size>120000)errors.push(`Phase 04 asset exceeds 120 KB -> ${asset}`);
+}
+
 if(errors.length){console.error('\nTECHNICAL QA FAILED');for(const e of errors)console.error(' - '+e);process.exit(1)}
-console.log(`TECHNICAL QA PASS — ${htmlFiles.length} HTML, ${jsFiles.length} JS, ${cssFiles.length} CSS files checked; ${urls.length} sitemap URLs verified; static global shell verified on every HTML route.`);
+console.log(`TECHNICAL QA PASS — ${htmlFiles.length} HTML, ${jsFiles.length} JS, ${cssFiles.length} CSS files checked; ${urls.length} sitemap URLs verified; static global shell verified on every HTML route; Phase 04 homepage regression checks passed.`);
