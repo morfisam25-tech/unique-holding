@@ -1,0 +1,40 @@
+name: Gate A targeted diagnostics
+on:
+  push:
+    branches: [gate-a-qa-runner]
+permissions:
+  contents: read
+jobs:
+  targeted:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+      - name: Verify product ancestry
+        shell: bash
+        run: git merge-base --is-ancestor 4ca464131e2e0d3ce2ba98aeda385c5d6162f34f HEAD
+      - name: Install browser driver
+        shell: bash
+        run: |
+          CHROME="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || command -v chromium-browser || true)"
+          test -n "$CHROME"
+          echo "CHROME=$CHROME" >> "$GITHUB_ENV"
+          npm install --no-save --ignore-scripts puppeteer-core@24.16.0
+          node --check .github/qa/gate-a-targeted.cjs
+      - name: Run targeted diagnostics
+        shell: bash
+        run: |
+          mkdir -p gate-a-targeted
+          python3 -m http.server 8000 --bind 127.0.0.1 >/tmp/gate-a-targeted-server.log 2>&1 &
+          PID=$!
+          trap 'kill $PID || true' EXIT
+          sleep 1
+          NODE_PATH="$PWD/node_modules" node .github/qa/gate-a-targeted.cjs
+          cat gate-a-targeted/targeted.json
+      - name: Upload targeted packet
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gate-a-targeted-diagnostics
+          path: gate-a-targeted/
+          if-no-files-found: error
