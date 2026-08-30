@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
 
 const root=process.cwd();
 const errors=[];
@@ -11,9 +12,12 @@ const cssFiles=files.filter(f=>f.endsWith('.css'));
 const jsFiles=files.filter(f=>f.endsWith('.js')&&!f.startsWith('.github/'));
 const attr=(tag,name)=>{const m=tag.match(new RegExp(`${name}=["']([^"']+)["']`,'i'));return m?.[1]||''};
 const noindex=html=>/<meta[^>]+name=["']robots["'][^>]+content=["'][^"']*noindex/i.test(html);
+const sha256=value=>crypto.createHash('sha256').update(value).digest('hex');
 const forbiddenPublicPhrases=['real private codebase','current evidence base','current corporate evidence base','verified public wording','automated quotation engine behind this page','public positioning remains intentionally limited','development status is kept separate','maturity determines visibility','does not invent a generic specification','evidence-backed public operating profile'];
+const primaryNavRoutes=[['corporate.html','Corporate'],['energy.html','Energy &amp; Trade'],['technology.html','Technology'],['ventures.html','Portfolio'],['contact.html','Contact'],['sales.html','Industrial Sales']];
+const footerRequired=['global-footer-shell','Footer navigation','energy.html','technology.html','ventures.html','evidence-axis.html','corporate.html','contact.html','products.html','sales.html','privacy.html','legal.html','Privacy &amp; Cookies','Legal Notice','Unique Otomotiv Kimya Sanayi Limited Şirketi'];
 
-for(const artifact of ['FIX_DEPLOY_NOTE.txt','FIX_DEPLOY_NOTE_2.txt'])if(files.includes(artifact))errors.push(`${artifact}: temporary deployment artifact must not ship`);
+for(const artifact of ['FIX_DEPLOY_NOTE.txt','FIX_DEPLOY_NOTE_2.txt','_ignore'])if(files.includes(artifact))errors.push(`${artifact}: temporary artifact must not ship`);
 
 for(const file of htmlFiles){
   const html=read(file);
@@ -28,6 +32,28 @@ for(const file of htmlFiles){
     const can=html.match(/<link[^>]+rel=["']canonical["'][^>]+href=["']([^"']+)["']/i)?.[1];
     if(!can)errors.push(`${file}: missing canonical`);else if(!can.startsWith('https://www.uniqueholding.com.tr/'))errors.push(`${file}: canonical outside target domain`);
   }
+
+  const navBlock=html.match(/<nav\b[^>]*id=["']primary-nav["'][^>]*>([\s\S]*?)<\/nav>/i)?.[0]||'';
+  if(!navBlock)errors.push(`${file}: static global primary navigation missing`);
+  else{
+    const navLinks=navBlock.match(/<a\b/gi)||[];
+    if(navLinks.length!==6)errors.push(`${file}: primary navigation must contain exactly six links, found ${navLinks.length}`);
+    for(const [href,label] of primaryNavRoutes){
+      if(!new RegExp(`href=["']${href.replaceAll('.','\\.')}["']`,'i').test(navBlock))errors.push(`${file}: static primary navigation missing route ${href}`);
+      if(!navBlock.includes(`>${label}</a>`))errors.push(`${file}: static primary navigation missing label ${label}`);
+    }
+    if(/href=["']#worlds["']/i.test(navBlock)||/>\s*Activities\s*</i.test(navBlock))errors.push(`${file}: redundant Activities top-level navigation returned`);
+    if(/href=["']evidence-axis\.html["']/i.test(navBlock))errors.push(`${file}: Evidence Axis must not return as a top-level primary-nav item`);
+  }
+  if(!/<header\b[^>]*data-header/i.test(html))errors.push(`${file}: static global header missing`);
+  if(!/<footer\b[^>]*class=["'][^"']*site-footer/i.test(html))errors.push(`${file}: static global footer missing`);
+  for(const token of footerRequired)if(!html.includes(token))errors.push(`${file}: static global footer missing ${token}`);
+  if(!html.includes('assets/site.js'))errors.push(`${file}: shared behavior script missing`);
+  const jsMarker=html.indexOf("document.documentElement.classList.add('js')");
+  const firstStyle=html.search(/<link[^>]+rel=["']stylesheet["']/i);
+  if(jsMarker<0)errors.push(`${file}: early JS capability marker missing`);
+  else if(firstStyle>=0&&jsMarker>firstStyle)errors.push(`${file}: JS capability marker must precede stylesheets to avoid mobile shell swap`);
+
   for(const tag of html.match(/<a\b[^>]*href=["'][^"']+["'][^>]*>/gi)||[]){
     const href=attr(tag,'href');
     if(!href||href.startsWith('#')||/^(mailto:|tel:|https?:|javascript:)/i.test(href))continue;
@@ -64,18 +90,18 @@ if(!index.includes('application/ld+json'))errors.push('index.html: missing struc
 if(!read('robots.txt').includes('https://www.uniqueholding.com.tr/sitemap.xml'))errors.push('robots.txt: sitemap declaration missing');
 if(!files.includes('assets/favicon.svg'))errors.push('favicon missing');
 if(!files.includes('assets/performance.css'))errors.push('performance override missing');
+
 const siteCss=read('assets/site.css');
 for(const token of ["@layer tokens,base,components,page,polish,performance;","@import url('polish.css') layer(polish);","@import url('performance.css') layer(performance);",'--text-micro:10px','--space-8:32px','--layout-max:1540px','--color-focus:#ff7a2e'])if(!siteCss.includes(token))errors.push(`assets/site.css: Phase 02 architecture regression -> ${token}`);
 if(!read('assets/internal.css').startsWith('@layer components{'))errors.push('assets/internal.css: components layer missing');
 for(const file of ['assets/energy-visuals.css','assets/technology-visuals.css'])if(!read(file).startsWith('@layer page{'))errors.push(`${file}: page layer missing`);
+for(const token of ['.site-header .primary-nav .nav-cta','.global-footer-shell','body.nav-open','@media(max-width:1180px)','@media(prefers-reduced-motion:reduce)','html:not(.js) .site-header .primary-nav'])if(!siteCss.includes(token))errors.push(`assets/site.css: Phase 03 shell styling regression -> ${token}`);
+
 const siteJs=read('assets/site.js');
 if(/addHeadLink\(\s*['"]stylesheet/i.test(siteJs))errors.push('assets/site.js: runtime stylesheet injection is forbidden');
-for(const token of ["{key:'corporate',label:'Corporate',href:'corporate.html'}","{key:'energy',label:'Energy & Trade',href:'energy.html'}","{key:'technology',label:'Technology',href:'technology.html'}","{key:'portfolio',label:'Portfolio',href:'ventures.html'}","{key:'contact',label:'Contact',href:'contact.html'}","Industrial Sales","global-footer-shell","Footer navigation","evidence-axis.html","privacy.html","legal.html"])if(!siteJs.includes(token))errors.push(`assets/site.js: Phase 03 shared-shell regression -> ${token}`);
+for(const forbidden of [/\bnav\.innerHTML\s*=/,/\bfooter\.innerHTML\s*=/,/document\.createElement\(\s*['"]header['"]\s*\)/,/document\.createElement\(\s*['"]footer['"]\s*\)/])if(forbidden.test(siteJs))errors.push(`assets/site.js: runtime shared-shell construction is forbidden -> ${forbidden}`);
 for(const token of ["requestAnimationFrame(()=>nav.querySelector('a[href]')?.focus())","if(event.key==='Escape')","if(event.key!=='Tab')return","event.shiftKey&&current===first","!event.shiftKey&&current===last","menu.focus()","document.body.classList.add('nav-open')","setInert(main,true)","setInert(footer,true)"])if(!siteJs.includes(token))errors.push(`assets/site.js: Phase 03 focus-management regression -> ${token}`);
 for(const route of ['corporate.html','energy.html','technology.html','ventures.html','contact.html','sales.html','products.html','evidence-axis.html','privacy.html','legal.html'])if(!fs.existsSync(path.join(root,route)))errors.push(`Phase 03: shared-shell route missing -> ${route}`);
-for(const file of htmlFiles){const html=read(file);if(!html.includes('assets/site.js'))errors.push(`${file}: shared shell script missing`)}
-for(const token of ["document.createElement('header')","document.createElement('footer')","header.dataset.header=''","footer.className='site-footer'"])if(!siteJs.includes(token))errors.push(`assets/site.js: Phase 03 shell fallback regression -> ${token}`);
-for(const token of ['.site-header .primary-nav .nav-cta','.global-footer-shell','body.nav-open','@media(max-width:1180px)','@media(prefers-reduced-motion:reduce)'])if(!siteCss.includes(token))errors.push(`assets/site.css: Phase 03 shell styling regression -> ${token}`);
 
 const filmTag=index.match(/<video[^>]+id=["']holding-film["'][^>]*>/i)?.[0]||'';
 if(!filmTag)errors.push('index.html: approved film element missing');
@@ -84,5 +110,21 @@ if(!/\bplaysinline\b/i.test(filmTag))errors.push('index.html: approved film must
 for(const filmToken of ['assets/media/unique-holding-film-720p.mp4','assets/media/unique-holding-caption.vtt','data-film-sound','data-film-play','data-film-progress','data-film-time','data-film-mute','data-film-volume','data-film-captions','data-film-fullscreen','data-film-replay'])if(!index.includes(filmToken))errors.push(`index.html: Phase 01 film regression -> ${filmToken}`);
 for(const logicToken of ["const reducedMotion=window.matchMedia('(prefers-reduced-motion: reduce)').matches","if(reducedMotion){","const audibleStarted=await playSafely()","const mutedStarted=await playSafely()","if(!manualPaused&&!video.ended&&!reducedMotion)playSafely()"])if(!index.includes(logicToken))errors.push(`index.html: Phase 01 playback logic regression -> ${logicToken}`);
 
+const styleStart=index.indexOf('  <style>');
+const styleEnd=styleStart>=0?index.indexOf('  </style>',styleStart):-1;
+const heroStart=index.indexOf('    <section class="hero hero-film-hero"');
+const heroEnd=heroStart>=0?index.indexOf('    <section class="worlds"',heroStart):-1;
+const filmScriptMarker='  <script src="assets/site.js" defer></script>';
+const markerPos=index.indexOf(filmScriptMarker);
+const markerEnd=markerPos>=0?markerPos+filmScriptMarker.length:-1;
+const filmJsStart=markerEnd>=0?index.indexOf('  <script>',markerEnd):-1;
+const filmJsEnd=filmJsStart>=0?index.indexOf('  </script>',filmJsStart):-1;
+const protectedSlices=[
+  ['player inline CSS',styleStart>=0&&styleEnd>=0?index.slice(styleStart,styleEnd+'  </style>'.length):'', 'c7eeb7d7c334b92d50460a0e0bd4a2bd0f34ca3cb75550ecb485344620f4ba92'],
+  ['hero/player markup',heroStart>=0&&heroEnd>=0?index.slice(heroStart,heroEnd):'', 'd9c6628f5451049921b2a0bfd1f5f174c8c482101b156473204dd2a1c8012e9f'],
+  ['player behavior script',filmJsStart>=0&&filmJsEnd>=0?index.slice(filmJsStart,filmJsEnd+'  </script>'.length):'', '1e1697cce9df7d454022d27a9925095a3a0b5a4f27c8a88dc02e4916b6d9afe1']
+];
+for(const [label,value,expected] of protectedSlices){if(!value)errors.push(`index.html: protected Phase 01 ${label} missing`);else if(sha256(value)!==expected)errors.push(`index.html: protected Phase 01 ${label} changed`)}
+
 if(errors.length){console.error('\nTECHNICAL QA FAILED');for(const e of errors)console.error(' - '+e);process.exit(1)}
-console.log(`TECHNICAL QA PASS — ${htmlFiles.length} HTML, ${jsFiles.length} JS, ${cssFiles.length} CSS files checked; ${urls.length} sitemap URLs verified.`);
+console.log(`TECHNICAL QA PASS — ${htmlFiles.length} HTML, ${jsFiles.length} JS, ${cssFiles.length} CSS files checked; ${urls.length} sitemap URLs verified; static global shell verified on every HTML route.`);

@@ -100,3 +100,20 @@ body.nav-open{overflow:hidden}
   .site-header,.site-header .primary-nav,.site-header .primary-nav a::after,.site-header .menu-toggle span{transition:none!important}
 }
 }
+
+/* Phase 03 correction — accessible static navigation when JavaScript is disabled. */
+@layer polish{
+@media(max-width:1180px){
+  html:not(.js) .site-header,html:not(.js) .site-header.is-scrolled{position:relative;height:auto;min-height:74px;background:rgba(7,9,10,.98);backdrop-filter:none;border-bottom:1px solid var(--border-subtle)}
+  html:not(.js) .site-header .nav-shell{height:auto;min-height:74px;flex-wrap:wrap;align-items:center;padding:10px 0 18px}
+  html:not(.js) .site-header .menu-toggle{display:none}
+  html:not(.js) .site-header .primary-nav{position:static;inset:auto;width:100%;display:flex;flex-direction:row;align-items:center;justify-content:flex-start;flex-wrap:wrap;gap:6px 18px;padding:8px 0 0;background:transparent;overflow:visible;opacity:1;visibility:visible;pointer-events:auto;transform:none;transition:none}
+  html:not(.js) .site-header .primary-nav a,html:not(.js) .site-header .primary-nav a:nth-child(6),html:not(.js) .site-header .primary-nav a:nth-child(7){width:auto;min-height:44px;padding:0!important;border:0;font-family:var(--font-sans);font-size:11px;font-weight:700;letter-spacing:.075em;text-transform:uppercase;white-space:nowrap}
+  html:not(.js) .site-header .primary-nav .nav-cta{width:auto;min-height:44px;margin-top:0;padding:0 14px!important}
+}
+@media(max-width:520px){
+  html:not(.js) .site-header .primary-nav{flex-direction:column;align-items:stretch;gap:0}
+  html:not(.js) .site-header .primary-nav a,html:not(.js) .site-header .primary-nav a:nth-child(6),html:not(.js) .site-header .primary-nav a:nth-child(7){width:100%;white-space:normal}
+  html:not(.js) .site-header .primary-nav .nav-cta{width:max-content;margin-top:8px}
+}
+}
