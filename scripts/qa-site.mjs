@@ -240,5 +240,34 @@ for(const forbidden of [/trusted by/i,/certified by/i,/award[- ]winning/i,/advis
 if(/\b240294\b|MERS[Iİ]S|\bVKN\b|Tax Number|Vergi (?:No|Numara)/i.test(phase06Proof))errors.push('corporate.html: Phase 06 must not publish withheld registration identifiers');
 if(!/target=["']_blank["'][^>]*rel=["'][^"']*noopener/i.test(phase06Proof))errors.push('corporate.html: Phase 06 external trust links must use noopener');
 
+
+
+const energy=read('energy.html');
+const energyMain=energy.match(/<main\b[\s\S]*?<\/main>/i)?.[0]||'';
+const energyH1s=energyMain.match(/<h1\b/gi)||[];
+if(energyH1s.length!==1)errors.push(`energy.html: expected exactly one H1, found ${energyH1s.length}`);
+for(const token of [
+  'Petrochemical and industrial-chemical trading remains a current operating activity',
+  '01 / Industrial Business','A current industrial business built around physical-product requirements.',
+  'UNIQE OTOMOTİV KİMYA SANAYİ LİMİTED ŞİRKETİ','industrial trading, commercial sourcing and supply coordination',
+  'Import · Domestic supply · Export · Re-export','02 / What We Trade','Petrochemical Products','Industrial Chemicals','Energy &amp; Hydrocarbon Products',
+  '03 / Commercial Flow','Commercial sourcing','Offer review','Supply coordination',
+  '04 / Core Industrial Products','Urea 46','Caustic Soda Solid','Sodium Sulphate Anhydrous',
+  '05 / Operating Context','Since 2020','Istanbul, Türkiye','06 / Industrial Sales','Bring the requirement.',
+  'Product','Grade / specification','Quantity','Destination','Timing'
+])if(!energyMain.includes(token))errors.push(`energy.html: Phase 07 required content missing -> ${token}`);
+for(const route of ['products.html#petrochemical','products.html#chemical','products.html#energy-products','urea-46.html','caustic-soda-solid.html','sodium-sulphate-anhydrous.html','products.html','sales.html'])if(!energyMain.includes(`href="${route}"`))errors.push(`energy.html: Phase 07 route missing -> ${route}`);
+for(const id of ['overview','product-families','trading','core-products','customers','operations'])if(!new RegExp(`id=["']${id}["']`,'i').test(energyMain))errors.push(`energy.html: required/compatibility anchor missing -> #${id}`);
+if(/S&P|Platts/i.test(energyMain))errors.push('energy.html: Platts/S&P market-context prestige proof must not appear in Phase 07');
+for(const country of [/\bGermany\b/i,/\bAustria\b/i,/\bSerbia\b/i])if(country.test(energyMain))errors.push(`energy.html: unsupported named-market claim -> ${country}`);
+for(const claim of [/\bour (?:plant|factory|vessel|ship|warehouse|terminal|fleet|truck|trucks|storage|production)\b/i,/\bowned (?:plant|factory|vessel|ship|warehouse|terminal|fleet|trucks?|storage tanks?)\b/i,/\bmanufacturer\b/i,/\bproducer\b/i,/\bauthorized distributor\b/i,/\bexclusive supplier\b/i])if(claim.test(energyMain))errors.push(`energy.html: unsupported ownership/status wording -> ${claim}`);
+for(const claim of [/\brevenue\b/i,/\bturnover\b/i,/\bannual volume\b/i,/\btonnage\b/i,/\bshipment counts?\b/i,/\btrusted partner\b/i,/\bglobal leader\b/i,/\bworld-class\b/i,/\bbest-in-class\b/i,/\bcertified by\b/i,/\baward-winning\b/i])if(claim.test(energyMain))errors.push(`energy.html: unsupported metric/prestige wording -> ${claim}`);
+if(/\b240294\b|MERS[Iİ]S|\bVKN\b|Tax Number|Vergi (?:No|Numara)|Askı/i.test(energyMain))errors.push('energy.html: withheld registration/status information must not appear in Phase 07');
+if(/Unique Otomotiv Kimya Sanayi Limited Şirketi/.test(energyMain))errors.push('energy.html: old operating-company spelling returned');
+if(!/<style>[\s\S]*?@layer\s+page\s*\{[\s\S]*?<\/style>/i.test(energy.slice(0,energy.indexOf('</head>'))))errors.push('energy.html: Phase 07 page CSS must load deterministically in head');
+if(/<style\b/i.test(energyMain))errors.push('energy.html: Phase 07 styles must not appear inside main');
+const phase06Corporate=corporate.match(/<section class=["']corp-proof["'][\s\S]*?<\/section>/i)?.[0]||'';
+if(!phase06Corporate.includes('06 / Operating Proof')||!phase06Corporate.includes('Official company identity')||!phase06Corporate.includes('Public specialist output'))errors.push('corporate.html: protected Phase 06 Operating Proof section missing');
+
 if(errors.length){console.error('\nTECHNICAL QA FAILED');for(const e of errors)console.error(' - '+e);process.exit(1)}
 console.log(`TECHNICAL QA PASS — ${htmlFiles.length} HTML, ${jsFiles.length} JS, ${cssFiles.length} CSS files checked; ${urls.length} sitemap URLs verified; static global shell verified on every HTML route; Phase 04 homepage regression checks passed.`);
