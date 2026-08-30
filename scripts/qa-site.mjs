@@ -223,5 +223,22 @@ if(sha256(corporateFooter)!=='fb78cdce26ad95e93209faaec99e957f7fd2f882d3e5a6a83e
 if(!/<style>[\s\S]*?@layer\s+page\s*\{[\s\S]*?<\/style>/i.test(corporate.slice(0,corporate.indexOf('</head>'))))errors.push('corporate.html: Phase 05 page CSS must load deterministically in head');
 if(/<style\b/i.test(corporateMain))errors.push('corporate.html: page styles must not appear inside main');
 
+const phase06Proof=corporate.match(/<section class=["']corp-proof["'][\s\S]*?<\/section>/i)?.[0]||'';
+for(const token of [
+  '06 / Operating Proof','Corporate identity, commercial routes and public work.',
+  'The trust profile rests on the operating company, the Istanbul base, direct industrial contact routes and specialist work that is visible in public.',
+  'Official company identity','UNIQE OTOMOTİV KİMYA SANAYİ LİMİTED ŞİRKETİ',
+  'The operating-company name appears in the İstanbul Chamber of Commerce Chemicals member-firms listing.',
+  'https://www.ito.org.tr/en/sectoral-committees/member-firms/chemicals?page=543',
+  'Industrial sales route','Direct commercial contact','Product, grade, quantity, destination and timing can be routed through the published industrial-sales channel.',
+  'Public specialist output','Evidence Axis publishes an Intercom vs Zendesk intelligence sample that shows the specialist work in practice.',
+  'https://evidenceaxis.com/','Turkish corporate operations since 2020','Istanbul operating base','Public corporate and industrial contact routes'
+])if(!phase06Proof.includes(token))errors.push(`corporate.html: Phase 06 trust/proof statement missing -> ${token}`);
+if(/<img\b/i.test(phase06Proof))errors.push('corporate.html: Phase 06 must not introduce a leadership/stock image without approved provenance');
+for(const forbidden of [/\bChairman\b/i,/\bCEO\b/i,/\bPresident\b/i,/\bFounder\b/i,/\bBoard Member\b/i,/\bManaging Partner\b/i,/\bManaging Director\b/i])if(forbidden.test(phase06Proof))errors.push(`corporate.html: unsupported Phase 06 leadership title -> ${forbidden}`);
+for(const forbidden of [/trusted by/i,/certified by/i,/award[- ]winning/i,/advisory board/i,/management team/i,/team of \d+/i,/\d+ employees/i])if(forbidden.test(phase06Proof))errors.push(`corporate.html: unsupported Phase 06 trust/team language -> ${forbidden}`);
+if(/\b240294\b|MERS[Iİ]S|\bVKN\b|Tax Number|Vergi (?:No|Numara)/i.test(phase06Proof))errors.push('corporate.html: Phase 06 must not publish withheld registration identifiers');
+if(!/target=["']_blank["'][^>]*rel=["'][^"']*noopener/i.test(phase06Proof))errors.push('corporate.html: Phase 06 external trust links must use noopener');
+
 if(errors.length){console.error('\nTECHNICAL QA FAILED');for(const e of errors)console.error(' - '+e);process.exit(1)}
 console.log(`TECHNICAL QA PASS — ${htmlFiles.length} HTML, ${jsFiles.length} JS, ${cssFiles.length} CSS files checked; ${urls.length} sitemap URLs verified; static global shell verified on every HTML route; Phase 04 homepage regression checks passed.`);
