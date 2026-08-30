@@ -266,6 +266,31 @@ if(/\b240294\b|MERS[Iİ]S|\bVKN\b|Tax Number|Vergi (?:No|Numara)|Askı/i.test(en
 if(/Unique Otomotiv Kimya Sanayi Limited Şirketi/.test(energyMain))errors.push('energy.html: old operating-company spelling returned');
 if(!/<style>[\s\S]*?@layer\s+page\s*\{[\s\S]*?<\/style>/i.test(energy.slice(0,energy.indexOf('</head>'))))errors.push('energy.html: Phase 07 page CSS must load deterministically in head');
 if(/<style\b/i.test(energyMain))errors.push('energy.html: Phase 07 styles must not appear inside main');
+const energyVisualCss=read('assets/energy-visuals.css');
+for(const forbidden of ['images.unsplash.com','.energy-visual-card','energy-product-card--','energy-process-card--'])if(energyVisualCss.includes(forbidden))errors.push(`assets/energy-visuals.css: obsolete/remote Energy visual system returned -> ${forbidden}`);
+if(/https?:\/\//i.test(energyVisualCss))errors.push('assets/energy-visuals.css: external media request is forbidden in Phase 08 visual system');
+for(const token of ['energy-visual-moment--film','energy-visual-moment--operations','energy-flow-list::before'])if(!energyVisualCss.includes(token))errors.push(`assets/energy-visuals.css: Phase 08 visual treatment missing -> ${token}`);
+const phase08Images=[
+  ['assets/phase08/film-still-physical-trade.webp',960,540,true],
+  ['assets/phase08/operations-context.webp',640,800,true]
+];
+for(const [asset,w,h,lazy] of phase08Images){
+  if(!files.includes(asset)){errors.push(`Phase 08 asset missing -> ${asset}`);continue}
+  const dims=webpDimensions(asset);
+  if(!dims)errors.push(`Phase 08 asset dimensions unreadable -> ${asset}`);
+  else if(dims.width!==w||dims.height!==h)errors.push(`Phase 08 intrinsic dimensions changed -> ${asset}: ${dims.width}x${dims.height}`);
+  if(fs.statSync(path.join(root,asset)).size>180000)errors.push(`Phase 08 asset exceeds 180 KB -> ${asset}`);
+  const escaped=asset.replaceAll('.','\\.');
+  const tag=energy.match(new RegExp(`<img\\b[^>]*src=["']${escaped}["'][^>]*>`,'i'))?.[0]||'';
+  if(!tag)errors.push(`energy.html: Phase 08 image tag missing -> ${asset}`);
+  else{
+    if(Number(attr(tag,'width'))!==w||Number(attr(tag,'height'))!==h)errors.push(`energy.html: Phase 08 image attributes must match intrinsic ${w}x${h} -> ${asset}`);
+    if(lazy&&attr(tag,'loading')!=='lazy')errors.push(`energy.html: below-fold Phase 08 image must be lazy -> ${asset}`);
+    if(attr(tag,'decoding')!=='async')errors.push(`energy.html: Phase 08 image must decode async -> ${asset}`);
+  }
+}
+if(/our (?:plant|factory|vessel|ship|warehouse|terminal|fleet|loading operation|production line)/i.test(energyMain))errors.push('energy.html: Phase 08 visual integration implies unsupported asset ownership');
+if(/<figcaption\b/i.test(energyMain))errors.push('energy.html: Phase 08 should not add ownership-ambiguous visual captions');
 const phase06Corporate=corporate.match(/<section class=["']corp-proof["'][\s\S]*?<\/section>/i)?.[0]||'';
 if(!phase06Corporate.includes('06 / Operating Proof')||!phase06Corporate.includes('Official company identity')||!phase06Corporate.includes('Public specialist output'))errors.push('corporate.html: protected Phase 06 Operating Proof section missing');
 
