@@ -14,6 +14,8 @@ jobs:
     steps:
       - name: Checkout Phase 08 snapshot
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
 
       - name: Verify immutable product snapshot
         shell: bash
