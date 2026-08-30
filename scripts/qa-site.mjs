@@ -13,6 +13,21 @@ const jsFiles=files.filter(f=>f.endsWith('.js')&&!f.startsWith('.github/'));
 const attr=(tag,name)=>{const m=tag.match(new RegExp(`${name}=["']([^"']+)["']`,'i'));return m?.[1]||''};
 const noindex=html=>/<meta[^>]+name=["']robots["'][^>]+content=["'][^"']*noindex/i.test(html);
 const sha256=value=>crypto.createHash('sha256').update(value).digest('hex');
+const webpDimensions=file=>{
+  const b=fs.readFileSync(path.join(root,file));
+  if(b.length<30||b.toString('ascii',0,4)!=='RIFF'||b.toString('ascii',8,12)!=='WEBP')return null;
+  const kind=b.toString('ascii',12,16);
+  if(kind==='VP8 '){
+    if(b[23]!==0x9d||b[24]!==0x01||b[25]!==0x2a)return null;
+    return{width:b.readUInt16LE(26)&0x3fff,height:b.readUInt16LE(28)&0x3fff};
+  }
+  if(kind==='VP8L'){
+    if(b[20]!==0x2f)return null;
+    const bits=b.readUInt32LE(21);return{width:(bits&0x3fff)+1,height:((bits>>>14)&0x3fff)+1};
+  }
+  if(kind==='VP8X')return{width:1+b.readUIntLE(24,3),height:1+b.readUIntLE(27,3)};
+  return null;
+};
 const forbiddenPublicPhrases=['real private codebase','current evidence base','current corporate evidence base','verified public wording','automated quotation engine behind this page','public positioning remains intentionally limited','development status is kept separate','maturity determines visibility','does not invent a generic specification','evidence-backed public operating profile'];
 const primaryNavRoutes=[['corporate.html','Corporate'],['energy.html','Energy &amp; Trade'],['technology.html','Technology'],['ventures.html','Portfolio'],['contact.html','Contact'],['sales.html','Industrial Sales']];
 const footerRequired=['global-footer-shell','Footer navigation','energy.html','technology.html','ventures.html','evidence-axis.html','corporate.html','contact.html','products.html','sales.html','privacy.html','legal.html','Privacy &amp; Cookies','Legal Notice','Unique Otomotiv Kimya Sanayi Limited Şirketi'];
@@ -120,7 +135,7 @@ for(const logicToken of ["const reducedMotion=window.matchMedia('(prefers-reduce
 const styleStart=index.indexOf('  <style>');
 const styleEnd=styleStart>=0?index.indexOf('  </style>',styleStart):-1;
 const heroStart=index.indexOf('    <section class="hero hero-film-hero"');
-const heroEnd=heroStart>=0?index.indexOf('    <style>',heroStart):-1;
+const heroEnd=heroStart>=0?index.indexOf('    <section class="home-thesis"',heroStart):-1;
 const filmScriptMarker='  <script src="assets/site.js" defer></script>';
 const markerPos=index.indexOf(filmScriptMarker);
 const markerEnd=markerPos>=0?markerPos+filmScriptMarker.length:-1;
@@ -133,7 +148,28 @@ const protectedSlices=[
 ];
 for(const [label,value,expected] of protectedSlices){if(!value)errors.push(`index.html: protected Phase 01 ${label} missing`);else if(sha256(value)!==expected)errors.push(`index.html: protected Phase 01 ${label} changed`)}
 
-const phase04Required=['home-thesis','home-operating-world--trade','home-operating-world--tech','home-mindset','home-proof','home-commercial','home-routes','home-close','Intelligence</em> to understand.','Technology to build.','Commerce to execute.','assets/phase04/film-still-logistics.webp','assets/phase04/film-still-intelligence.webp','Intercom vs Zendesk','9</b> checked sources','Checked 19 August 2026'];
+const headEnd=index.indexOf('</head>');
+const mainStart=index.indexOf('<main id="main">');
+const mainEnd=mainStart>=0?index.indexOf('</main>',mainStart):-1;
+const headHtml=headEnd>=0?index.slice(0,headEnd):'';
+const mainHtml=mainStart>=0&&mainEnd>=0?index.slice(mainStart,mainEnd):'';
+const phase04StyleStart=headHtml.indexOf('    <style>\n      @layer page{');
+const phase04StyleEnd=phase04StyleStart>=0?headHtml.indexOf('    </style>',phase04StyleStart):-1;
+const phase04Style=phase04StyleStart>=0&&phase04StyleEnd>=0?headHtml.slice(phase04StyleStart,phase04StyleEnd+'    </style>'.length):'';
+if(!phase04Style)errors.push('index.html: Phase 04 @layer page styles must exist in head');
+else if(sha256(phase04Style)!=='87861dec2e13c7b96e0875b25283002efa9d1b6e8dcf6c22e611194c1e73f5c1')errors.push('index.html: accepted Phase 04 CSS changed');
+if(/@layer\s+page\s*\{/.test(mainHtml)||/<style\b[^>]*>[\s\S]*?\.home-thesis/i.test(mainHtml))errors.push('index.html: Phase 04 styles must not appear inside main');
+
+const headerStart=index.indexOf('  <header class="site-header"');
+const headerEnd=headerStart>=0?index.indexOf('  </header>',headerStart):-1;
+const homepageHeader=headerStart>=0&&headerEnd>=0?index.slice(headerStart,headerEnd+'  </header>'.length):'';
+const footerStart=index.indexOf('  <footer class="site-footer"');
+const footerEnd=footerStart>=0?index.indexOf('</footer>',footerStart):-1;
+const homepageFooter=footerStart>=0&&footerEnd>=0?index.slice(footerStart,footerEnd+'</footer>'.length):'';
+if(sha256(homepageHeader)!=='42d6bee4ef6d7c4abfd4216dbbb17fc11a6aa4ad43b6aa89c7c0a46d8c82aed9')errors.push('index.html: protected Phase 03 static header changed');
+if(sha256(homepageFooter)!=='d0178f35973403716959980aa038c91d833b0966406fed1483d21d374fab03cb')errors.push('index.html: protected Phase 03 static footer changed');
+
+const phase04Required=['home-thesis','home-operating-world--trade','home-operating-world--tech','home-mindset','home-proof','home-commercial','home-routes','home-close','Two operating worlds. One execution mindset.','Intelligence</em> to understand.','Technology to build.','Commerce to execute.','Physical markets. Commercial execution.','Research that informs. Products that move into build.','Understand → Build → Execute','Since<br>2020','Start with the requirement.','For partners, teams and new opportunities.','From intelligence to <em>execution.</em>','assets/phase04/film-still-logistics.webp','assets/phase04/film-still-intelligence.webp','Intercom vs Zendesk','9</b> checked sources','Checked 19 August 2026'];
 for(const token of phase04Required)if(!index.includes(token))errors.push(`index.html: Phase 04 homepage regression -> ${token}`);
 for(const removed of ['<section class="worlds"','<section class="relationships"','<section class="industrial gateway"','<section class="technology-preview"','<section class="corporate-gateway"'])if(index.includes(removed))errors.push(`index.html: legacy homepage section returned -> ${removed}`);
 const postHero=heroEnd>=0?index.slice(heroEnd,index.indexOf('  </main>',heroEnd)):'';
@@ -141,6 +177,20 @@ if(/images\.unsplash\.com/i.test(postHero))errors.push('index.html: Phase 04 bel
 for(const asset of ['assets/phase04/film-still-logistics.webp','assets/phase04/film-still-intelligence.webp']){
   if(!files.includes(asset))errors.push(`Phase 04 asset missing -> ${asset}`);
   else if(fs.statSync(path.join(root,asset)).size>120000)errors.push(`Phase 04 asset exceeds 120 KB -> ${asset}`);
+}
+const phase04ImageExpectations=[
+  ['assets/phase04/film-still-logistics.webp',800,450],
+  ['assets/phase04/film-still-intelligence.webp',800,450]
+];
+for(const [asset,expectedWidth,expectedHeight] of phase04ImageExpectations){
+  if(!files.includes(asset))continue;
+  const dims=webpDimensions(asset);
+  if(!dims)errors.push(`Phase 04 asset dimensions unreadable -> ${asset}`);
+  else if(dims.width!==expectedWidth||dims.height!==expectedHeight)errors.push(`Phase 04 intrinsic dimensions changed -> ${asset}: ${dims.width}x${dims.height}`);
+  const escaped=asset.replaceAll('.','\\.');
+  const tag=index.match(new RegExp(`<img\\b[^>]*src=["']${escaped}["'][^>]*>`,'i'))?.[0]||'';
+  if(!tag)errors.push(`index.html: Phase 04 image tag missing -> ${asset}`);
+  else if(Number(attr(tag,'width'))!==expectedWidth||Number(attr(tag,'height'))!==expectedHeight)errors.push(`index.html: Phase 04 image attributes must match intrinsic ${expectedWidth}x${expectedHeight} -> ${asset}`);
 }
 
 if(errors.length){console.error('\nTECHNICAL QA FAILED');for(const e of errors)console.error(' - '+e);process.exit(1)}
