@@ -15,14 +15,13 @@ jobs:
       - name: Checkout Phase 08 snapshot
         uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          fetch-depth: 0
 
       - name: Verify immutable product snapshot
         shell: bash
         run: |
-          test "$(git rev-parse HEAD^)" = "4ca464131e2e0d3ce2ba98aeda385c5d6162f34f"
-          git diff --name-only 4ca464131e2e0d3ce2ba98aeda385c5d6162f34f..HEAD | grep -Fx '.github/workflows/phase08-browser-qa.yml'
-          test "$(git diff --name-only 4ca464131e2e0d3ce2ba98aeda385c5d6162f34f..HEAD | wc -l)" -eq 1
+          git merge-base --is-ancestor 4ca464131e2e0d3ce2ba98aeda385c5d6162f34f HEAD
+          test "$(git diff --name-only 4ca464131e2e0d3ce2ba98aeda385c5d6162f34f..HEAD | sort)" = ".github/workflows/phase08-browser-qa.yml"
 
       - name: Install browser driver only
         shell: bash
