@@ -31,7 +31,7 @@ jobs:
           echo "CHROME=$CHROME" >> "$GITHUB_ENV"
           npm install --no-save --ignore-scripts puppeteer-core@24.16.0
 
-      - name: Render Energy page at three viewports
+      - name: Render Energy page at five exact required viewports
         shell: bash
         run: |
           mkdir -p phase08-browser-qa
@@ -44,9 +44,11 @@ jobs:
           const puppeteer = require('puppeteer-core');
 
           const cases = [
-            {name:'desktop', width:1440, height:1000},
-            {name:'tablet', width:1024, height:1366},
-            {name:'mobile', width:390, height:844}
+            {name:'1920x1080', width:1920, height:1080},
+            {name:'1440x900', width:1440, height:900},
+            {name:'768x1024', width:768, height:1024},
+            {name:'390x844', width:390, height:844},
+            {name:'360x800', width:360, height:800}
           ];
 
           async function settle(ms=350){ return new Promise(r => setTimeout(r, ms)); }
@@ -138,6 +140,13 @@ jobs:
                   const r = el.getBoundingClientRect();
                   return {tag:el.tagName.toLowerCase(), class:el.className || '', top:Math.round(r.top + scrollY), height:Math.round(r.height)};
                 });
+                const nav = document.querySelector('#primary-nav');
+                const header = document.querySelector('[data-header]');
+                const targets = {};
+                for (const sel of ['.energy-visual-moment--film','.energy-flow','.energy-core','.energy-context','.energy-visual-moment--operations','.energy-rfq']) {
+                  const el=document.querySelector(sel);
+                  targets[sel]=el ? {exists:true, width:Math.round(el.getBoundingClientRect().width), height:Math.round(el.getBoundingClientRect().height)} : {exists:false};
+                }
                 return {
                   viewportWidth: vw,
                   viewportHeight: innerHeight,
@@ -146,7 +155,10 @@ jobs:
                   horizontalOverflow: document.documentElement.scrollWidth > vw + 2,
                   overflow,
                   images,
-                  sections
+                  sections,
+                  header:{exists:!!header, width:header?Math.round(header.getBoundingClientRect().width):0},
+                  nav:{exists:!!nav, width:nav?Math.round(nav.getBoundingClientRect().width):0, ariaHidden:nav?.getAttribute('aria-hidden') || null},
+                  targets
                 };
               });
 
@@ -159,7 +171,10 @@ jobs:
               };
 
               await captureAt(page,c.name,'film','.energy-visual-moment--film');
+              await captureAt(page,c.name,'flow','.energy-flow');
+              await captureAt(page,c.name,'core','.energy-core');
               await captureAt(page,c.name,'context','.energy-context');
+              await captureAt(page,c.name,'operations','.energy-visual-moment--operations');
               await captureAt(page,c.name,'rfq','.energy-rfq');
               await captureAt(page,c.name,'hero');
               await page.screenshot({path:`phase08-browser-qa/energy-${c.name}-full.png`,fullPage:true});
@@ -177,21 +192,28 @@ jobs:
         run: |
           node <<'NODE'
           const r=require('./phase08-browser-qa/report.json');
+          const required=['1920x1080','1440x900','768x1024','390x844','360x800'];
+          if(JSON.stringify(Object.keys(r.cases))!==JSON.stringify(required)) throw new Error(`Exact viewport matrix mismatch: ${Object.keys(r.cases)}`);
           for(const [name,c] of Object.entries(r.cases)){
             if(![200,304].includes(c.status)) throw new Error(`${name}: HTTP ${c.status}`);
             if(c.horizontalOverflow) throw new Error(`${name}: horizontal overflow ${c.scrollWidth}/${c.viewportWidth}`);
             const broken=c.images.filter(i=>!i.complete||i.naturalWidth<1||i.naturalHeight<1);
             if(broken.length) throw new Error(`${name}: broken images ${JSON.stringify(broken)}`);
+            const phase08Images=c.images.filter(i=>i.src.includes('assets/phase08/'));
+            if(phase08Images.length!==2) throw new Error(`${name}: expected exactly two Phase 08 images, found ${phase08Images.length}`);
             if(c.pageErrors.length) throw new Error(`${name}: page errors ${JSON.stringify(c.pageErrors)}`);
+            if(c.consoleErrors.length) throw new Error(`${name}: console errors ${JSON.stringify(c.consoleErrors)}`);
             if(c.requestFailures.length) throw new Error(`${name}: request failures ${JSON.stringify(c.requestFailures)}`);
+            if(!c.header.exists||!c.nav.exists) throw new Error(`${name}: header/nav missing`);
+            for(const [sel,t] of Object.entries(c.targets)) if(!t.exists) throw new Error(`${name}: missing required target ${sel}`);
           }
-          console.log('PHASE08_BROWSER_SANITY_PASS');
+          console.log('PHASE08_EXACT_VIEWPORT_MATRIX_PASS');
           NODE
 
       - name: Upload browser QA packet
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: phase08-browser-qa
+          name: phase08-browser-qa-exact-matrix
           path: phase08-browser-qa/
           if-no-files-found: error
