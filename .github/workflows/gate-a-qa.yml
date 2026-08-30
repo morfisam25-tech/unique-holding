@@ -1,0 +1,283 @@
+name: Cumulative Quality Gate A — Phases 00–08
+
+on:
+  push:
+    branches:
+      - gate-a-qa-runner
+
+permissions:
+  contents: read
+
+jobs:
+  gate-a:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout immutable Phase 08 product snapshot
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify QA-only ancestry and scope
+        shell: bash
+        run: |
+          PRODUCT=4ca464131e2e0d3ce2ba98aeda385c5d6162f34f
+          git merge-base --is-ancestor "$PRODUCT" HEAD
+          test "$(git diff --name-only "$PRODUCT"..HEAD | sort)" = ".github/workflows/gate-a-qa.yml"
+          mkdir -p gate-a/{screenshots,nav-open,visible-text,reports}
+          echo "$PRODUCT" > gate-a/reports/product-sha.txt
+          git rev-parse HEAD > gate-a/reports/qa-branch-head.txt
+          git diff --name-only "$PRODUCT"..HEAD > gate-a/reports/qa-only-diff.txt
+
+      - name: Run existing technical QA without suppressing findings
+        shell: bash
+        run: |
+          set +e
+          node scripts/qa-site.mjs > gate-a/reports/qa-site.log 2>&1
+          code=$?
+          echo "$code" > gate-a/reports/qa-site-exit-code.txt
+          cat gate-a/reports/qa-site.log
+          echo "qa-site exit=$code"
+          exit 0
+
+      - name: Static cumulative content scan
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs=require('fs');
+          const routes=['index.html','corporate.html','energy.html','products.html','product.html','urea-46.html','caustic-soda-solid.html','sodium-sulphate-anhydrous.html','sales.html','technology.html','evidence-axis.html','ventures.html','contact.html','privacy.html','legal.html','404.html'];
+          const rules=[
+            ['obsolete-company-spelling',/Unique Otomotiv Kimya Sanayi Limited Şirketi/gi],
+            ['platts-or-sp',/\b(?:S&P|Platts)\b/gi],
+            ['placeholder',/\b(?:TODO|FIXME|TBD|Lorem ipsum|placeholder)\b/gi],
+            ['ownership-language',/\b(?:our vessels?|our tankers?|our terminals?|our warehouses?|our plants?|our refiner(?:y|ies)|owned vessels?|owned terminals?|owned warehouses?|owned plants?)\b/gi],
+            ['fake-leadership-risk',/\b(?:CEO|Chief Executive Officer|Founder|Chairman|Managing Director|Board of Directors)\b/gi],
+            ['revenue-volume-risk',/\b(?:revenue|turnover|annual volume|million tonnes?|metric tons? per year|MT\/year)\b/gi],
+            ['registration-id-risk',/\b(?:MERS[Iİ]S|Ticaret Sicil|Trade Registry|Tax Number|Vergi No|VKN)\b/gi],
+            ['partner-certification-risk',/\b(?:certified by|official partner|strategic partner|authorized distributor|exclusive distributor|ISO 9001|ISO 14001)\b/gi],
+            ['internal-qa-language',/\b(?:QA PASS|reviewer|phase 0[0-9]|phase 1[0-9]|evidence base|verified public wording|internal audit|source-lock)\b/gi]
+          ];
+          const out={productSha:'4ca464131e2e0d3ce2ba98aeda385c5d6162f34f',routes:{},summary:{}};
+          for(const route of routes){
+            const text=fs.readFileSync(route,'utf8');
+            const routeHits=[];
+            for(const [id,re] of rules){
+              re.lastIndex=0; let m;
+              while((m=re.exec(text))){
+                const start=Math.max(0,m.index-120), end=Math.min(text.length,m.index+m[0].length+160);
+                routeHits.push({rule:id,match:m[0],context:text.slice(start,end).replace(/\s+/g,' ')});
+                if(routeHits.length>100)break;
+              }
+            }
+            out.routes[route]=routeHits;
+          }
+          for(const [id] of rules) out.summary[id]=Object.values(out.routes).flat().filter(x=>x.rule===id).length;
+          fs.writeFileSync('gate-a/reports/content-scan.json',JSON.stringify(out,null,2));
+          NODE
+
+      - name: Install browser driver
+        shell: bash
+        run: |
+          CHROME="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || command -v chromium-browser || true)"
+          test -n "$CHROME"
+          echo "CHROME=$CHROME" >> "$GITHUB_ENV"
+          npm install --no-save --ignore-scripts puppeteer-core@24.16.0
+
+      - name: Render and crawl all public routes at exact matrix
+        shell: bash
+        run: |
+          python3 -m http.server 8000 --bind 127.0.0.1 >gate-a/reports/server.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID || true' EXIT
+          sleep 1
+          cat > /tmp/gate-a.cjs <<'NODE'
+          const fs=require('fs');
+          const crypto=require('crypto');
+          const puppeteer=require('puppeteer-core');
+          const PRODUCT='4ca464131e2e0d3ce2ba98aeda385c5d6162f34f';
+          const routes=['index.html','corporate.html','energy.html','products.html','product.html','urea-46.html','caustic-soda-solid.html','sodium-sulphate-anhydrous.html','sales.html','technology.html','evidence-axis.html','ventures.html','contact.html','privacy.html','legal.html','404.html'];
+          const viewports=[
+            {name:'1920x1080',width:1920,height:1080},
+            {name:'1440x900',width:1440,height:900},
+            {name:'768x1024',width:768,height:1024},
+            {name:'390x844',width:390,height:844},
+            {name:'360x800',width:360,height:800}
+          ];
+          const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+          const safe=s=>s.replace(/\.html$/,'').replace(/[^a-z0-9_-]+/gi,'-')||'index';
+          const hash=s=>crypto.createHash('sha256').update(s||'').digest('hex');
+          async function sweep(page){
+            await page.evaluate(async()=>{await new Promise(resolve=>{let y=0;const tick=()=>{const max=Math.max(document.body.scrollHeight,document.documentElement.scrollHeight);y+=700;scrollTo(0,Math.min(y,max));if(y>=max)setTimeout(()=>{scrollTo(0,0);resolve()},250);else setTimeout(tick,50)};tick()})});
+          }
+          function box(el){if(!el)return null;const r=el.getBoundingClientRect();return{left:Math.round(r.left),top:Math.round(r.top),right:Math.round(r.right),bottom:Math.round(r.bottom),width:Math.round(r.width),height:Math.round(r.height)}}
+          async function focusAudit(page){
+            await page.evaluate(()=>scrollTo(0,0));
+            const rows=[];
+            for(let i=0;i<10;i++){
+              await page.keyboard.press('Tab');
+              rows.push(await page.evaluate(()=>{const e=document.activeElement;if(!e)return null;const s=getComputedStyle(e);const r=e.getBoundingClientRect();return{tag:e.tagName.toLowerCase(),id:e.id||'',class:typeof e.className==='string'?e.className:'',text:(e.innerText||e.getAttribute('aria-label')||'').trim().slice(0,90),outlineStyle:s.outlineStyle,outlineWidth:s.outlineWidth,outlineColor:s.outlineColor,boxShadow:s.boxShadow,rect:{left:Math.round(r.left),top:Math.round(r.top),width:Math.round(r.width),height:Math.round(r.height)}}}));
+            }
+            return rows.filter(Boolean);
+          }
+          async function filmAudit(page){
+            return await page.evaluate(()=>{
+              const video=document.getElementById('holding-film');
+              const hero=document.querySelector('.hero-film-hero');
+              const shell=document.querySelector('.hero-film-shell');
+              const sound=document.querySelector('[data-film-sound]');
+              const controls=[...document.querySelectorAll('.hero-film-controls button,.hero-film-controls input')];
+              if(!video||!hero||!shell)return null;
+              const vr=video.getBoundingClientRect(),hr=hero.getBoundingClientRect(),sr=shell.getBoundingClientRect(),cs=getComputedStyle(video);
+              const iw=video.videoWidth||1280, ih=video.videoHeight||720;
+              let rendered={width:vr.width,height:vr.height},visibleX:1,visibleY:1,cropX:0,cropY:0;
+              if(cs.objectFit==='cover'&&iw&&ih){
+                const scale=Math.max(vr.width/iw,vr.height/ih);
+                const cw=iw*scale,ch=ih*scale;
+                visibleX=Math.min(1,vr.width/cw); visibleY=Math.min(1,vr.height/ch);
+                cropX=1-visibleX; cropY=1-visibleY;
+                rendered={width:cw,height:ch};
+              } else if(cs.objectFit==='contain'&&iw&&ih){
+                const scale=Math.min(vr.width/iw,vr.height/ih); rendered={width:iw*scale,height:ih*scale};
+              }
+              return{
+                intrinsic:{width:iw,height:ih,ratio:iw/ih},
+                hero:{left:hr.left,top:hr.top,width:hr.width,height:hr.height,ratio:hr.width/hr.height,overflow:getComputedStyle(hero).overflow},
+                shell:{left:sr.left,top:sr.top,width:sr.width,height:sr.height,overflow:getComputedStyle(shell).overflow},
+                videoBox:{left:vr.left,top:vr.top,width:vr.width,height:vr.height},
+                objectFit:cs.objectFit,objectPosition:cs.objectPosition,
+                coverRendered:{width:rendered.width,height:rendered.height},
+                visibleSourceFraction:{x:visibleX,y:visibleY},
+                croppedSourceFraction:{x:cropX,y:cropY},
+                soundCTA:sound?{hidden:sound.hidden,text:sound.textContent.trim(),rect:(()=>{const r=sound.getBoundingClientRect();return{left:r.left,top:r.top,width:r.width,height:r.height}})()}:null,
+                controls:controls.map(e=>{const r=e.getBoundingClientRect(),s=getComputedStyle(e);return{label:e.getAttribute('aria-label')||e.textContent.trim(),hidden:e.hidden,display:s.display,visibility:s.visibility,rect:{left:r.left,top:r.top,right:r.right,bottom:r.bottom,width:r.width,height:r.height}}}),
+                captions:{tracks:video.textTracks?video.textTracks.length:0,trackModes:video.textTracks?[...video.textTracks].map(t=>({kind:t.kind,label:t.label,mode:t.mode})):[]}
+              }
+            });
+          }
+          async function navAudit(page,route,vp){
+            const state=await page.evaluate(()=>{const t=document.querySelector('.menu-toggle'),n=document.querySelector('#primary-nav');if(!t||!n)return null;const ts=getComputedStyle(t),ns=getComputedStyle(n);return{toggleDisplay:ts.display,toggleVisible:ts.display!=='none'&&ts.visibility!=='hidden',expanded:t.getAttribute('aria-expanded'),navDisplay:ns.display,navVisibility:ns.visibility,bodyNavOpen:document.body.classList.contains('nav-open')}});
+            if(state?.toggleVisible){
+              await page.click('.menu-toggle'); await sleep(150);
+              const opened=await page.evaluate(()=>({expanded:document.querySelector('.menu-toggle')?.getAttribute('aria-expanded'),bodyNavOpen:document.body.classList.contains('nav-open'),activeTag:document.activeElement?.tagName?.toLowerCase()||'',activeText:(document.activeElement?.textContent||document.activeElement?.getAttribute?.('aria-label')||'').trim().slice(0,80)}));
+              if(vp.width<=768) await page.screenshot({path:`gate-a/nav-open/${safe(route)}-${vp.name}.jpg`,type:'jpeg',quality:72});
+              await page.keyboard.press('Escape'); await sleep(100);
+              const closed=await page.evaluate(()=>({expanded:document.querySelector('.menu-toggle')?.getAttribute('aria-expanded'),bodyNavOpen:document.body.classList.contains('nav-open'),activeTag:document.activeElement?.tagName?.toLowerCase()||'',activeText:(document.activeElement?.textContent||document.activeElement?.getAttribute?.('aria-label')||'').trim().slice(0,80)}));
+              return{initial:state,opened,closed};
+            }
+            return{initial:state};
+          }
+          (async()=>{
+            const browser=await puppeteer.launch({headless:true,executablePath:process.env.CHROME,args:['--no-sandbox','--disable-dev-shm-usage','--autoplay-policy=user-gesture-required']});
+            const report={productSha:PRODUCT,routes:{},linkRecords:[],routeViewports:{}};
+            for(const route of routes){
+              report.routes[route]={};
+              for(const vp of viewports){
+                const page=await browser.newPage();
+                const consoleErrors=[],pageErrors=[],requestFailures=[];
+                page.on('console',m=>{if(m.type()==='error')consoleErrors.push(m.text())});
+                page.on('pageerror',e=>pageErrors.push(String(e)));
+                page.on('requestfailed',r=>requestFailures.push({url:r.url(),error:r.failure()?.errorText||''}));
+                await page.setViewport({width:vp.width,height:vp.height,deviceScaleFactor:1});
+                const url=`http://127.0.0.1:8000/${route}`;
+                const response=await page.goto(url,{waitUntil:'domcontentloaded',timeout:30000});
+                await page.evaluate(()=>document.fonts?.ready||Promise.resolve());
+                await sleep(300);
+                const routeName=safe(route);
+                await page.screenshot({path:`gate-a/screenshots/${routeName}-${vp.name}-viewport.jpg`,type:'jpeg',quality:78});
+                await sweep(page); await sleep(200);
+                const metrics=await page.evaluate(()=>{
+                  const vw=document.documentElement.clientWidth;
+                  const overflow=[],clipped=[],images=[];
+                  for(const el of document.querySelectorAll('body *')){
+                    const s=getComputedStyle(el),r=el.getBoundingClientRect();
+                    if(!r.width||!r.height||s.display==='none'||s.visibility==='hidden')continue;
+                    if(s.position!=='fixed'&&s.position!=='sticky'&&(r.right>vw+2||r.left<-2)){
+                      overflow.push({tag:el.tagName.toLowerCase(),id:el.id||'',class:typeof el.className==='string'?el.className:'',left:Math.round(r.left),right:Math.round(r.right),width:Math.round(r.width)});
+                      if(overflow.length>=40)break;
+                    }
+                  }
+                  for(const el of document.querySelectorAll('h1,h2,h3,h4,h5,h6,p,a,button,label,li,td,th,span')){
+                    const s=getComputedStyle(el),r=el.getBoundingClientRect(),txt=(el.innerText||el.textContent||'').trim();
+                    if(!txt||!r.width||!r.height||s.display==='none'||s.visibility==='hidden')continue;
+                    const xClip=el.scrollWidth>el.clientWidth+2&&(s.overflowX==='hidden'||s.overflowX==='clip'||s.whiteSpace==='nowrap');
+                    const yClip=el.scrollHeight>el.clientHeight+2&&(s.overflowY==='hidden'||s.overflowY==='clip');
+                    if(xClip||yClip)clipped.push({tag:el.tagName.toLowerCase(),text:txt.slice(0,100),xClip,yClip,clientWidth:el.clientWidth,scrollWidth:el.scrollWidth,clientHeight:el.clientHeight,scrollHeight:el.scrollHeight,overflowX:s.overflowX,overflowY:s.overflowY,whiteSpace:s.whiteSpace});
+                    if(clipped.length>=40)break;
+                  }
+                  for(const img of document.images){const r=img.getBoundingClientRect(),s=getComputedStyle(img);images.push({src:img.getAttribute('src')||'',complete:img.complete,naturalWidth:img.naturalWidth,naturalHeight:img.naturalHeight,renderedWidth:Math.round(r.width),renderedHeight:Math.round(r.height),objectFit:s.objectFit,objectPosition:s.objectPosition});}
+                  const h=document.querySelector('[data-header]'),f=document.querySelector('footer.site-footer'),m=document.querySelector('main'),nav=document.querySelector('#primary-nav');
+                  const rect=e=>{if(!e)return null;const r=e.getBoundingClientRect();return{left:Math.round(r.left),top:Math.round(r.top),right:Math.round(r.right),bottom:Math.round(r.bottom),width:Math.round(r.width),height:Math.round(r.height)}};
+                  const ctas=[...document.querySelectorAll('main a,main button')].filter(e=>{const r=e.getBoundingClientRect(),s=getComputedStyle(e);return r.width>0&&r.height>0&&s.display!=='none'&&s.visibility!=='hidden'}).slice(0,30).map(e=>({text:(e.innerText||e.getAttribute('aria-label')||'').trim().slice(0,100),href:e.getAttribute('href')||null,rect:rect(e)}));
+                  const mainChildren=m?[...m.children].map(e=>({tag:e.tagName.toLowerCase(),class:typeof e.className==='string'?e.className:'',rect:rect(e)})):[];
+                  const gaps=[]; for(let i=1;i<mainChildren.length;i++){const a=mainChildren[i-1].rect,b=mainChildren[i].rect;if(a&&b){const g=b.top-a.bottom;if(g>180)gaps.push({after:mainChildren[i-1].class,before:mainChildren[i].class,gap:Math.round(g)})}}
+                  return{viewport:{width:innerWidth,height:innerHeight},scrollWidth:document.documentElement.scrollWidth,scrollHeight:document.documentElement.scrollHeight,horizontalOverflow:document.documentElement.scrollWidth>vw+2,overflow,clipped,images,header:rect(h),footer:rect(f),main:rect(m),nav:rect(nav),h1s:[...document.querySelectorAll('main h1')].map(e=>(e.innerText||e.textContent||'').trim()),ctas,mainChildren,gaps,bodyBg:getComputedStyle(document.body).backgroundColor,bodyColor:getComputedStyle(document.body).color,headerHtml:h?h.outerHTML:'',footerHtml:f?f.outerHTML:''};
+                });
+                const navState=await navAudit(page,route,vp);
+                const focus=await focusAudit(page);
+                const film=route==='index.html'&&vp.width<=768?await filmAudit(page):null;
+                if(vp.name==='1440x900'){
+                  const visible=await page.evaluate(()=>document.body.innerText);
+                  fs.writeFileSync(`gate-a/visible-text/${routeName}.txt`,visible);
+                  const links=await page.evaluate(()=>[...document.querySelectorAll('a[href]')].map(a=>({href:a.getAttribute('href'),label:(a.innerText||a.getAttribute('aria-label')||'').trim().replace(/\s+/g,' ').slice(0,180),target:a.getAttribute('target')||'',rel:a.getAttribute('rel')||''})));
+                  report.linkRecords.push(...links.map(l=>({source:route,...l})));
+                }
+                await page.screenshot({path:`gate-a/screenshots/${routeName}-${vp.name}-full.jpg`,type:'jpeg',quality:68,fullPage:true});
+                report.routes[route][vp.name]={status:response?.status()||null,...metrics,headerHash:hash(metrics.headerHtml),footerHash:hash(metrics.footerHtml),consoleErrors,pageErrors,requestFailures,navState,focus,film};
+                delete report.routes[route][vp.name].headerHtml; delete report.routes[route][vp.name].footerHtml;
+                await page.close();
+              }
+            }
+            const uniq=new Map();
+            for(const rec of report.linkRecords){const key=[rec.source,rec.href,rec.label].join('|');if(!uniq.has(key))uniq.set(key,rec)}
+            report.linkRecords=[...uniq.values()];
+            const internal=[];
+            for(const rec of report.linkRecords){
+              if(!rec.href||/^(mailto:|tel:|javascript:)/i.test(rec.href))continue;
+              let u; try{u=new URL(rec.href,`http://127.0.0.1:8000/${rec.source}`)}catch{continue}
+              if(u.hostname!=='127.0.0.1')continue;
+              const target=(u.pathname.replace(/^\//,'')||'index.html');
+              let status=null,fragmentOk=true,error=null;
+              try{const res=await fetch(`http://127.0.0.1:8000/${target}`);status=res.status;if(u.hash){const text=await res.text();const id=decodeURIComponent(u.hash.slice(1));fragmentOk=new RegExp(`(?:id|name)=["']${id.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}["']`,'i').test(text)}}catch(e){error=String(e)}
+              internal.push({...rec,target,fragment:u.hash||'',status,fragmentOk,error,automatedClass:(!status||status>=400||!fragmentOk)?'BROKEN':'PASS'});
+            }
+            report.internalLinks=internal;
+            fs.writeFileSync('gate-a/reports/browser-audit.json',JSON.stringify(report,null,2));
+            fs.writeFileSync('gate-a/reports/link-audit.json',JSON.stringify(internal,null,2));
+            fs.writeFileSync('gate-a/reports/homepage-film.json',JSON.stringify({productSha:PRODUCT,index:report.routes['index.html']},null,2));
+            await browser.close();
+          })().catch(e=>{console.error(e);process.exit(1)});
+          NODE
+          NODE_PATH="$PWD/node_modules" node /tmp/gate-a.cjs
+
+      - name: Summarize automated findings
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs=require('fs');const r=JSON.parse(fs.readFileSync('gate-a/reports/browser-audit.json','utf8'));
+          const lines=[];let count=0;
+          for(const [route,vps] of Object.entries(r.routes))for(const [vp,c] of Object.entries(vps)){
+            const broken=c.images.filter(i=>!i.complete||i.naturalWidth<1||i.naturalHeight<1);
+            const bits=[];
+            if(c.horizontalOverflow)bits.push('horizontal-overflow');
+            if(broken.length)bits.push(`broken-images:${broken.length}`);
+            if(c.consoleErrors.length)bits.push(`console-errors:${c.consoleErrors.length}`);
+            if(c.pageErrors.length)bits.push(`page-errors:${c.pageErrors.length}`);
+            if(c.requestFailures.length)bits.push(`request-failures:${c.requestFailures.length}`);
+            if(c.clipped.length)bits.push(`clip-heuristics:${c.clipped.length}`);
+            if(bits.length)count++;
+            lines.push(`${route} ${vp} ${bits.length?bits.join(','):'AUTOMATED-CLEAN'}`);
+          }
+          const brokenLinks=r.internalLinks.filter(x=>x.automatedClass!=='PASS');
+          lines.push(`internal-link-records=${r.internalLinks.length}`);
+          lines.push(`automated-broken-links=${brokenLinks.length}`);
+          lines.push(`route-viewport-cases-with-findings=${count}`);
+          fs.writeFileSync('gate-a/reports/summary.txt',lines.join('\n')+'\n');console.log(lines.join('\n'));
+          NODE
+
+      - name: Upload Gate A audit packet
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cumulative-quality-gate-a-phases-00-08
+          path: gate-a/
+          if-no-files-found: error
+          compression-level: 6
