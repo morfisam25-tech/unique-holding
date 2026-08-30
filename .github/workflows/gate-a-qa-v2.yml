@@ -1,0 +1,83 @@
+name: Cumulative Quality Gate A — Browser v2
+
+on:
+  push:
+    branches:
+      - gate-a-qa-runner
+
+permissions:
+  contents: read
+
+jobs:
+  gate-a-browser:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout QA branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify immutable product ancestry and QA-only diff
+        shell: bash
+        run: |
+          PRODUCT=4ca464131e2e0d3ce2ba98aeda385c5d6162f34f
+          git merge-base --is-ancestor "$PRODUCT" HEAD
+          git diff --name-only "$PRODUCT"..HEAD | sort > /tmp/diff.txt
+          cat >/tmp/expected.txt <<'EOF'
+          .github/qa/gate-a.cjs
+          .github/workflows/gate-a-qa-v2.yml
+          .github/workflows/gate-a-qa.yml
+          EOF
+          diff -u /tmp/expected.txt /tmp/diff.txt
+          mkdir -p gate-a/{screenshots,nav-open,visible-text,reports}
+          echo "$PRODUCT" > gate-a/reports/product-sha.txt
+          git rev-parse HEAD > gate-a/reports/qa-branch-head.txt
+          cp /tmp/diff.txt gate-a/reports/qa-only-diff.txt
+      - name: Technical QA
+        shell: bash
+        run: |
+          set +e
+          node scripts/qa-site.mjs >gate-a/reports/qa-site.log 2>&1
+          code=$?
+          echo "$code" >gate-a/reports/qa-site-exit-code.txt
+          cat gate-a/reports/qa-site.log
+          exit 0
+      - name: Content regression scan
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs=require('fs');
+          const routes=['index.html','corporate.html','energy.html','products.html','product.html','urea-46.html','caustic-soda-solid.html','sodium-sulphate-anhydrous.html','sales.html','technology.html','evidence-axis.html','ventures.html','contact.html','privacy.html','legal.html','404.html'];
+          const rules={obsoleteCompany:/Unique Otomotiv Kimya Sanayi Limited Şirketi/gi,platts:/\b(?:S&P|Platts)\b/gi,placeholder:/\b(?:TODO|FIXME|TBD|Lorem ipsum|placeholder)\b/gi,ownership:/\b(?:our vessels?|our tankers?|our terminals?|our warehouses?|our plants?|our refiner(?:y|ies)|owned vessels?|owned terminals?|owned warehouses?|owned plants?)\b/gi,leadership:/\b(?:CEO|Chief Executive Officer|Founder|Chairman|Managing Director|Board of Directors)\b/gi,revenueVolume:/\b(?:revenue|turnover|annual volume|million tonnes?|metric tons? per year|MT\/year)\b/gi,registration:/\b(?:MERS[Iİ]S|Ticaret Sicil|Trade Registry|Tax Number|Vergi No|VKN)\b/gi,partnerCertification:/\b(?:certified by|official partner|strategic partner|authorized distributor|exclusive distributor|ISO 9001|ISO 14001)\b/gi,internalQA:/\b(?:QA PASS|reviewer|phase 0[0-9]|phase 1[0-9]|evidence base|verified public wording|internal audit|source-lock)\b/gi};
+          const out={};for(const route of routes){const text=fs.readFileSync(route,'utf8');out[route]=[];for(const [rule,re] of Object.entries(rules)){re.lastIndex=0;let m;while((m=re.exec(text))){out[route].push({rule,match:m[0],context:text.slice(Math.max(0,m.index-100),Math.min(text.length,m.index+m[0].length+130)).replace(/\s+/g,' ')});if(out[route].length>80)break}}}fs.writeFileSync('gate-a/reports/content-scan.json',JSON.stringify(out,null,2));
+          NODE
+      - name: Install browser driver
+        shell: bash
+        run: |
+          CHROME="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || command -v chromium-browser || true)"
+          test -n "$CHROME"
+          echo "CHROME=$CHROME" >> "$GITHUB_ENV"
+          npm install --no-save --ignore-scripts puppeteer-core@24.16.0
+          node --check .github/qa/gate-a.cjs
+      - name: Crawl exact route and viewport matrix
+        shell: bash
+        run: |
+          python3 -m http.server 8000 --bind 127.0.0.1 >gate-a/reports/server.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID || true' EXIT
+          sleep 1
+          NODE_PATH="$PWD/node_modules" node .github/qa/gate-a.cjs
+      - name: Summarize findings
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs=require('fs'),r=JSON.parse(fs.readFileSync('gate-a/reports/browser-audit.json','utf8'));const lines=[];let cases=0;
+          for(const [route,vps] of Object.entries(r.routes))for(const [vp,c] of Object.entries(vps)){const broken=c.images.filter(i=>!i.complete||i.naturalWidth<1||i.naturalHeight<1),bits=[];if(c.horizontalOverflow)bits.push('horizontal-overflow');if(broken.length)bits.push(`broken-images:${broken.length}`);if(c.consoleErrors.length)bits.push(`console-errors:${c.consoleErrors.length}`);if(c.pageErrors.length)bits.push(`page-errors:${c.pageErrors.length}`);if(c.requestFailures.length)bits.push(`request-failures:${c.requestFailures.length}`);if(c.clipped.length)bits.push(`clip-heuristics:${c.clipped.length}`);if(bits.length)cases++;lines.push(`${route} ${vp} ${bits.length?bits.join(','):'AUTOMATED-CLEAN'}`)}const brokenLinks=r.internalLinks.filter(x=>x.automatedClass!=='PASS');lines.push(`internal-link-records=${r.internalLinks.length}`);lines.push(`automated-broken-links=${brokenLinks.length}`);lines.push(`cases-with-automated-findings=${cases}`);fs.writeFileSync('gate-a/reports/summary.txt',lines.join('\n')+'\n');console.log(lines.join('\n'));
+          NODE
+      - name: Upload Gate A packet
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cumulative-quality-gate-a-v2
+          path: gate-a/
+          if-no-files-found: error
+          compression-level: 6
