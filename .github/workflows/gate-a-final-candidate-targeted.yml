@@ -1,0 +1,47 @@
+name: Gate A final replacement candidate targeted
+on:
+  push:
+    branches: [gate-a-final-candidate-qa]
+    paths:
+      - '.github/qa/gate-a-final-targeted.cjs'
+      - '.github/workflows/gate-a-final-candidate-targeted.yml'
+permissions:
+  contents: read
+jobs:
+  targeted:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+      - name: Verify candidate snapshot
+        shell: bash
+        run: |
+          set -euo pipefail
+          FINAL=83567c124d171bf5d3664b41d8547555a2d196a8
+          BASE=bfdaeefcce715ff36bf8f9838b6401ffcc477b9c
+          git merge-base --is-ancestor "$FINAL" HEAD
+          test "$(git rev-parse ${FINAL}^)" = "$BASE"
+          test "$(git diff-tree --no-commit-id --name-only -r "$FINAL" | sort)" = $'products.html\nscripts/qa-site.mjs'
+          git diff --exit-code "$BASE" "$FINAL" -- index.html assets/site.css
+          if git diff --name-only "$FINAL"..HEAD | grep -Ev '^\.github/(qa|workflows)/' | grep -q .; then exit 2; fi
+          mkdir -p gate-a-final/reports
+          node scripts/qa-site.mjs | tee gate-a-final/reports/qa-site.log
+      - name: Prepare browser
+        shell: bash
+        run: |
+          CHROME="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium)"
+          echo "CHROME=$CHROME" >> "$GITHUB_ENV"
+          npm install --no-save --ignore-scripts puppeteer-core@24.16.0
+          node --check .github/qa/gate-a-final-targeted.cjs
+      - name: Run targeted browser acceptance
+        shell: bash
+        run: |
+          python3 -m http.server 8000 --bind 127.0.0.1 >gate-a-final/reports/server.log 2>&1 &
+          PID=$!; trap 'kill $PID || true' EXIT; sleep 1
+          NODE_PATH="$PWD/node_modules" node .github/qa/gate-a-final-targeted.cjs | tee gate-a-final/reports/targeted-console.log
+      - name: Upload targeted packet
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gate-a-final-candidate-targeted
+          path: gate-a-final/
