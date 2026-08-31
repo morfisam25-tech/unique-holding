@@ -1,0 +1,76 @@
+const fs=require('fs');
+const puppeteer=require('puppeteer-core');
+const PRODUCT='b6962ddae08385144001c1e244d5fb97a6a9c362';
+const base='http://127.0.0.1:8000/';
+const compact=[{name:'768x1024',width:768,height:1024},{name:'390x844',width:390,height:844},{name:'360x800',width:360,height:800}];
+const filmVP=[{name:'1920x1080',width:1920,height:1080},{name:'1440x900',width:1440,height:900},...compact];
+const hashVP=[{name:'1440x900',width:1440,height:900},...compact];
+const families=[['petrochemical','Petrochemical Products'],['chemical','Chemical Products'],['energy-products','Energy & Hydrocarbon Products']];
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const intersects=(a,b)=>Boolean(a&&b&&a.left<b.right&&a.right>b.left&&a.top<b.bottom&&a.bottom>b.top);
+const out={productSha:PRODUCT,nav:{},film:{},hashes:{},hashchange:[],search:{},corporate:null,assertions:[],failures:[]};
+const ok=(name,condition,detail)=>{out.assertions.push({name,pass:Boolean(condition),detail});if(!condition)out.failures.push({name,detail});};
+async function newPage(browser,vp){const p=await browser.newPage();await p.setViewport({width:vp.width,height:vp.height,deviceScaleFactor:1});return p}
+async function goto(p,url){const res=await p.goto(base+url,{waitUntil:'load',timeout:30000});await p.evaluate(()=>document.fonts?.ready||Promise.resolve());return res}
+async function anchorState(p,id){return p.evaluate(id=>{const box=e=>{if(!e)return null;const q=e.getBoundingClientRect();return{left:q.left,top:q.top,right:q.right,bottom:q.bottom,width:q.width,height:q.height}};const t=document.getElementById(id),h=t?.querySelector(':scope > h2'),head=document.querySelector('.site-header');return{hash:location.hash,target:box(t),heading:box(h),headingText:h?.textContent.trim()||'',header:box(head),scrollY,hidden:t?.hidden??null,docHeight:document.documentElement.scrollHeight}},id)}
+
+(async()=>{
+ const browser=await puppeteer.launch({headless:true,executablePath:process.env.CHROME,args:['--no-sandbox','--disable-dev-shm-usage','--autoplay-policy=no-user-gesture-required']});
+ fs.mkdirSync('gate-a-final/targeted',{recursive:true});
+
+ // A-001 locked regression: steady-state compact navigation.
+ for(const vp of compact){
+   const p=await newPage(browser,vp);await goto(p,'index.html');await p.click('.menu-toggle');await sleep(450);
+   const open=await p.evaluate(()=>{const box=e=>{const q=e.getBoundingClientRect();return{left:q.left,top:q.top,right:q.right,bottom:q.bottom,width:q.width,height:q.height}};const n=document.querySelector('#primary-nav'),t=document.querySelector('.menu-toggle'),m=document.querySelector('main'),f=document.querySelector('footer');return{viewport:{w:innerWidth,h:innerHeight},nav:box(n),expanded:t.getAttribute('aria-expanded'),bodyOpen:document.body.classList.contains('nav-open'),links:[...n.querySelectorAll('a[href]')].map(a=>({text:a.textContent.trim(),rect:box(a)})),mainInert:m?.inert??null,footerInert:f?.inert??null}});
+   await p.screenshot({path:`gate-a-final/targeted/nav-${vp.name}.png`});
+   const fwd=[];for(let i=0;i<9;i++){await p.keyboard.press('Tab');fwd.push(await p.evaluate(()=>Boolean(document.activeElement?.closest?.('.site-header'))))}
+   const back=[];for(let i=0;i<9;i++){await p.keyboard.down('Shift');await p.keyboard.press('Tab');await p.keyboard.up('Shift');back.push(await p.evaluate(()=>Boolean(document.activeElement?.closest?.('.site-header'))))}
+   await p.keyboard.press('Escape');await sleep(100);
+   const closed=await p.evaluate(()=>{const t=document.querySelector('.menu-toggle'),m=document.querySelector('main'),f=document.querySelector('footer');return{expanded:t.getAttribute('aria-expanded'),bodyOpen:document.body.classList.contains('nav-open'),mainInert:m?.inert??null,footerInert:f?.inert??null,focus:(document.activeElement?.getAttribute?.('aria-label')||document.activeElement?.textContent||'').trim()}});
+   out.nav[vp.name]={open,forwardTrap:fwd,backwardTrap:back,closed};
+   ok(`nav-${vp.name}-full-viewport`,Math.abs(open.nav.left)<=1&&Math.abs(open.nav.top)<=1&&Math.abs(open.nav.width-vp.width)<=1&&Math.abs(open.nav.height-vp.height)<=1,open.nav);
+   ok(`nav-${vp.name}-six-routes`,open.links.length===6&&open.links.every(x=>x.rect.left>=open.nav.left-1&&x.rect.right<=open.nav.right+1&&x.rect.top>=open.nav.top-1&&x.rect.bottom<=open.nav.bottom+1),open.links);
+   ok(`nav-${vp.name}-inert`,open.mainInert===true&&open.footerInert===true,{main:open.mainInert,footer:open.footerInert});
+   ok(`nav-${vp.name}-tab-trap`,fwd.every(Boolean),fwd);
+   ok(`nav-${vp.name}-shift-tab-trap`,back.every(Boolean),back);
+   ok(`nav-${vp.name}-escape`,closed.expanded==='false'&&!closed.bodyOpen&&closed.mainInert===false&&closed.footerInert===false&&/Open navigation/i.test(closed.focus),closed);
+   await p.close();
+ }
+
+ // Film emulation regression only. Real-device sign-off remains pending.
+ for(const vp of filmVP){
+   const p=await newPage(browser,vp);await goto(p,'index.html');
+   const playback=await p.evaluate(async()=>{const v=document.getElementById('holding-film');if(v.readyState<1)await new Promise(resolve=>{v.addEventListener('loadedmetadata',resolve,{once:true});setTimeout(resolve,5000)});const t=v.textTracks?.[0];if(t)t.mode='showing';v.muted=true;try{await v.play()}catch(e){}const start=performance.now();while(v.currentTime<4.1&&performance.now()-start<12000)await new Promise(r=>setTimeout(r,100));if(t)t.mode='showing';return{time:v.currentTime,paused:v.paused,readyState:v.readyState}});
+   const data=await p.evaluate(()=>{const box=e=>{const q=e.getBoundingClientRect();return{left:q.left,top:q.top,right:q.right,bottom:q.bottom,width:q.width,height:q.height}};const v=document.getElementById('holding-film'),hero=document.querySelector('.hero-film-hero'),cs=getComputedStyle(v),vr=v.getBoundingClientRect();const iw=v.videoWidth||1280,ih=v.videoHeight||720;let visibleX=1,visibleY=1,renderW=vr.width,renderH=vr.height;if(cs.objectFit==='cover'){const scale=Math.max(vr.width/iw,vr.height/ih);renderW=iw*scale;renderH=ih*scale;visibleX=Math.min(1,vr.width/renderW);visibleY=Math.min(1,vr.height/renderH)}else if(cs.objectFit==='contain'){const scale=Math.min(vr.width/iw,vr.height/ih);renderW=iw*scale;renderH=ih*scale;}const controls={};for(const [k,sel] of Object.entries({sound:'[data-film-sound]',play:'[data-film-play]',progress:'[data-film-progress]',time:'[data-film-time]',mute:'[data-film-mute]',volume:'[data-film-volume]',captions:'[data-film-captions]',fullscreen:'[data-film-fullscreen]',replay:'[data-film-replay]'})){const e=document.querySelector(sel);const s=e?getComputedStyle(e):null;controls[k]=e?{hidden:e.hidden,display:s.display,visibility:s.visibility,rect:box(e)}:null}const track=v.textTracks?.[0];const active=track?.activeCues?[...track.activeCues].map(c=>({text:c.text,startTime:c.startTime,endTime:c.endTime})):[];return{viewport:{w:innerWidth,h:innerHeight},video:box(v),hero:box(hero),intrinsic:{w:iw,h:ih},objectFit:cs.objectFit,objectPosition:cs.objectPosition,sourceVisiblePct:{x:visibleX*100,y:visibleY*100},trackMode:track?.mode||null,activeCues:active,controls};});
+   data.playback=playback;const visibleControls=Object.entries(data.controls).filter(([,c])=>c&&!c.hidden&&c.display!=='none'&&c.visibility!=='hidden');const videoIntersections=visibleControls.filter(([,c])=>intersects(data.video,c.rect)).map(([k])=>k);data.controlsIntersectingVideo=videoIntersections;out.film[vp.name]=data;
+   await p.screenshot({path:`gate-a-final/targeted/film-${vp.name}.png`});
+   const portrait=vp.width<=980&&vp.height>vp.width;
+   ok(`film-${vp.name}-played-to-cue`,playback.time>=4.0,playback);
+   ok(`film-${vp.name}-live-caption`,data.trackMode==='showing'&&data.activeCues.some(c=>/Technology changes how businesses compete\./.test(c.text)),{mode:data.trackMode,active:data.activeCues});
+   if(portrait){const ratio=data.video.width/data.video.height;const centered=Math.abs((data.video.top+data.video.height/2)-(data.hero.top+data.hero.height/2))<=2;ok(`film-${vp.name}-portrait-fit`,data.objectFit==='contain',data.objectFit);ok(`film-${vp.name}-16x9`,Math.abs(ratio-(16/9))<0.01,{ratio,video:data.video});ok(`film-${vp.name}-centered`,centered,{video:data.video,hero:data.hero});ok(`film-${vp.name}-full-source`,data.sourceVisiblePct.x>=99.9&&data.sourceVisiblePct.y>=99.9,data.sourceVisiblePct);ok(`film-${vp.name}-controls-outside-video`,videoIntersections.length===0,{intersections:videoIntersections,video:data.video,controls:data.controls});}else ok(`film-${vp.name}-desktop-cover`,data.objectFit==='cover',{fit:data.objectFit});
+   for(const key of ['play','progress','time','mute','volume','captions','fullscreen','replay']){const c=data.controls[key];ok(`film-${vp.name}-${key}-viewport`,Boolean(c)&&!c.hidden&&c.display!=='none'&&c.visibility!=='hidden'&&c.rect.left>=-1&&c.rect.right<=vp.width+1&&c.rect.top>=-1&&c.rect.bottom<=vp.height+1,c)}
+   await p.close();
+ }
+
+ // A-003 direct load: 3 fragments x 4 viewports. Capture layout stability at 0/500/1500 ms.
+ for(const [id,headingText] of families){out.hashes[id]={};for(const vp of hashVP){
+   const p=await newPage(browser,vp);const errors=[];p.on('console',m=>{if(m.type()==='error')errors.push(m.text())});await goto(p,`products.html#${id}`);const first=await anchorState(p,id);await sleep(500);const after500=await anchorState(p,id);await sleep(1000);const after1500=await anchorState(p,id);const data={first,after500,after1500,consoleErrors:errors};out.hashes[id][vp.name]=data;await p.screenshot({path:`gate-a-final/targeted/hash-${id}-${vp.name}.png`});
+   const hh=first.header?.height||0;const stable=Math.max(Math.abs((after500.heading?.top??9999)-(first.heading?.top??-9999)),Math.abs((after1500.heading?.top??9999)-(first.heading?.top??-9999)))<=3;const safe=Boolean(first.heading)&&first.heading.top>=hh+4&&first.heading.top<=hh+80&&first.heading.bottom<vp.height*.4;
+   ok(`hash-${id}-${vp.name}-exists`,Boolean(first.target)&&first.headingText===headingText&&!first.hidden,first);
+   ok(`hash-${id}-${vp.name}-header-safe`,safe,{header:first.header,heading:first.heading});
+   ok(`hash-${id}-${vp.name}-stable`,stable,{first:first.heading,after500:after500.heading,after1500:after1500.heading,scrollY:[first.scrollY,after500.scrollY,after1500.scrollY],docHeight:[first.docHeight,after500.docHeight,after1500.docHeight]});
+   ok(`hash-${id}-${vp.name}-no-console-errors`,errors.length===0,errors);
+   await p.close();
+ }}
+
+ // Same-page native fragment transitions at 390x844.
+ {const p=await newPage(browser,{name:'390x844',width:390,height:844});await goto(p,'products.html');for(const id of ['petrochemical','chemical','energy-products','petrochemical']){await p.evaluate(id=>{location.hash=id},id);await sleep(120);const data=await anchorState(p,id);out.hashchange.push(data);const hh=data.header?.height||0;ok(`hashchange-${id}-${out.hashchange.length}`,data.hash==='#'+id&&data.heading&&data.heading.top>=hh+4&&data.heading.top<=hh+80&&data.heading.bottom<844*.4,data)}await p.close()}
+
+ // Search regression over static catalog.
+ {const p=await newPage(browser,{name:'1440x900',width:1440,height:900});const consoleErrors=[];p.on('console',m=>{if(m.type()==='error')consoleErrors.push(m.text())});await goto(p,'products.html');const tests=[['MEG',1,['meg'],['petrochemical']],['HDPE',1,['hdpe'],['petrochemical']],['Urea',3,['urea-agri-prilled','urea-agri-granular','urea-industrial'],['petrochemical']],['Bitumen',1,['bitumen'],['energy-products']],['zzzz-no-result',0,[],[]],['',62,null,['petrochemical','chemical','energy-products']]];for(const [query,expectedCount,expectedSlugs,expectedGroups] of tests){await p.evaluate(q=>{const input=document.getElementById('product-search');input.value=q;input.dispatchEvent(new Event('input',{bubbles:true}))},query);await sleep(60);const state=await p.evaluate(()=>{const cards=[...document.querySelectorAll('[data-product-kind="inquiry"]')];const visible=cards.filter(c=>!c.hidden);const groups=['petrochemical','chemical','energy-products'].map(id=>({id,exists:Boolean(document.getElementById(id)),hidden:document.getElementById(id)?.hidden??null}));return{countText:document.getElementById('product-count')?.textContent||'',visibleCount:visible.length,visibleSlugs:visible.map(c=>c.dataset.slug),groups,allCount:cards.length,uniqueCount:new Set(cards.map(c=>c.dataset.slug)).size}});out.search[query||'__clear__']=state;ok(`search-${query||'clear'}-count`,state.visibleCount===expectedCount&&state.countText===expectedCount+' inquiry routes',state);if(expectedSlugs)ok(`search-${query||'clear'}-slugs`,JSON.stringify([...state.visibleSlugs].sort())===JSON.stringify([...expectedSlugs].sort()),state.visibleSlugs);ok(`search-${query||'clear'}-groups`,state.groups.every(g=>g.exists)&&JSON.stringify(state.groups.filter(g=>!g.hidden).map(g=>g.id).sort())===JSON.stringify([...expectedGroups].sort()),state.groups);ok(`search-${query||'clear'}-ids-persist`,state.groups.every(g=>g.exists),state.groups);ok(`search-${query||'clear'}-no-duplicates`,state.allCount===62&&state.uniqueCount===62,state)}ok('search-console-errors-zero',consoleErrors.length===0,consoleErrors);await p.screenshot({path:'gate-a-final/targeted/products-search-cleared.png',fullPage:false});await p.close()}
+
+ // A-004 locked regression.
+ {const p=await newPage(browser,{name:'1440x900',width:1440,height:900});await goto(p,'corporate.html');out.corporate=await p.evaluate(()=>{const a=[...document.querySelectorAll('a')].find(x=>x.textContent.trim()==='Public sample ↗');return a?{href:a.href,rawHref:a.getAttribute('href'),target:a.target,rel:a.rel,text:a.textContent.trim()}:null});ok('corporate-public-sample',out.corporate?.rawHref==='https://evidenceaxis.com/sample-report/'&&out.corporate?.target==='_blank'&&out.corporate?.rel.split(/\s+/).includes('noopener'),out.corporate);await p.screenshot({path:'gate-a-final/targeted/corporate-sample.png',fullPage:true});await p.close()}
+
+ fs.writeFileSync('gate-a-final/targeted/targeted-report.json',JSON.stringify(out,null,2));console.log(JSON.stringify({productSha:PRODUCT,assertions:out.assertions.length,failures:out.failures},null,2));await browser.close();if(out.failures.length)process.exit(2);
+})().catch(e=>{console.error(e);process.exit(1)});
