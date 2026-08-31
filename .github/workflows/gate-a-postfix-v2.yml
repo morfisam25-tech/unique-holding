@@ -1,0 +1,83 @@
+name: Gate A post-fix cumulative review v2
+
+on:
+  push:
+    branches: [gate-a-correction-qa-runner]
+
+permissions:
+  contents: read
+
+jobs:
+  gate-a:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify immutable product snapshot
+        run: |
+          set -euo pipefail
+          PRODUCT=ac633ec0e431668b000c105cb05bc81da93ebd2d
+          git merge-base --is-ancestor "$PRODUCT" HEAD
+          mkdir -p gate-a-postfix/reports gate-a-postfix/content
+          echo "$PRODUCT" > gate-a-postfix/reports/product-sha.txt
+          git diff --name-only "$PRODUCT"..HEAD | sort > gate-a-postfix/reports/qa-only-diff.txt
+      - name: Technical QA and content regression
+        run: |
+          set -euo pipefail
+          node scripts/qa-site.mjs | tee gate-a-postfix/reports/qa-site.log
+          node <<'NODE'
+          const fs=require('fs');const routes=['index.html','corporate.html','energy.html','products.html','product.html','urea-46.html','caustic-soda-solid.html','sodium-sulphate-anhydrous.html','sales.html','technology.html','evidence-axis.html','ventures.html','contact.html','privacy.html','legal.html','404.html'];const rules={obsoleteCompany:/Unique Otomotiv Kimya Sanayi Limited Şirketi/gi,platts:/\b(?:S&P|Platts)\b/gi,placeholder:/\b(?:TODO|FIXME|TBD|Lorem ipsum)\b/gi,ownership:/\b(?:our vessels?|our tankers?|our terminals?|our warehouses?|our plants?|our refiner(?:y|ies)|owned vessels?|owned terminals?|owned warehouses?|owned plants?)\b/gi,leadership:/\b(?:CEO|Chief Executive Officer|Founder|Chairman|Managing Director|Board of Directors)\b/gi,revenueVolume:/\b(?:revenue|turnover|annual volume|million tonnes?|metric tons? per year|MT\/year)\b/gi,registration:/\b(?:MERS[Iİ]S|Ticaret Sicil|Trade Registry|Tax Number|Vergi No|VKN)\b/gi,partnerCertification:/\b(?:certified by|official partner|strategic partner|authorized distributor|exclusive distributor|ISO 9001|ISO 14001)\b/gi,internalQA:/\b(?:QA PASS|reviewer|phase 0[0-9]|phase 1[0-9]|verified public wording|internal audit|source-lock)\b/gi};const out={};for(const route of routes){const text=fs.readFileSync(route,'utf8');out[route]=[];for(const [rule,re] of Object.entries(rules)){re.lastIndex=0;let m;while((m=re.exec(text)))out[route].push({rule,match:m[0],context:text.slice(Math.max(0,m.index-100),Math.min(text.length,m.index+m[0].length+130)).replace(/\s+/g,' ')})}}fs.writeFileSync('gate-a-postfix/content/content-scan.json',JSON.stringify(out,null,2));
+          NODE
+      - name: Prepare browser QA
+        run: |
+          set -euo pipefail
+          CHROME="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || true)"
+          test -n "$CHROME"
+          echo "CHROME=$CHROME" >> "$GITHUB_ENV"
+          npm install --no-save --ignore-scripts puppeteer-core@24.16.0
+          git show origin/gate-a-qa-runner:.github/qa/gate-a.cjs > /tmp/gate-a-broad.cjs
+          sed -i 's/4ca464131e2e0d3ce2ba98aeda385c5d6162f34f/ac633ec0e431668b000c105cb05bc81da93ebd2d/g' /tmp/gate-a-broad.cjs
+          cp .github/qa/gate-a-postfix-targeted.cjs /tmp/gate-a-targeted.cjs
+          python3 <<'PY'
+          from pathlib import Path
+          p=Path('/tmp/gate-a-targeted.cjs');s=p.read_text()
+          s=s.replace("const r=e=>rectObj(e.getBoundingClientRect());","const r=e=>{const q=e.getBoundingClientRect();return{left:q.left,top:q.top,right:q.right,bottom:q.bottom,width:q.width,height:q.height}};")
+          s=s.replace("const r=e=>rectObj(e.getBoundingClientRect()),cs=getComputedStyle(v);","const r=e=>{const q=e.getBoundingClientRect();return{left:q.left,top:q.top,right:q.right,bottom:q.bottom,width:q.width,height:q.height}},cs=getComputedStyle(v);")
+          s=s.replace("const r=e=>e?rectObj(e.getBoundingClientRect()):null;","const r=e=>{if(!e)return null;const q=e.getBoundingClientRect();return{left:q.left,top:q.top,right:q.right,bottom:q.bottom,width:q.width,height:q.height}};")
+          if 'rectObj(e.getBoundingClientRect())' in s: raise SystemExit('unpatched rectObj browser-context reference')
+          p.write_text(s)
+          PY
+          node --check /tmp/gate-a-broad.cjs
+          node --check /tmp/gate-a-targeted.cjs
+      - name: Run cumulative and targeted browser QA
+        run: |
+          set +e
+          mkdir -p gate-a/{screenshots,nav-open,visible-text,reports}
+          python3 -m http.server 8000 --bind 127.0.0.1 >gate-a-postfix/reports/server.log 2>&1 &
+          PID=$!; trap 'kill $PID || true' EXIT; sleep 1
+          NODE_PATH="$PWD/node_modules" node /tmp/gate-a-broad.cjs; echo $? > gate-a-postfix/reports/broad-exit-code.txt
+          NODE_PATH="$PWD/node_modules" node /tmp/gate-a-targeted.cjs; echo $? > gate-a-postfix/reports/targeted-exit-code.txt
+          NODE_PATH="$PWD/node_modules" node .github/qa/gate-a-postfix-lazy.cjs; echo $? > gate-a-postfix/reports/lazy-exit-code.txt
+          NODE_PATH="$PWD/node_modules" node .github/qa/gate-a-postfix-nojs.cjs; echo $? > gate-a-postfix/reports/nojs-exit-code.txt
+          exit 0
+      - name: Summarize and enforce
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs=require('fs'),b=require('./gate-a/reports/browser-audit.json'),t=require('./gate-a-postfix/targeted/targeted-report.json'),l=require('./gate-a-postfix/lazy/lazy-report.json'),n=require('./gate-a-postfix/nojs/nojs-report.json');let cases=0,horizontalOverflowCases=0,consoleErrors=0,pageErrors=0,requestFailures=0,rawBrokenImageSamples=0,clipHeuristicCases=0;const routeRows=[];for(const [route,vps] of Object.entries(b.routes))for(const [vp,c] of Object.entries(vps)){cases++;const bi=c.images.filter(i=>!i.complete||i.naturalWidth<1||i.naturalHeight<1);horizontalOverflowCases+=c.horizontalOverflow?1:0;consoleErrors+=c.consoleErrors.length;pageErrors+=c.pageErrors.length;requestFailures+=c.requestFailures.length;rawBrokenImageSamples+=bi.length;clipHeuristicCases+=c.clipped.length?1:0;routeRows.push({route,vp,status:c.status,horizontalOverflow:c.horizontalOverflow,brokenImages:bi.length,consoleErrors:c.consoleErrors.length,pageErrors:c.pageErrors.length,requestFailures:c.requestFailures.length,clipHeuristics:c.clipped.length})}const rawBroken=b.internalLinks.filter(x=>x.automatedClass!=='PASS'),dynamic=new Set(['#petrochemical','#chemical','#energy-products']),hard=rawBroken.filter(x=>!dynamic.has(x.fragment));const s={productSha:b.productSha,cases,expectedCases:80,horizontalOverflowCases,consoleErrors,pageErrors,requestFailures,rawBrokenImageSamples,clipHeuristicCases,internalLinkRecords:b.internalLinks.length,rawBrokenLinks:rawBroken.length,hardBrokenLinksExcludingDynamic:hard.length,targetedFailures:t.failures,lazyFailures:l.failures,noJsFailures:n.failures,routeRows};fs.writeFileSync('gate-a-postfix/reports/postfix-summary.json',JSON.stringify(s,null,2));console.log(JSON.stringify(s,null,2));if(cases!==80||horizontalOverflowCases||consoleErrors||pageErrors||requestFailures||hard.length||t.failures.length||l.failures.length||n.failures.length)process.exit(2);
+          NODE
+          test "$(cat gate-a-postfix/reports/broad-exit-code.txt)" = 0
+          test "$(cat gate-a-postfix/reports/targeted-exit-code.txt)" = 0
+          test "$(cat gate-a-postfix/reports/lazy-exit-code.txt)" = 0
+          test "$(cat gate-a-postfix/reports/nojs-exit-code.txt)" = 0
+      - name: Upload correction review packet
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cumulative-quality-gate-a-correction-review-v2
+          path: |
+            gate-a/
+            gate-a-postfix/
+          if-no-files-found: error
+          compression-level: 6
