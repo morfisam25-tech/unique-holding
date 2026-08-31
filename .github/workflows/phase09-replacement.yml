@@ -1,0 +1,43 @@
+name: Phase 09 replacement candidate builder
+on:
+  push:
+    branches: [phase09-replacement-runner]
+    paths:
+      - '.github/phase09/build-replacement.cjs'
+      - '.github/workflows/phase09-replacement.yml'
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Preserve replacement patch and rebuild from approved baseline
+        run: |
+          set -euo pipefail
+          cp .github/phase09/build-replacement.cjs /tmp/build-replacement.cjs
+          BASE=83567c124d171bf5d3664b41d8547555a2d196a8
+          OLD=7568f4d2215f2eeb2a09d0e5b60182ff19c80f96
+          git checkout -B phase09-replacement "$BASE"
+          git checkout "$OLD" -- assets/products-ia.css product.html products.html scripts/qa-site.mjs
+          node /tmp/build-replacement.cjs
+          node scripts/qa-site.mjs
+          test "$(git diff --name-only | sort)" = $'assets/products-ia.css\nproduct.html\nproducts.html\nscripts/qa-site.mjs'
+          git diff --exit-code "$BASE" -- index.html assets/site.css
+      - name: Commit one replacement candidate
+        run: |
+          set -euo pipefail
+          git config user.name "morfisam25-tech"
+          git config user.email "morfisam25@gmail.com"
+          git add assets/products-ia.css product.html products.html scripts/qa-site.mjs
+          git commit -m "PHASE 09 — Rebuild product information architecture"
+          BASE=83567c124d171bf5d3664b41d8547555a2d196a8
+          test "$(git rev-parse HEAD^)" = "$BASE"
+          test "$(git diff-tree --no-commit-id --name-only -r HEAD | sort)" = $'assets/products-ia.css\nproduct.html\nproducts.html\nscripts/qa-site.mjs'
+          git push --force origin HEAD:phase09-ia-candidate
+          echo "CANDIDATE=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+      - name: Report candidate
+        run: |
+          echo "PHASE09_REPLACEMENT_CANDIDATE=$CANDIDATE"
