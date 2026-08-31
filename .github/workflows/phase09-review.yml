@@ -24,7 +24,7 @@ jobs:
           cp .github/phase09/phase09-browser-qa.cjs /tmp/phase09-browser-qa.cjs
           PRODUCT=97358c5aee8685e972decb0e022385f4998f237c
           BASE=83567c124d171bf5d3664b41d8547555a2d196a8
-          git checkout -B candidate "$PRODUCT"
+          git checkout -f -B candidate "$PRODUCT"
           test "$(git rev-parse ${PRODUCT}^)" = "$BASE"
           test "$(git diff-tree --no-commit-id --name-only -r "$PRODUCT" | sort)" = $'assets/products-ia.css\nproduct.html\nproducts.html\nscripts/qa-site.mjs'
           git diff --exit-code "$BASE" "$PRODUCT" -- index.html assets/site.css
