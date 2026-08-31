@@ -1,0 +1,45 @@
+name: Phase 09 product IA builder
+on:
+  push:
+    branches: [phase09-ia-build-runner]
+    paths:
+      - '.github/phase09/build-phase09.cjs'
+      - '.github/workflows/phase09-build.yml'
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Preserve builder and checkout approved baseline
+        run: |
+          set -euo pipefail
+          cp .github/phase09/build-phase09.cjs /tmp/build-phase09.cjs
+          git fetch origin rebuild/award-level-corporate-v2
+          git checkout -B phase09-product origin/rebuild/award-level-corporate-v2
+          test "$(git rev-parse HEAD)" = "83567c124d171bf5d3664b41d8547555a2d196a8"
+      - name: Build Phase 09
+        run: |
+          set -euo pipefail
+          node /tmp/build-phase09.cjs
+          node scripts/qa-site.mjs
+          test "$(git diff --name-only | sort)" = $'assets/products-ia.css\nproduct.html\nproducts.html\nscripts/qa-site.mjs'
+          git diff --exit-code -- index.html assets/site.css
+      - name: Commit exactly once to rebuild branch
+        run: |
+          set -euo pipefail
+          git config user.name "morfisam25-tech"
+          git config user.email "morfisam25@gmail.com"
+          git add assets/products-ia.css product.html products.html scripts/qa-site.mjs
+          git commit -m "PHASE 09 — Rebuild product information architecture"
+          test "$(git rev-parse HEAD^)" = "83567c124d171bf5d3664b41d8547555a2d196a8"
+          git push origin HEAD:rebuild/award-level-corporate-v2
+          echo "PHASE09_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+      - name: Final commit scope
+        run: |
+          set -euo pipefail
+          git diff-tree --no-commit-id --name-only -r "$PHASE09_SHA" | sort
+          test "$(git diff-tree --no-commit-id --name-only -r "$PHASE09_SHA" | sort)" = $'assets/products-ia.css\nproduct.html\nproducts.html\nscripts/qa-site.mjs'
