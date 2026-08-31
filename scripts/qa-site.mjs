@@ -379,3 +379,22 @@ if(!products.includes('aria-live="polite"'))errors.push('products.html: Phase 09
 
 if(errors.length){console.error('\nTECHNICAL QA FAILED');for(const e of errors)console.error(' - '+e);process.exit(1)}
 console.log(`TECHNICAL QA PASS — ${htmlFiles.length} HTML, ${jsFiles.length} JS, ${cssFiles.length} CSS files checked; ${urls.length} sitemap URLs verified; static global shell verified on every HTML route; Phase 04 homepage regression checks passed.`);
+
+// Phase 10 — authoritative core-product reference-page guards.
+{
+  const phase10Pages={"urea-46.html":{"name":"Urea 46","values":["Nitrogen Content","min 46% wt","Biuret","max 0.8% wt","Formaldehyde","max 0.55% wt","Moisture","max 0.3% wt","Particle size 2–4 mm","90%"],"family":"Fertilizer / Industrial Feedstock"},"caustic-soda-solid.html":{"name":"Caustic Soda Solid","values":["Chemical name","Sodium Hydroxide","CAS","1310-73-2","NaOH","approx. 98.8%","Dry basis","99.3%","UN number","1823","Class","8","Packing Group","II"],"family":"Industrial Chemicals"},"sodium-sulphate-anhydrous.html":{"name":"Sodium Sulphate Anhydrous","values":["Na₂SO₄","99.20%","Water Insoluble Matter","0.02%","Ca & Mg","0.02%","Chloride","0.30%","Fe","0.0003%","Moisture","0.05%","Whiteness","91%"],"family":"Industrial Chemicals"}};
+  const claimBan=['in stock','available now','our factory','our plant','our production','our warehouse','our terminal','our fleet','direct producer','exclusive supplier','leading supplier','global supplier','certified supplier','guaranteed supply','annual capacity','minimum order','moq','immediate delivery'];
+  for(const [file,meta] of Object.entries(phase10Pages)){
+    const html=read(file);const lower=html.toLowerCase();
+    if(noindex(html))errors.push(`${file}: Phase 10 reference route must remain indexable`);
+    if((html.match(/<h1\b/gi)||[]).length!==1)errors.push(`${file}: Phase 10 reference route must have exactly one H1`);
+    for(const token of ['assets/core-product-reference.css','data-reference-detail="true"','Reference detail','01 / Product Identity','02 / Commercial Route / Variant Context','03 / Published Reference Data','04 / Specification Interpretation / Boundary','05 / Buyer Requirement','06 / Commercial Review / Industrial Sales','<table class="reference-table">','<caption>Published reference data</caption>','scope="col"','scope="row"','products.html','sales.html','Product','Grade / specification','Quantity','Destination','Timing','Specification','Contact'])if(!html.includes(token))errors.push(`${file}: Phase 10 authority architecture regression -> ${token}`);
+    for(const value of meta.values)if(!html.includes(value))errors.push(`${file}: approved Phase 10 technical value missing -> ${value}`);
+    for(const phrase of claimBan)if(lower.includes(phrase))errors.push(`${file}: unsupported Phase 10 product claim -> ${phrase}`);
+    const canonical='https://www.uniqueholding.com.tr/'+file;if(!html.includes(`rel="canonical" href="${canonical}"`))errors.push(`${file}: Phase 10 canonical regression`);
+  }
+  const p09=read('products.html');
+  const refs=(p09.match(/data-destination="reference-detail"/g)||[]).length;const inquiries=(p09.match(/data-destination="inquiry-detail"/g)||[]).length;
+  if(refs!==3||inquiries!==62)errors.push(`Phase 10: Phase 09 route classification regression REFERENCE=${refs} INQUIRY=${inquiries}`);
+  for(const [slug,href] of [['urea-46','urea-46.html'],['caustic-soda-solid','caustic-soda-solid.html'],['sodium-sulphate-anhydrous','sodium-sulphate-anhydrous.html']])if(!p09.includes(`data-slug="${slug}" href="${href}"`))errors.push(`Phase 10: Core route destination regression -> ${slug}`);
+}
