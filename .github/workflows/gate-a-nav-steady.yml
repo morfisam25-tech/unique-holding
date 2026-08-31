@@ -1,0 +1,26 @@
+name: Gate A steady-state compact nav
+on:
+  push:
+    branches: [gate-a-correction-qa-runner]
+permissions:
+  contents: read
+jobs:
+  nav:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          CHROME="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium)"
+          echo "CHROME=$CHROME" >> "$GITHUB_ENV"
+          npm install --no-save --ignore-scripts puppeteer-core@24.16.0
+      - run: |
+          mkdir -p gate-a-nav-steady
+          python3 -m http.server 8000 --bind 127.0.0.1 >/tmp/server.log 2>&1 &
+          PID=$!; trap 'kill $PID || true' EXIT; sleep 1
+          NODE_PATH="$PWD/node_modules" node .github/qa/gate-a-nav-steady.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gate-a-nav-steady
+          path: gate-a-nav-steady/
+          if-no-files-found: error
