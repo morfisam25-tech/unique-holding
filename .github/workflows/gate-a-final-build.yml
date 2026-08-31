@@ -1,0 +1,47 @@
+name: Gate A final structural product build
+on:
+  push:
+    branches: [gate-a-final-build-runner]
+    paths:
+      - '.github/qa/build-gate-a-final.cjs'
+      - '.github/workflows/gate-a-final-build.yml'
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Build exact final product commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE=bfdaeefcce715ff36bf8f9838b6401ffcc477b9c
+          REMOTE=$(git ls-remote origin refs/heads/gate-a-correction | cut -f1)
+          test "$REMOTE" = "$BASE"
+          cp .github/qa/build-gate-a-final.cjs /tmp/build-gate-a-final.cjs
+          git checkout --detach "$BASE"
+          node /tmp/build-gate-a-final.cjs | tee /tmp/build.log
+          test "$(git diff --name-only | sort)" = $'products.html\nscripts/qa-site.mjs'
+          git diff --exit-code "$BASE" -- index.html assets/site.css
+          node scripts/qa-site.mjs | tee /tmp/qa-site.log
+          grep -Fx 'MISMATCH COUNT: 0' /tmp/qa-site.log
+          git config user.name 'morfisam25-tech'
+          git config user.email 'morfisam25@gmail.com'
+          git add products.html scripts/qa-site.mjs
+          git commit -m 'GATE A final — make product fragments layout-stable'
+          FINAL=$(git rev-parse HEAD)
+          test "$(git rev-parse HEAD^)" = "$BASE"
+          test "$(git diff-tree --no-commit-id --name-only -r HEAD | sort)" = $'products.html\nscripts/qa-site.mjs'
+          git push origin HEAD:refs/heads/gate-a-correction
+          echo "$FINAL" | tee /tmp/final-sha.txt
+      - name: Upload build proof
+        uses: actions/upload-artifact@v4
+        with:
+          name: gate-a-final-build-proof
+          path: |
+            /tmp/build.log
+            /tmp/qa-site.log
+            /tmp/final-sha.txt
