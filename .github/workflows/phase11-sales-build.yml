@@ -18,6 +18,15 @@ jobs:
         run: |
           set -euo pipefail
           cp .github/phase11/build-phase11.cjs /tmp/build-phase11.cjs
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('/tmp/build-phase11.cjs')
+          s=p.read_text()
+          old="console.log(`TECHNICAL QA PASS — ${htmlFiles.length} HTML, ${jsFiles.length} JS, ${cssFiles.length} CSS files checked; ${urls.length} sitemap URLs verified; Phase 09/10/11 guards passed; protected film hashes verified.`);"
+          new="console.log('TECHNICAL QA PASS — '+htmlFiles.length+' HTML, '+jsFiles.length+' JS, '+cssFiles.length+' CSS files checked; '+urls.length+' sitemap URLs verified; Phase 09/10/11 guards passed; protected film hashes verified.');"
+          assert old in s
+          p.write_text(s.replace(old,new))
+          PY
           BASE=26b30d3f8ded68caf5046b55301e77c379330d6c
           git checkout -B phase11-candidate-work "$BASE"
           node /tmp/build-phase11.cjs
