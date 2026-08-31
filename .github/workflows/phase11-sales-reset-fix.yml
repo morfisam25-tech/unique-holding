@@ -1,0 +1,43 @@
+name: Phase 11 reset-safe replacement candidate
+on:
+  push:
+    branches: [phase11-sales-reset-fix-runner]
+    paths:
+      - '.github/workflows/phase11-sales-reset-fix.yml'
+permissions:
+  contents: write
+jobs:
+  replace:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Rebuild one-commit candidate from Phase 10 baseline
+        run: |
+          set -euo pipefail
+          BASE=26b30d3f8ded68caf5046b55301e77c379330d6c
+          SOURCE=7e10e5f47277a0878281cfd7e7f68624885e9855
+          git checkout -B phase11-reset-work "$BASE"
+          git checkout "$SOURCE" -- assets/industrial-sales.css sales.html product.html urea-46.html caustic-soda-solid.html sodium-sulphate-anhydrous.html scripts/qa-site.mjs
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('sales.html');s=p.read_text()
+          old="form.addEventListener('reset',()=>queueMicrotask(()=>{if(prefill){product.value=prefill;context.textContent='Product context: '+prefill;context.hidden=false;}else{context.textContent='';context.hidden=true;}updateMailto();}));"
+          new="form.addEventListener('reset',()=>setTimeout(()=>{if(prefill){product.value=prefill;context.textContent='Product context: '+prefill;context.hidden=false;}else{context.textContent='';context.hidden=true;}updateMailto();},0));"
+          assert old in s
+          p.write_text(s.replace(old,new))
+          PY
+          node scripts/qa-site.mjs
+          git diff --exit-code "$BASE" -- index.html assets/site.css products.html energy.html assets/media/unique-holding-film-720p.mp4 assets/media/unique-holding-caption.vtt
+          git config user.name "morfisam25-tech"
+          git config user.email "morfisam25@gmail.com"
+          git add assets/industrial-sales.css sales.html product.html urea-46.html caustic-soda-solid.html sodium-sulphate-anhydrous.html scripts/qa-site.mjs
+          git commit -m "PHASE 11 — Build industrial sales and RFQ experience"
+          test "$(git rev-parse HEAD^)" = "$BASE"
+          EXPECTED=$'assets/industrial-sales.css\ncaustic-soda-solid.html\nproduct.html\nsales.html\nscripts/qa-site.mjs\nsodium-sulphate-anhydrous.html\nurea-46.html'
+          test "$(git diff-tree --no-commit-id --name-only -r HEAD | sort)" = "$EXPECTED"
+          git push --force origin HEAD:phase11-sales-candidate
+          echo "REPLACEMENT=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+      - name: Report replacement
+        run: echo "PHASE11_REPLACEMENT=$REPLACEMENT"
