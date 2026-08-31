@@ -420,5 +420,27 @@ if(!products.includes('aria-live="polite"'))errors.push('products.html: Phase 09
   const releaseBlocker={id:'RELEASE-BLOCKER-HTTPS-001',status:'OPEN'};if(releaseBlocker.status!=='OPEN')errors.push('Phase 11: RELEASE-BLOCKER-HTTPS-001 must remain OPEN');console.log(releaseBlocker.id+' STATUS: '+releaseBlocker.status);
 }
 
+
+// Phase 12 — Technology / Intelligence content-system guards.
+{
+  const technology=read('technology.html');const technologyMain=technology.match(/<main\b[\s\S]*?<\/main>/i)?.[0]||'';const technologyLower=technologyMain.toLowerCase();const technologyCss=read('assets/technology-content.css');
+  if(!technology.includes('assets/technology-content.css')||!technologyCss.startsWith('@layer page{'))errors.push('Phase 12: Technology content stylesheet architecture missing');
+  if((technologyMain.match(/<h1\b/gi)||[]).length!==1)errors.push('technology.html: Phase 12 requires exactly one H1');
+  for(const token of ['Technology &amp; intelligence for decisions, products and new ventures.','Unique Holding remains active in energy, petrochemicals, industrial chemicals and global trade.','Technology &amp; Intelligence is a major growth direction','01 / Technology &amp; Intelligence','02 / Evidence-Driven Intelligence','03 / Digital Product Development','04 / Business / Venture Systems','05 / Content &amp; Distribution Systems','06 / How Technology Fits the Group','07 / Portfolio / Next Step','Evidence Axis','Digital Products','Business &amp; Venture Advisory','Content &amp; Distribution Systems','Specialist venture · Active operating area','Development-stage area','Capability / system','YEKI HAST is a development-stage digital product','This capability is business and venture operating work; it is not financial, legal or investment advice.','Industrial activity continues. Technology expands the operating range.','Observe','Analyze','Build','Test','Operate'])if(!technologyMain.includes(token))errors.push('technology.html: Phase 12 required architecture/content missing -> '+token);
+  const areas=(technologyMain.match(/data-tech-area=/g)||[]).length;if(areas!==4)errors.push('technology.html: Phase 12 must expose exactly four operating-area modules, found '+areas);
+  if(!technologyMain.includes('a specialist venture within the Unique Holding portfolio'))errors.push('technology.html: approved Evidence Axis relationship wording missing');
+  for(const href of ['evidence-axis.html','ventures.html','contact.html'])if(!technologyMain.includes('href="'+href+'"'))errors.push('technology.html: Phase 12 required destination missing -> '+href);
+  const claimBan=[/market leader/i,/industry leader/i,/leading ai/i,/world-class/i,/award-winning/i,/trusted by/i,/used by thousands/i,/\bcustomers\b/i,/enterprise customers/i,/fortune 500/i,/\barr\b/i,/\bmrr\b/i,/\brevenue\b/i,/\busers\b/i,/\bdownloads\b/i,/global offices/i,/proprietary ai/i,/\bpatented\b/i,/strategic partners/i,/\bsubsidiar(?:y|ies)\b/i,/wholly owned/i,/soc 2/i,/iso certified/i];
+  for(const claim of claimBan)if(claim.test(technologyMain))errors.push('technology.html: unsupported Phase 12 claim/legal wording -> '+claim);
+  if(/YEKI HAST[\s\S]{0,260}\b(?:launched|production ready|market leader)\b/i.test(technologyMain))errors.push('technology.html: YEKI HAST status exceeds approved development-stage boundary');
+  if(!technology.includes('<title>Technology &amp; Intelligence | Unique Holding</title>'))errors.push('technology.html: Phase 12 title regression');
+  if(!technology.includes('rel="canonical" href="https://www.uniqueholding.com.tr/technology.html"'))errors.push('technology.html: Phase 12 canonical regression');
+  if(!technology.includes('name="description" content="Technology and intelligence at Unique Holding: Evidence Axis, development-stage digital products, venture systems and content/distribution capabilities alongside active industrial operations."'))errors.push('technology.html: Phase 12 meta description regression');
+  if(/https?:\/\//i.test(technologyCss))errors.push('assets/technology-content.css: Phase 12 content layer must not add external dependencies/media');
+  const sales=read('sales.html');for(const token of ['01 / Product','02 / Grade / Specification','03 / Quantity','04 / Destination','05 / Timing','06 / Specification / Technical Requirement','07 / Contact','sales@uniqueholding.com.tr','new URLSearchParams(location.search)','mailto:sales@uniqueholding.com.tr?subject='])if(!sales.includes(token))errors.push('Phase 12: Phase 11 RFQ lock regression -> '+token);
+  const p09=read('products.html');const refs=(p09.match(/data-destination="reference-detail"/g)||[]).length;const inquiries=(p09.match(/data-destination="inquiry-detail"/g)||[]).length;if(refs!==3||inquiries!==62)errors.push('Phase 12: Phase 09 3/62 classification regression');
+  const releaseBlocker={id:'RELEASE-BLOCKER-HTTPS-001',status:'OPEN'};if(releaseBlocker.status!=='OPEN')errors.push('Phase 12: RELEASE-BLOCKER-HTTPS-001 must remain OPEN');
+}
+
 if(errors.length){console.error('\nTECHNICAL QA FAILED');for(const e of errors)console.error(' - '+e);process.exit(1)}
-console.log('TECHNICAL QA PASS — '+htmlFiles.length+' HTML, '+jsFiles.length+' JS, '+cssFiles.length+' CSS files checked; '+urls.length+' sitemap URLs verified; Phase 09/10/11 guards passed; protected film hashes verified.');
+console.log('TECHNICAL QA PASS — '+htmlFiles.length+' HTML, '+jsFiles.length+' JS, '+cssFiles.length+' CSS files checked; '+urls.length+' sitemap URLs verified; Phase 09/10/11/12 guards passed; protected film hashes verified.');
