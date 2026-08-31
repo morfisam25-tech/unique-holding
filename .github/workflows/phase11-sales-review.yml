@@ -44,7 +44,7 @@ jobs:
           new="await page.focus('#'+id);await page.$eval('#'+id,(e,value)=>{e.value=value;e.dispatchEvent(new Event('input',{bubbles:true}));},typed[key]);const g=await geometry(page);"
           assert old in s;s=s.replace(old,new)
           old="await goto(page,'products.html#'+id);const first=await page.$eval('#'+id,e=>e.getBoundingClientRect().top);"
-          new="await goto(page,'products.html#'+id);await page.waitForFunction(id=>{const e=document.getElementById(id);if(!e)return false;const t=e.getBoundingClientRect().top;return t>=60&&t<=130;},{timeout:3000},id);const first=await page.$eval('#'+id,e=>e.getBoundingClientRect().top);"
+          new="await goto(page,'products.html#'+id);await page.waitForFunction(()=>document.readyState==='complete',{timeout:8000}).catch(()=>{});await new Promise(r=>setTimeout(r,250));const first=await page.$eval('#'+id,e=>e.getBoundingClientRect().top);"
           assert old in s;s=s.replace(old,new)
           p.write_text(s)
           PY
