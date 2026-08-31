@@ -1,0 +1,14 @@
+const fs=require('fs');
+const cssPath='assets/products-ia.css';
+let css=fs.readFileSync(cssPath,'utf8');
+const needle="html{scroll-behavior:auto}.catalog-anchor{scroll-margin-top:96px}";
+if(!css.includes(needle))throw new Error('Phase 09 CSS anchor rule missing');
+const fixed=needle+".catalog-group[hidden],#catalog .product-link[hidden],.catalog-empty[hidden]{display:none!important}";
+css=css.replace(needle,fixed);
+fs.writeFileSync(cssPath,css);
+const qaPath='scripts/qa-site.mjs';
+let qa=fs.readFileSync(qaPath,'utf8');
+const marker="if(!productsCss.startsWith('@layer page{'))errors.push('assets/products-ia.css: Phase 09 page layer missing');";
+if(!qa.includes(marker))throw new Error('Phase 09 QA marker missing');
+qa=qa.replace(marker,marker+"\nif(!productsCss.includes('.catalog-group[hidden],#catalog .product-link[hidden],.catalog-empty[hidden]{display:none!important}'))errors.push('assets/products-ia.css: filtered Products content must remain removed from layout and keyboard flow');");
+fs.writeFileSync(qaPath,qa);
