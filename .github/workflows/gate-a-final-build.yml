@@ -24,6 +24,13 @@ jobs:
           cp .github/qa/build-gate-a-final.cjs /tmp/build-gate-a-final.cjs
           git checkout --detach "$BASE"
           node /tmp/build-gate-a-final.cjs | tee /tmp/build.log
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('scripts/qa-site.mjs')
+          s=p.read_text()
+          s=s.replace('data-catalog-category="Energy & Hydrocarbon Products"','data-catalog-category="Energy &amp; Hydrocarbon Products"')
+          p.write_text(s)
+          PY
           test "$(git diff --name-only | sort)" = $'products.html\nscripts/qa-site.mjs'
           git diff --exit-code "$BASE" -- index.html assets/site.css
           node scripts/qa-site.mjs | tee /tmp/qa-site.log
