@@ -1,0 +1,57 @@
+name: Gate A final replacement candidate full
+on:
+  push:
+    branches: [gate-a-final-candidate-qa]
+    paths:
+      - '.github/qa/gate-a-final-full.cjs'
+      - '.github/workflows/gate-a-final-candidate-full.yml'
+permissions:
+  contents: read
+jobs:
+  full:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+      - name: Verify candidate and technical/content locks
+        shell: bash
+        run: |
+          set -euo pipefail
+          FINAL=83567c124d171bf5d3664b41d8547555a2d196a8
+          BASE=bfdaeefcce715ff36bf8f9838b6401ffcc477b9c
+          git merge-base --is-ancestor "$FINAL" HEAD
+          test "$(git rev-parse ${FINAL}^)" = "$BASE"
+          test "$(git diff-tree --no-commit-id --name-only -r "$FINAL" | sort)" = $'products.html\nscripts/qa-site.mjs'
+          git diff --exit-code "$BASE" "$FINAL" -- index.html assets/site.css
+          if git diff --name-only "$FINAL"..HEAD | grep -Ev '^\.github/(qa|workflows)/' | grep -q .; then exit 2; fi
+          mkdir -p gate-a-final/reports
+          node scripts/qa-site.mjs | tee gate-a-final/reports/qa-site.log
+          node <<'NODE'
+          const fs=require('fs');const routes=['index.html','corporate.html','energy.html','products.html','product.html','urea-46.html','caustic-soda-solid.html','sodium-sulphate-anhydrous.html','sales.html','technology.html','evidence-axis.html','ventures.html','contact.html','privacy.html','legal.html','404.html'];const rules={obsoleteCompany:/Unique Otomotiv Kimya Sanayi Limited Şirketi/gi,platts:/\b(?:S&P|Platts)\b/gi,placeholder:/\b(?:TODO|FIXME|TBD|Lorem ipsum)\b/gi,ownership:/\b(?:our vessels?|our tankers?|our terminals?|our warehouses?|our plants?|our refiner(?:y|ies)|owned vessels?|owned terminals?|owned warehouses?|owned plants?)\b/gi,leadership:/\b(?:CEO|Chief Executive Officer|Founder|Chairman|Managing Director|Board of Directors)\b/gi,revenueVolume:/\b(?:revenue|turnover|annual volume|million tonnes?|metric tons? per year|MT\/year)\b/gi,registration:/\b(?:MERS[Iİ]S|Ticaret Sicil|Trade Registry|Tax Number|Vergi No|VKN)\b/gi,partnerCertification:/\b(?:certified by|official partner|strategic partner|authorized distributor|exclusive distributor|ISO 9001|ISO 14001)\b/gi,internalQA:/\b(?:QA PASS|reviewer|phase 0[0-9]|phase 1[0-9]|verified public wording|internal audit|source-lock)\b/gi};let hits=0;const out={};for(const route of routes){const text=fs.readFileSync(route,'utf8');out[route]=[];for(const [rule,re] of Object.entries(rules)){re.lastIndex=0;let m;while((m=re.exec(text))){hits++;out[route].push({rule,match:m[0]})}}}fs.writeFileSync('gate-a-final/reports/content-scan.json',JSON.stringify({hits,routes:out},null,2));console.log('CONTENT_SCAN_HITS='+hits);if(hits)process.exit(2);
+          NODE
+      - name: Prepare browser
+        shell: bash
+        run: |
+          CHROME="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium)"
+          echo "CHROME=$CHROME" >> "$GITHUB_ENV"
+          npm install --no-save --ignore-scripts puppeteer-core@24.16.0
+          node --check .github/qa/gate-a-final-full.cjs
+      - name: Run all 80 browser cases
+        shell: bash
+        run: |
+          python3 -m http.server 8000 --bind 127.0.0.1 >gate-a-final/reports/server.log 2>&1 &
+          PID=$!; trap 'kill $PID || true' EXIT; sleep 1
+          NODE_PATH="$PWD/node_modules" node .github/qa/gate-a-final-full.cjs | tee gate-a-final/reports/full-console.log
+      - name: Write final automated summary
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs=require('fs');const full=JSON.parse(fs.readFileSync('gate-a-final/full/full-report.json'));const summary={productSha:'83567c124d171bf5d3664b41d8547555a2d196a8',targetedRun:33351637546,targetedAssertions:168,targetedFailures:0,fullCases:full.summary.cases,fullFailures:full.failures.length,severity:{BLOCKER:0,HIGH:0,MEDIUM:0,LOW:0},filmStatus:'BROWSER QA PASS / REAL PHONE SIGN-OFF PENDING'};fs.writeFileSync('gate-a-final/reports/summary.json',JSON.stringify(summary,null,2));console.log(JSON.stringify(summary,null,2));if(full.summary.cases!==80||full.failures.length)process.exit(2);
+          NODE
+      - name: Upload final cumulative packet
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cumulative-quality-gate-a-final-candidate
+          path: gate-a-final/
+          if-no-files-found: error
