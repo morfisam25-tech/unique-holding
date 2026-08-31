@@ -136,7 +136,7 @@ if(/\bautoplay\b/i.test(filmTag))errors.push('index.html: native autoplay must r
 if(!/\bplaysinline\b/i.test(filmTag))errors.push('index.html: approved film must preserve playsinline');
 for(const filmToken of ['assets/media/unique-holding-film-720p.mp4','assets/media/unique-holding-caption.vtt','data-film-sound','data-film-play','data-film-progress','data-film-time','data-film-mute','data-film-volume','data-film-captions','data-film-fullscreen','data-film-replay'])if(!index.includes(filmToken))errors.push(`index.html: Phase 01 film regression -> ${filmToken}`);
 for(const logicToken of ["const reducedMotion=window.matchMedia('(prefers-reduced-motion: reduce)').matches","if(reducedMotion){","const audibleStarted=await playSafely()","const mutedStarted=await playSafely()","if(!manualPaused&&!video.ended&&!reducedMotion)playSafely()"])if(!index.includes(logicToken))errors.push(`index.html: Phase 01 playback logic regression -> ${logicToken}`);
-if(!index.includes('@media(max-width:980px) and (orientation:portrait){.hero-film{object-fit:contain;object-position:center center}}'))errors.push('index.html: Gate A portrait film containment regression');
+if(!index.includes('@media(max-width:980px) and (orientation:portrait){.hero-film{position:absolute;left:0;top:50%;width:100%;height:auto;aspect-ratio:16/9;transform:translateY(-50%);object-fit:contain;object-position:center center}}'))errors.push('index.html: Gate A portrait film containment regression');
 
 const styleStart=index.indexOf('  <style>');
 const styleEnd=styleStart>=0?index.indexOf('  </style>',styleStart):-1;
@@ -148,7 +148,7 @@ const markerEnd=markerPos>=0?markerPos+filmScriptMarker.length:-1;
 const filmJsStart=markerEnd>=0?index.indexOf('  <script>',markerEnd):-1;
 const filmJsEnd=filmJsStart>=0?index.indexOf('  </script>',filmJsStart):-1;
 const protectedSlices=[
-  ['player inline CSS',styleStart>=0&&styleEnd>=0?index.slice(styleStart,styleEnd+'  </style>'.length):'', 'ea19f2952096f0b93d892f6923269ff406a04e8fce42d30fc4382d39286f46eb'],
+  ['player inline CSS',styleStart>=0&&styleEnd>=0?index.slice(styleStart,styleEnd+'  </style>'.length):'', '304201e768beb75f4a8c00f50da66a44a2fc3ee116eec2da588cc3ec6c248848'],
   ['hero/player markup',heroStart>=0&&heroEnd>=0?index.slice(heroStart,heroEnd):'', 'd9c6628f5451049921b2a0bfd1f5f174c8c482101b156473204dd2a1c8012e9f'],
   ['player behavior script',filmJsStart>=0&&filmJsEnd>=0?index.slice(filmJsStart,filmJsEnd+'  </script>'.length):'', '1e1697cce9df7d454022d27a9925095a3a0b5a4f27c8a88dc02e4916b6d9afe1']
 ];
@@ -262,7 +262,9 @@ for(const token of [
 ])if(!energyMain.includes(token))errors.push(`energy.html: Phase 07 required content missing -> ${token}`);
 for(const route of ['products.html#petrochemical','products.html#chemical','products.html#energy-products','urea-46.html','caustic-soda-solid.html','sodium-sulphate-anhydrous.html','products.html','sales.html'])if(!energyMain.includes(`href="${route}"`))errors.push(`energy.html: Phase 07 route missing -> ${route}`);
 const products=read('products.html');
-for(const token of ["'Petrochemical Products':'petrochemical'","'Chemical Products':'chemical'","'Energy & Hydrocarbon Products':'energy-products'",'function alignHashTarget()','requestAnimationFrame(()=>requestAnimationFrame(()=>',"window.addEventListener('hashchange',alignHashTarget)"])if(!products.includes(token))errors.push(`products.html: Gate A family-hash regression -> ${token}`);
+for(const id of ['petrochemical','chemical','energy-products'])if(!new RegExp(`<section\\b[^>]*id=[\"']${id}[\"'][^>]*data-catalog-category=`,'i').test(products))errors.push(`products.html: Gate A static family anchor missing -> #${id}`);
+for(const token of ['data-catalog-category="Petrochemical Products"','data-catalog-category="Chemical Products"','data-catalog-category="Energy & Hydrocarbon Products"','data-catalog-rows','scroll-margin-top:96px'])if(!products.includes(token))errors.push(`products.html: Gate A static family architecture regression -> ${token}`);
+if(/alignHashTarget|requestAnimationFrame\s*\(|setTimeout\s*\(|window\.scrollTo\s*\(/.test(products))errors.push('products.html: timing-only family-hash workaround must not return');
 for(const id of ['overview','product-families','trading','core-products','customers','operations'])if(!new RegExp(`id=["']${id}["']`,'i').test(energyMain))errors.push(`energy.html: required/compatibility anchor missing -> #${id}`);
 if(/S&P|Platts/i.test(energyMain))errors.push('energy.html: Platts/S&P market-context prestige proof must not appear in Phase 07');
 for(const country of [/\bGermany\b/i,/\bAustria\b/i,/\bSerbia\b/i])if(country.test(energyMain))errors.push(`energy.html: unsupported named-market claim -> ${country}`);
