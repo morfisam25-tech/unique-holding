@@ -1,0 +1,55 @@
+name: Phase 10 core product authority review
+on:
+  push:
+    branches: [phase10-authority-qa-runner]
+    paths:
+      - '.github/phase10/phase10-browser-qa.cjs'
+      - '.github/workflows/phase10-authority-review.yml'
+permissions:
+  contents: read
+jobs:
+  review:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify immutable Phase 10 product snapshot
+        run: |
+          set -euo pipefail
+          PRODUCT=26b30d3f8ded68caf5046b55301e77c379330d6c
+          BASE=97358c5aee8685e972decb0e022385f4998f237c
+          test "$(git rev-parse ${PRODUCT}^)" = "$BASE"
+          EXPECTED=$'assets/core-product-reference.css\ncaustic-soda-solid.html\nscripts/qa-site.mjs\nsodium-sulphate-anhydrous.html\nurea-46.html'
+          test "$(git diff-tree --no-commit-id --name-only -r "$PRODUCT" | sort)" = "$EXPECTED"
+          git diff --exit-code "$BASE" "$PRODUCT" -- index.html assets/site.css product.html products.html sales.html assets/media/unique-holding-film-720p.mp4 assets/media/unique-holding-caption.vtt
+          mkdir -p phase10-review/reports
+          node scripts/qa-site.mjs | tee phase10-review/reports/qa-site.log
+          printf '%s\n' '{"id":"RELEASE-BLOCKER-HTTPS-001","status":"OPEN","note":"CUSTOM DOMAIN HTTPS / Not Secure remains open. DNS, GitHub Pages and certificates were not investigated or modified in Phase 10."}' > phase10-review/reports/release-blocker.json
+      - name: Prepare browser QA
+        run: |
+          set -euo pipefail
+          node --check .github/phase10/phase10-browser-qa.cjs
+          CHROME="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium)"
+          echo "CHROME=$CHROME" >> "$GITHUB_ENV"
+          npm install --no-save --ignore-scripts puppeteer-core@24.16.0
+      - name: Run Phase 10 browser acceptance
+        run: |
+          set -euo pipefail
+          python3 -m http.server 8000 --bind 127.0.0.1 >phase10-review/reports/server.log 2>&1 &
+          PID=$!; trap 'kill $PID || true' EXIT; sleep 1
+          NODE_PATH="$PWD/node_modules" node .github/phase10/phase10-browser-qa.cjs | tee phase10-review/reports/browser-console.log
+      - name: Write review summary
+        run: |
+          node <<'NODE'
+          const fs=require('fs');const r=JSON.parse(fs.readFileSync('phase10-review/reports/browser-report.json','utf8'));
+          const summary={phase:'10',status:r.failures.length?'FAILED':'READY FOR EXTERNAL REVIEW',baseline:'97358c5aee8685e972decb0e022385f4998f237c',newSha:'26b30d3f8ded68caf5046b55301e77c379330d6c',filesChanged:['assets/core-product-reference.css','caustic-soda-solid.html','scripts/qa-site.mjs','sodium-sulphate-anhydrous.html','urea-46.html'],routing:{reference:3,inquiry:62,invalid:0},browser:r.summary,film:'UNCHANGED — protected Phase 01/Gate A asset and code paths excluded from product diff',httpsBlocker:'RELEASE-BLOCKER-HTTPS-001 — OPEN'};
+          fs.writeFileSync('phase10-review/reports/summary.json',JSON.stringify(summary,null,2));console.log(JSON.stringify(summary,null,2));if(r.failures.length)process.exit(2);
+          NODE
+      - name: Upload Phase 10 review packet
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase10-core-product-authority-review
+          path: phase10-review/
+          if-no-files-found: error
