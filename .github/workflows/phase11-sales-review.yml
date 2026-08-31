@@ -1,0 +1,56 @@
+name: Phase 11 industrial sales review
+on:
+  push:
+    branches: [phase11-sales-qa-runner]
+    paths:
+      - '.github/phase11/phase11-browser-qa.cjs'
+      - '.github/workflows/phase11-sales-review.yml'
+permissions:
+  contents: read
+jobs:
+  review:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify immutable Phase 11 product snapshot
+        run: |
+          set -euo pipefail
+          PRODUCT=7e10e5f47277a0878281cfd7e7f68624885e9855
+          BASE=26b30d3f8ded68caf5046b55301e77c379330d6c
+          cp .github/phase11/phase11-browser-qa.cjs /tmp/phase11-browser-qa.cjs
+          test "$(git rev-parse ${PRODUCT}^)" = "$BASE"
+          EXPECTED=$'assets/industrial-sales.css\ncaustic-soda-solid.html\nproduct.html\nsales.html\nscripts/qa-site.mjs\nsodium-sulphate-anhydrous.html\nurea-46.html'
+          test "$(git diff-tree --no-commit-id --name-only -r "$PRODUCT" | sort)" = "$EXPECTED"
+          git diff --exit-code "$BASE" "$PRODUCT" -- index.html assets/site.css products.html energy.html assets/media/unique-holding-film-720p.mp4 assets/media/unique-holding-caption.vtt
+          git checkout --force "$PRODUCT"
+          mkdir -p phase11-review/reports
+          node scripts/qa-site.mjs | tee phase11-review/reports/qa-site.log
+          printf '%s\n' '{"id":"RELEASE-BLOCKER-HTTPS-001","status":"OPEN","note":"CUSTOM DOMAIN HTTPS / Not Secure remains open. DNS, GitHub Pages and certificates were not investigated or modified in Phase 11."}' > phase11-review/reports/release-blocker.json
+      - name: Prepare browser QA
+        run: |
+          set -euo pipefail
+          node --check /tmp/phase11-browser-qa.cjs
+          CHROME="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium)"
+          echo "CHROME=$CHROME" >> "$GITHUB_ENV"
+          npm install --no-save --ignore-scripts puppeteer-core@24.16.0
+      - name: Run Phase 11 browser acceptance
+        run: |
+          set -euo pipefail
+          python3 -m http.server 8000 --bind 127.0.0.1 >phase11-review/reports/server.log 2>&1 &
+          PID=$!; trap 'kill $PID || true' EXIT; sleep 1
+          OUT_DIR=phase11-review NODE_PATH="$PWD/node_modules" node /tmp/phase11-browser-qa.cjs | tee phase11-review/reports/browser-console.log
+      - name: Write review summary
+        run: |
+          node <<'NODE'
+          const fs=require('fs');const r=JSON.parse(fs.readFileSync('phase11-review/reports/browser-report.json','utf8'));
+          const summary={phase:'11',status:r.failures.length?'FAILED':'READY FOR EXTERNAL REVIEW',baseline:'26b30d3f8ded68caf5046b55301e77c379330d6c',newSha:'7e10e5f47277a0878281cfd7e7f68624885e9855',filesChanged:['assets/industrial-sales.css','caustic-soda-solid.html','product.html','sales.html','scripts/qa-site.mjs','sodium-sulphate-anhydrous.html','urea-46.html'],browser:r.summary,routing:{reference:3,inquiry:62,invalid:0},film:'UNCHANGED — protected Phase 01/Gate A asset and code paths excluded from product diff',httpsBlocker:'RELEASE-BLOCKER-HTTPS-001 — OPEN'};
+          fs.writeFileSync('phase11-review/reports/summary.json',JSON.stringify(summary,null,2));console.log(JSON.stringify(summary,null,2));if(r.failures.length)process.exit(2);
+          NODE
+      - name: Upload Phase 11 review packet
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase11-industrial-sales-review
+          path: phase11-review/
+          if-no-files-found: error
