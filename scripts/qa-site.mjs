@@ -377,9 +377,6 @@ if(!products.includes("clear.addEventListener('click'"))errors.push('products.ht
 if(!products.includes("empty.hidden=visible!==0"))errors.push('products.html: Phase 09 no-results state missing');
 if(!products.includes('aria-live="polite"'))errors.push('products.html: Phase 09 search status must be announced');
 
-if(errors.length){console.error('\nTECHNICAL QA FAILED');for(const e of errors)console.error(' - '+e);process.exit(1)}
-console.log(`TECHNICAL QA PASS — ${htmlFiles.length} HTML, ${jsFiles.length} JS, ${cssFiles.length} CSS files checked; ${urls.length} sitemap URLs verified; static global shell verified on every HTML route; Phase 04 homepage regression checks passed.`);
-
 // Phase 10 — authoritative core-product reference-page guards.
 {
   const phase10Pages={"urea-46.html":{"name":"Urea 46","values":["Nitrogen Content","min 46% wt","Biuret","max 0.8% wt","Formaldehyde","max 0.55% wt","Moisture","max 0.3% wt","Particle size 2–4 mm","90%"],"family":"Fertilizer / Industrial Feedstock"},"caustic-soda-solid.html":{"name":"Caustic Soda Solid","values":["Chemical name","Sodium Hydroxide","CAS","1310-73-2","NaOH","approx. 98.8%","Dry basis","99.3%","UN number","1823","Class","8","Packing Group","II"],"family":"Industrial Chemicals"},"sodium-sulphate-anhydrous.html":{"name":"Sodium Sulphate Anhydrous","values":["Na₂SO₄","99.20%","Water Insoluble Matter","0.02%","Ca & Mg","0.02%","Chloride","0.30%","Fe","0.0003%","Moisture","0.05%","Whiteness","91%"],"family":"Industrial Chemicals"}};
@@ -398,3 +395,30 @@ console.log(`TECHNICAL QA PASS — ${htmlFiles.length} HTML, ${jsFiles.length} J
   if(refs!==3||inquiries!==62)errors.push(`Phase 10: Phase 09 route classification regression REFERENCE=${refs} INQUIRY=${inquiries}`);
   for(const [slug,href] of [['urea-46','urea-46.html'],['caustic-soda-solid','caustic-soda-solid.html'],['sodium-sulphate-anhydrous','sodium-sulphate-anhydrous.html']])if(!p09.includes(`data-slug="${slug}" href="${href}"`))errors.push(`Phase 10: Core route destination regression -> ${slug}`);
 }
+
+
+// Phase 11 — Industrial Sales / RFQ experience guards.
+{
+  const sales=read('sales.html');const salesLower=sales.toLowerCase();const salesCss=read('assets/industrial-sales.css');
+  if(!sales.includes('assets/industrial-sales.css')||!salesCss.startsWith('@layer page{'))errors.push('Phase 11: Industrial Sales page stylesheet architecture missing');
+  if((sales.match(/<h1\b/gi)||[]).length!==1)errors.push('sales.html: Phase 11 requires exactly one H1');
+  for(const token of ['Industrial<br>Sales.','Prepare industrial RFQ','01 / Product','02 / Grade / Specification','03 / Quantity','04 / Destination','05 / Timing','06 / Specification / Technical Requirement','07 / Contact','rfq-product','rfq-grade','rfq-quantity','rfq-destination','rfq-timing','rfq-specification','rfq-contact-name','rfq-company','rfq-email','rfq-phone','rfq-email-action','Email handoff — not server submission','sales@uniqueholding.com.tr','+90 212 727 22 22','+90 539 380 91 97','01','Define the Requirement','Review &amp; Qualification','Offered-Lot Confirmation','Commercial Next Step'])if(!sales.includes(token))errors.push('sales.html: Phase 11 RFQ architecture regression -> '+token);
+  for(const id of ['rfq-product','rfq-grade','rfq-quantity','rfq-destination','rfq-timing','rfq-specification','rfq-contact-name','rfq-company','rfq-email','rfq-phone'])if(!new RegExp('<label[^>]+for=["\\\']'+id+'["\\\']','i').test(sales))errors.push('sales.html: Phase 11 visible label missing -> '+id);
+  for(const token of ['new URLSearchParams(location.search)','params.get(\'product\')','product.value=prefill','textContent=\'Product context: \'+prefill','encodeURIComponent(subject)','encodeURIComponent(body)','mailto:sales@uniqueholding.com.tr?subject='])if(!sales.includes(token))errors.push('sales.html: Phase 11 safe email/prefill behavior missing -> '+token);
+  if(/prefill[^;]{0,120}innerHTML|innerHTML[^;]{0,120}prefill/i.test(sales))errors.push('sales.html: Phase 11 product prefill must never use innerHTML');
+  if(/\bfetch\s*\(|XMLHttpRequest|Formspree|Typeform|Google Forms|HubSpot|Mailchimp|Zapier/i.test(sales))errors.push('sales.html: Phase 11 third-party/backend submission behavior is forbidden');
+  for(const fake of ['submitted','request received','quotation requested successfully'])if(salesLower.includes(fake))errors.push('sales.html: Phase 11 fake submission state wording -> '+fake);
+  const phase11ClaimBan=['in stock','available now','guaranteed availability','guaranteed supply','instant quotation','quotation in 24 hours','same-day quote','direct producer','our factory','our plant','our warehouse','our terminal','our fleet','our inventory','exclusive supplier','leading supplier','global supplier','certified supplier','moq','minimum order','annual capacity','immediate delivery'];
+  for(const phrase of phase11ClaimBan)if(salesLower.includes(phrase))errors.push('sales.html: unsupported Phase 11 commercial claim -> '+phrase);
+  const mailAddresses=[...sales.matchAll(/mailto:([^?"']+)/gi)].map(m=>m[1].toLowerCase());for(const address of mailAddresses)if(!['sales@uniqueholding.com.tr','farahmand@uniqueholding.com.tr'].includes(address))errors.push('sales.html: invented email address -> '+address);
+  if(/https?:\/\//i.test(salesCss))errors.push('assets/industrial-sales.css: external dependency/media request is forbidden');
+  const detail=read('product.html');if(!detail.includes("const salesUrl='sales.html?product='+encodeURIComponent(p.name)"))errors.push('product.html: Phase 11 inquiry-detail RFQ context handoff missing');
+  for(const [file,encoded] of Object.entries({'urea-46.html':'Urea%2046','caustic-soda-solid.html':'Caustic%20Soda%20Solid','sodium-sulphate-anhydrous.html':'Sodium%20Sulphate%20Anhydrous'})){
+    const html=read(file);if(!html.includes('sales.html?product='+encoded))errors.push(file+': Phase 11 Core RFQ context link missing');
+  }
+  const p09=read('products.html');const refs=(p09.match(/data-destination="reference-detail"/g)||[]).length;const inquiries=(p09.match(/data-destination="inquiry-detail"/g)||[]).length;if(refs!==3||inquiries!==62)errors.push('Phase 11: Phase 09 3/62 classification regression');
+  const releaseBlocker={id:'RELEASE-BLOCKER-HTTPS-001',status:'OPEN'};if(releaseBlocker.status!=='OPEN')errors.push('Phase 11: RELEASE-BLOCKER-HTTPS-001 must remain OPEN');console.log(releaseBlocker.id+' STATUS: '+releaseBlocker.status);
+}
+
+if(errors.length){console.error('\nTECHNICAL QA FAILED');for(const e of errors)console.error(' - '+e);process.exit(1)}
+console.log('TECHNICAL QA PASS — '+htmlFiles.length+' HTML, '+jsFiles.length+' JS, '+cssFiles.length+' CSS files checked; '+urls.length+' sitemap URLs verified; Phase 09/10/11 guards passed; protected film hashes verified.');
