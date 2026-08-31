@@ -1,0 +1,158 @@
+name: Gate A authorized correction
+
+on:
+  push:
+    branches: [gate-a-fix-runner]
+
+permissions:
+  contents: write
+
+jobs:
+  correct:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: gate-a-correction
+          fetch-depth: 0
+
+      - name: Verify immutable baseline
+        run: |
+          set -euo pipefail
+          BASE=4ca464131e2e0d3ce2ba98aeda385c5d6162f34f
+          test "$(git rev-parse HEAD)" = "$BASE"
+          test -z "$(git status --porcelain)"
+
+      - name: Apply fix-only corrections
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          import hashlib
+
+          def replace_once(path, old, new):
+              p=Path(path)
+              s=p.read_text()
+              n=s.count(old)
+              if n != 1:
+                  raise SystemExit(f'{path}: expected one replacement, found {n}: {old[:90]}')
+              p.write_text(s.replace(old,new,1))
+
+          # A-001 — remove the filtered containing block only while compact nav is open,
+          # and explicitly preserve viewport-height overlay geometry.
+          replace_once(
+              'assets/site.css',
+              "  .site-header{background:rgba(7,9,10,.88);backdrop-filter:blur(14px);border-bottom-color:rgba(255,255,255,.12)}\n  .site-header .nav-shell{width:calc(100% - 40px)}\n  .site-header .menu-toggle{display:block}\n  .site-header .primary-nav{position:fixed;inset:0;z-index:3;display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;gap:0;padding:112px max(28px,calc((100vw - 760px)/2)) 42px;background:rgba(8,10,11,.995);overflow-y:auto;overscroll-behavior:contain;opacity:0;visibility:hidden;pointer-events:none;transform:translateX(24px);transition:opacity var(--duration-menu) ease,transform var(--duration-menu) ease,visibility 0s linear var(--duration-menu)}",
+              "  .site-header{background:rgba(7,9,10,.88);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-bottom-color:rgba(255,255,255,.12)}\n  body.nav-open .site-header{backdrop-filter:none;-webkit-backdrop-filter:none}\n  .site-header .nav-shell{width:calc(100% - 40px)}\n  .site-header .menu-toggle{display:block}\n  .site-header .primary-nav{position:fixed;inset:0;min-height:100vh;min-height:100dvh;z-index:3;display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;gap:0;padding:112px max(28px,calc((100vw - 760px)/2)) 42px;background:rgba(8,10,11,.995);overflow-y:auto;overscroll-behavior:contain;opacity:0;visibility:hidden;pointer-events:none;transform:translateX(24px);transition:opacity var(--duration-menu) ease,transform var(--duration-menu) ease,visibility 0s linear var(--duration-menu)}"
+          )
+
+          # A-002 — authorized Phase 01 responsive CSS exception. Desktop remains cover.
+          replace_once(
+              'index.html',
+              "    @media(max-width:980px){.hero-film-hero .scroll-cue{display:none}}\n    @media(max-width:760px){",
+              "    @media(max-width:980px){.hero-film-hero .scroll-cue{display:none}}\n    @media(max-width:980px) and (orientation:portrait){.hero-film{object-fit:contain;object-position:center center}}\n    @media(max-width:760px){"
+          )
+
+          # A-003 — align dynamically-created catalog family targets after layout and on hashchange.
+          replace_once(
+              'products.html',
+              "function render(q=''){const term=q.trim().toLowerCase();const filtered=data.filter(p=>!term||[p.name,p.abbr,p.category,p.family].join(' ').toLowerCase().includes(term));count.textContent=filtered.length+' inquiry routes';const categories=[...new Set(data.map(p=>p.category))];catalog.innerHTML=categories.map(cat=>{const rows=filtered.filter(p=>p.category===cat);if(!rows.length)return'';const fams=[...new Set(rows.map(p=>p.family))];return `<section class=\"catalog-group\" id=\"${ids[cat]||''}\"><h2>${cat}</h2><p>${cat==='Petrochemical Products'?'Polymers, basic petrochemicals, aromatics, glycols, intermediates, ethanolamines and fertilizer-related inquiry families.':cat==='Chemical Products'?'Industrial chemical inquiry families reviewed against requested specification and offered-lot availability.':'Liquefied gases, refinery materials, base oils, waxes and hydrocarbon-stream inquiry families.'}</p>${fams.map(f=>`<div class=\"catalog-group\"><p class=\"subsite-label\">${f}</p><div class=\"product-grid\">${rows.filter(p=>p.family===f).map(p=>`<a class=\"product-link\" href=\"product.html?slug=${encodeURIComponent(p.slug)}\"><small>${p.family}</small><h3>${p.name}</h3><p>${p.abbr||'Specification-based inquiry'}</p><span>Open inquiry route ↗</span></a>`).join('')}</div></div>`).join('')}</section>`}).join('')||'<p>No inquiry families match this search.</p>';}\ninput.addEventListener('input',e=>render(e.target.value));render();})();",
+              "function render(q=''){const term=q.trim().toLowerCase();const filtered=data.filter(p=>!term||[p.name,p.abbr,p.category,p.family].join(' ').toLowerCase().includes(term));count.textContent=filtered.length+' inquiry routes';const categories=[...new Set(data.map(p=>p.category))];catalog.innerHTML=categories.map(cat=>{const rows=filtered.filter(p=>p.category===cat);if(!rows.length)return'';const fams=[...new Set(rows.map(p=>p.family))];return `<section class=\"catalog-group\" id=\"${ids[cat]||''}\"><h2>${cat}</h2><p>${cat==='Petrochemical Products'?'Polymers, basic petrochemicals, aromatics, glycols, intermediates, ethanolamines and fertilizer-related inquiry families.':cat==='Chemical Products'?'Industrial chemical inquiry families reviewed against requested specification and offered-lot availability.':'Liquefied gases, refinery materials, base oils, waxes and hydrocarbon-stream inquiry families.'}</p>${fams.map(f=>`<div class=\"catalog-group\"><p class=\"subsite-label\">${f}</p><div class=\"product-grid\">${rows.filter(p=>p.family===f).map(p=>`<a class=\"product-link\" href=\"product.html?slug=${encodeURIComponent(p.slug)}\"><small>${p.family}</small><h3>${p.name}</h3><p>${p.abbr||'Specification-based inquiry'}</p><span>Open inquiry route ↗</span></a>`).join('')}</div></div>`).join('')}</section>`}).join('')||'<p>No inquiry families match this search.</p>';}\nfunction alignHashTarget(){const id=decodeURIComponent(location.hash.slice(1));if(!id)return;requestAnimationFrame(()=>requestAnimationFrame(()=>{const target=document.getElementById(id);if(!target)return;const header=document.querySelector('.site-header');const offset=(header?.getBoundingClientRect().height||0)+16;const top=window.scrollY+target.getBoundingClientRect().top-offset;window.scrollTo({top:Math.max(0,top),behavior:'auto'});}));}\ninput.addEventListener('input',e=>render(e.target.value));render();alignHashTarget();window.addEventListener('hashchange',alignHashTarget);})();"
+          )
+
+          # A-004 — exact Phase 06 proof destination only.
+          replace_once(
+              'corporate.html',
+              'href="https://evidenceaxis.com/" target="_blank" rel="noopener">Public sample ↗</a>',
+              'href="https://evidenceaxis.com/sample-report/" target="_blank" rel="noopener">Public sample ↗</a>'
+          )
+
+          # Recalculate the authorized Phase 01 protected inline-CSS hash.
+          index=Path('index.html').read_text()
+          style_start=index.index('  <style>')
+          style_end=index.index('  </style>',style_start)
+          style_slice=index[style_start:style_end+len('  </style>')]
+          new_css_hash=hashlib.sha256(style_slice.encode()).hexdigest()
+          old_css_hash='c7eeb7d7c334b92d50460a0e0bd4a2bd0f34ca3cb75550ecb485344620f4ba92'
+
+          qa=Path('scripts/qa-site.mjs').read_text()
+          if qa.count(old_css_hash)!=1:
+              raise SystemExit('Phase 01 old CSS hash occurrence mismatch')
+          qa=qa.replace(old_css_hash,new_css_hash,1)
+
+          # Strengthen Phase 06 trust-link lock to the authorized direct sample URL.
+          qa=qa.replace("  'https://evidenceaxis.com/','Turkish corporate operations since 2020'", "  'https://evidenceaxis.com/sample-report/','Turkish corporate operations since 2020'", 1)
+
+          insert_after="for(const token of ['.site-header .primary-nav .nav-cta','.global-footer-shell','body.nav-open','@media(max-width:1180px)','@media(prefers-reduced-motion:reduce)','html:not(.js) .site-header .primary-nav'])if(!siteCss.includes(token))errors.push(`assets/site.css: Phase 03 shell styling regression -> ${token}`);"
+          guards="""
+// Gate A correction guards — compact nav must remain a genuine viewport overlay.
+for(const token of ['body.nav-open .site-header{backdrop-filter:none;-webkit-backdrop-filter:none}','position:fixed;inset:0;min-height:100vh;min-height:100dvh'])if(!siteCss.includes(token))errors.push(`assets/site.css: Gate A compact-nav regression -> ${token}`);
+""".strip()
+          if insert_after not in qa: raise SystemExit('QA Phase 03 insertion point missing')
+          qa=qa.replace(insert_after,insert_after+'\n'+guards,1)
+
+          film_insert="for(const logicToken of [\"const reducedMotion=window.matchMedia('(prefers-reduced-motion: reduce)').matches\",\"if(reducedMotion){\",\"const audibleStarted=await playSafely()\",\"const mutedStarted=await playSafely()\",\"if(!manualPaused&&!video.ended&&!reducedMotion)playSafely()\"])if(!index.includes(logicToken))errors.push(`index.html: Phase 01 playback logic regression -> ${logicToken}`);"
+          film_guard="""
+if(!index.includes('@media(max-width:980px) and (orientation:portrait){.hero-film{object-fit:contain;object-position:center center}}'))errors.push('index.html: Gate A portrait film containment regression');
+""".strip()
+          if film_insert not in qa: raise SystemExit('QA Phase 01 insertion point missing')
+          qa=qa.replace(film_insert,film_insert+'\n'+film_guard,1)
+
+          phase06_anchor="if(!/target=[\"']_blank[\"'][^>]*rel=[\"'][^\"']*noopener/i.test(phase06Proof))errors.push('corporate.html: Phase 06 external trust links must use noopener');"
+          phase06_guard="""
+if(!/href=["']https:\/\/evidenceaxis\.com\/sample-report\/["'][^>]*target=["']_blank["'][^>]*rel=["'][^"']*noopener/i.test(phase06Proof))errors.push('corporate.html: Gate A Public sample must link directly to Evidence Axis sample report');
+""".strip()
+          if phase06_anchor not in qa: raise SystemExit('QA Phase 06 insertion point missing')
+          qa=qa.replace(phase06_anchor,phase06_anchor+'\n'+phase06_guard,1)
+
+          energy_anchor="for(const route of ['products.html#petrochemical','products.html#chemical','products.html#energy-products','urea-46.html','caustic-soda-solid.html','sodium-sulphate-anhydrous.html','products.html','sales.html'])if(!energyMain.includes(`href=\"${route}\"`))errors.push(`energy.html: Phase 07 route missing -> ${route}`);"
+          product_guards="""
+const products=read('products.html');
+for(const token of ["'Petrochemical Products':'petrochemical'","'Chemical Products':'chemical'","'Energy & Hydrocarbon Products':'energy-products'",'function alignHashTarget()','requestAnimationFrame(()=>requestAnimationFrame(()=>','window.addEventListener(\'hashchange\',alignHashTarget)'])if(!products.includes(token))errors.push(`products.html: Gate A family-hash regression -> ${token}`);
+""".strip()
+          if energy_anchor not in qa: raise SystemExit('QA products insertion point missing')
+          qa=qa.replace(energy_anchor,energy_anchor+'\n'+product_guards,1)
+
+          Path('scripts/qa-site.mjs').write_text(qa)
+          Path('/tmp/new-phase01-css-hash.txt').write_text(new_css_hash+'\n')
+          print('NEW_PHASE01_CSS_HASH='+new_css_hash)
+          PY
+
+      - name: Run strengthened technical QA
+        run: |
+          set -euo pipefail
+          node scripts/qa-site.mjs
+          echo "New Phase 01 CSS hash: $(cat /tmp/new-phase01-css-hash.txt)"
+
+      - name: Verify exact product scope
+        run: |
+          set -euo pipefail
+          git diff --name-only | sort > /tmp/actual.txt
+          cat > /tmp/expected.txt <<'EOF'
+          assets/site.css
+          corporate.html
+          index.html
+          products.html
+          scripts/qa-site.mjs
+          EOF
+          diff -u /tmp/expected.txt /tmp/actual.txt
+          git diff --check
+
+      - name: Create exactly one product correction commit
+        run: |
+          set -euo pipefail
+          git config user.name "morfisam25-tech"
+          git config user.email "morfisam25@gmail.com"
+          git add assets/site.css index.html products.html corporate.html scripts/qa-site.mjs
+          git commit -m "GATE A correction — resolve cumulative Phase 00–08 defects"
+          BASE=4ca464131e2e0d3ce2ba98aeda385c5d6162f34f
+          test "$(git rev-parse HEAD^)" = "$BASE"
+          test "$(git log -1 --pretty=%s)" = "GATE A correction — resolve cumulative Phase 00–08 defects"
+          git diff --name-only HEAD^..HEAD | sort > /tmp/commit-files.txt
+          diff -u /tmp/expected.txt /tmp/commit-files.txt
+          git push origin HEAD:gate-a-correction
+          echo "NEW_PRODUCT_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      - name: Final commit record
+        run: |
+          echo "NEW_PRODUCT_SHA=$NEW_PRODUCT_SHA"
+          git show --stat --oneline --decorate HEAD
