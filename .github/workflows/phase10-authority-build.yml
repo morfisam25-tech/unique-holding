@@ -1,0 +1,42 @@
+name: Phase 10 authority candidate builder
+on:
+  push:
+    branches: [phase10-authority-build-runner]
+    paths:
+      - '.github/phase10/build-phase10.cjs'
+      - '.github/workflows/phase10-authority-build.yml'
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Build from approved Phase 09 baseline
+        run: |
+          set -euo pipefail
+          cp .github/phase10/build-phase10.cjs /tmp/build-phase10.cjs
+          BASE=97358c5aee8685e972decb0e022385f4998f237c
+          git checkout -B phase10-candidate-work "$BASE"
+          node /tmp/build-phase10.cjs
+          node scripts/qa-site.mjs
+          EXPECTED=$'assets/core-product-reference.css\ncaustic-soda-solid.html\nscripts/qa-site.mjs\nsodium-sulphate-anhydrous.html\nurea-46.html'
+          test "$(git diff HEAD --name-only | sort)" = "$EXPECTED"
+          git diff --exit-code "$BASE" -- index.html assets/site.css product.html products.html sales.html
+      - name: Commit exactly one Phase 10 product commit
+        run: |
+          set -euo pipefail
+          git config user.name "morfisam25-tech"
+          git config user.email "morfisam25@gmail.com"
+          git add assets/core-product-reference.css urea-46.html caustic-soda-solid.html sodium-sulphate-anhydrous.html scripts/qa-site.mjs
+          git commit -m "PHASE 10 — Build authoritative core product reference pages"
+          BASE=97358c5aee8685e972decb0e022385f4998f237c
+          test "$(git rev-parse HEAD^)" = "$BASE"
+          EXPECTED=$'assets/core-product-reference.css\ncaustic-soda-solid.html\nscripts/qa-site.mjs\nsodium-sulphate-anhydrous.html\nurea-46.html'
+          test "$(git diff-tree --no-commit-id --name-only -r HEAD | sort)" = "$EXPECTED"
+          git push --force origin HEAD:phase10-authority-candidate
+          echo "CANDIDATE=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+      - name: Report candidate
+        run: echo "PHASE10_CANDIDATE=$CANDIDATE"
