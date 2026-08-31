@@ -24,7 +24,7 @@ jobs:
           git checkout "$OLD" -- assets/products-ia.css product.html products.html scripts/qa-site.mjs
           node /tmp/build-replacement.cjs
           node scripts/qa-site.mjs
-          test "$(git diff --name-only | sort)" = $'assets/products-ia.css\nproduct.html\nproducts.html\nscripts/qa-site.mjs'
+          test "$(git diff HEAD --name-only | sort)" = $'assets/products-ia.css\nproduct.html\nproducts.html\nscripts/qa-site.mjs'
           git diff --exit-code "$BASE" -- index.html assets/site.css
       - name: Commit one replacement candidate
         run: |
