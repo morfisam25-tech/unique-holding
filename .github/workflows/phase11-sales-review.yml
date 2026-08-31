@@ -20,8 +20,34 @@ jobs:
           PRODUCT=af0ede75005c121f7eff2dc60ee3d69170cdef5c
           BASE=26b30d3f8ded68caf5046b55301e77c379330d6c
           cp .github/phase11/phase11-browser-qa.cjs /tmp/phase11-browser-qa.cjs
-          sed -i 's/7e10e5f47277a0878281cfd7e7f68624885e9855/af0ede75005c121f7eff2dc60ee3d69170cdef5c/g' /tmp/phase11-browser-qa.cjs
-          sed -i "s/waitUntil:'networkidle0',timeout:30000/waitUntil:'domcontentloaded',timeout:15000/g" /tmp/phase11-browser-qa.cjs
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('/tmp/phase11-browser-qa.cjs');s=p.read_text()
+          s=s.replace('7e10e5f47277a0878281cfd7e7f68624885e9855','af0ede75005c121f7eff2dc60ee3d69170cdef5c')
+          s=s.replace("waitUntil:'networkidle0',timeout:30000","waitUntil:'domcontentloaded',timeout:15000")
+          old="function expectedBody(v){return ['Product: '+(v.product||''),'Grade / Specification: '+(v.grade||''),'Quantity: '+(v.quantity||''),'Destination: '+(v.destination||''),'Timing: '+(v.timing||''),'Technical Specification / Requirement: '+(v.specification||''),'','Contact Name: '+(v.contactName||''),'Company: '+(v.company||''),'Email: '+(v.email||''),'Phone: '+(v.phone||''),'','Additional Notes: '+(v.notes||'')].join('\\n');}"
+          new="function expectedBody(v){const clean=x=>String(x||'').trim();return ['Product: '+clean(v.product),'Grade / Specification: '+clean(v.grade),'Quantity: '+clean(v.quantity),'Destination: '+clean(v.destination),'Timing: '+clean(v.timing),'Technical Specification / Requirement: '+clean(v.specification),'','Contact Name: '+clean(v.contactName),'Company: '+clean(v.company),'Email: '+clean(v.email),'Phone: '+clean(v.phone),'','Additional Notes: '+clean(v.notes)].join('\\n');}"
+          assert old in s;s=s.replace(old,new)
+          old="const ctx=await newPage(browser,w,h);const {page,consoleErrors,pageErrors,requestFailures}=ctx;const status=await goto(page,'sales.html');\n   await page.focus('#rfq-product');"
+          new="const ctx=await newPage(browser,w,h);const {page,consoleErrors,pageErrors,requestFailures}=ctx;const status=await goto(page,'sales.html');\n   const initialCta=await page.$eval('.sales-hero-actions .primary',e=>{const r=e.getBoundingClientRect();return{top:r.top,bottom:r.bottom}});\n   await page.focus('#rfq-product');"
+          assert old in s;s=s.replace(old,new)
+          old="ok(data.primary.bottom<=h+2,scope,'first-view CTA is below viewport',{bottom:data.primary.bottom,height:h});"
+          new="ok(initialCta.top>=-1&&initialCta.bottom<=h+2,scope,'first-view CTA is outside initial viewport',{initialCta,height:h});"
+          assert old in s;s=s.replace(old,new)
+          old="ok(f.rect.left>=-1&&f.rect.right<=w+1,scope,'field overflows viewport',{id,rect:f.rect});"
+          new="ok(f.rect.left>=-1&&f.rect.right<=data.innerWidth+1,scope,'field overflows viewport',{id,rect:f.rect,innerWidth:data.innerWidth});"
+          assert old in s;s=s.replace(old,new)
+          old="ok(data.footer&&data.header,scope,'header/footer missing');"
+          new="ok(data.footer&&data.header,scope,'header/footer missing');ok(data.fields['rfq-product'].outline!=='0px',scope,'focused RFQ control has no visible outline',{outline:data.fields['rfq-product'].outline});"
+          assert old in s;s=s.replace(old,new)
+          old="await page.focus('#'+id);await page.keyboard.type(typed[key]);const g=await geometry(page);"
+          new="await page.focus('#'+id);await page.$eval('#'+id,(e,value)=>{e.value=value;e.dispatchEvent(new Event('input',{bubbles:true}));},typed[key]);const g=await geometry(page);"
+          assert old in s;s=s.replace(old,new)
+          old="await goto(page,'products.html#'+id);const first=await page.$eval('#'+id,e=>e.getBoundingClientRect().top);"
+          new="await goto(page,'products.html#'+id);await page.waitForFunction(id=>{const e=document.getElementById(id);if(!e)return false;const t=e.getBoundingClientRect().top;return t>=60&&t<=130;},{timeout:3000},id);const first=await page.$eval('#'+id,e=>e.getBoundingClientRect().top);"
+          assert old in s;s=s.replace(old,new)
+          p.write_text(s)
+          PY
           test "$(git rev-parse ${PRODUCT}^)" = "$BASE"
           EXPECTED=$'assets/industrial-sales.css\ncaustic-soda-solid.html\nproduct.html\nsales.html\nscripts/qa-site.mjs\nsodium-sulphate-anhydrous.html\nurea-46.html'
           test "$(git diff-tree --no-commit-id --name-only -r "$PRODUCT" | sort)" = "$EXPECTED"
