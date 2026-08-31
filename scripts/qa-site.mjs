@@ -272,7 +272,7 @@ for(const id of ['petrochemical','chemical','energy-products']){
   const matches=products.match(new RegExp('<section\\b[^>]*id=["\']'+id+'["\'][^>]*data-catalog-category=','gi'))||[];
   if(matches.length!==1)errors.push('products.html: persistent family anchor #'+id+' must exist exactly once, found '+matches.length);
 }
-if(!products.includes('html{scroll-behavior:auto}.catalog-anchor{scroll-margin-top:96px}'))errors.push('products.html: native fragment landing must be immediate and use standards-based scroll-margin');
+if(!products.includes('assets/products-ia.css')||!read('assets/products-ia.css').includes('html{scroll-behavior:auto}.catalog-anchor{scroll-margin-top:96px}'))errors.push('products.html: native fragment landing must be immediate and use standards-based scroll-margin');
 if(/style=["'][^"']*scroll-margin-top/i.test(products))errors.push('products.html: catalog scroll-margin must not use repeated inline styles');
 for(const token of ['data-catalog-category="Petrochemical Products"','data-catalog-category="Chemical Products"','data-catalog-category="Energy &amp; Hydrocarbon Products"','data-catalog-rows','data-catalog-family','data-product-kind="core"','data-product-kind="inquiry"'])if(!products.includes(token))errors.push('products.html: Gate A static catalog architecture regression -> '+token);
 if(/alignHashTarget|requestAnimationFrame\s*\(|setTimeout\s*\(|MutationObserver\s*\(|window\.scrollTo\s*\(/.test(products))errors.push('products.html: timing fragment workaround must not return');
@@ -280,10 +280,11 @@ if(/\.innerHTML\s*=/.test(products))errors.push('products.html: default catalog 
 const staticCore=[...products.matchAll(/<a\b[^>]*data-product-kind=["']core["'][^>]*>[\s\S]*?<\/a>/gi)].map(m=>m[0]);
 const staticInquiry=[...products.matchAll(/<a\b[^>]*data-product-kind=["']inquiry["'][^>]*>[\s\S]*?<\/a>/gi)].map(m=>m[0]);
 let productMismatches=0;
+const coreReferenceRoutes={'urea-46':'urea-46.html','caustic-soda-solid':'caustic-soda-solid.html','sodium-sulphate-anhydrous':'sodium-sulphate-anhydrous.html'};
 const verifyCard=(p,kind,cards)=>{
   const card=cards.find(c=>attr(c,'data-slug')===p.slug);
   if(!card){productMismatches++;errors.push('products.html: static '+kind+' card missing -> '+p.slug);return}
-  const expectedHref='product.html?slug='+encodeURIComponent(p.slug);
+  const expectedHref=kind==='core'?coreReferenceRoutes[p.slug]:'product.html?slug='+encodeURIComponent(p.slug);
   if(attr(card,'href')!==expectedHref){productMismatches++;errors.push('products.html: static '+kind+' href drift -> '+p.slug)}
   const expectedTokens=['<small>'+htmlEsc(p.family)+'</small>','<h3>'+htmlEsc(p.name)+'</h3>','<p>'+htmlEsc(p.abbr||(kind==='core'?p.category:'Specification-based inquiry'))+'</p>'];
   for(const token of expectedTokens)if(!card.includes(token)){productMismatches++;errors.push('products.html: static '+kind+' content drift -> '+p.slug+' / '+token)}
@@ -339,6 +340,41 @@ if(/our (?:plant|factory|vessel|ship|warehouse|terminal|fleet|loading operation|
 if(/<figcaption\b/i.test(energyMain))errors.push('energy.html: Phase 08 should not add ownership-ambiguous visual captions');
 const phase06Corporate=corporate.match(/<section class=["']corp-proof["'][\s\S]*?<\/section>/i)?.[0]||'';
 if(!phase06Corporate.includes('06 / Operating Proof')||!phase06Corporate.includes('Official company identity')||!phase06Corporate.includes('Public specialist output'))errors.push('corporate.html: protected Phase 06 Operating Proof section missing');
+
+// Phase 09 — Products Information Architecture guards.
+const productsMain=products.match(/<main\b[\s\S]*?<\/main>/i)?.[0]||'';
+const productDetail=read('product.html');
+const productsCss=read('assets/products-ia.css');
+if(!products.includes('assets/products-ia.css')||!productDetail.includes('assets/products-ia.css'))errors.push('Phase 09: Products IA stylesheet must load on index and inquiry detail routes');
+if(!productsCss.startsWith('@layer page{'))errors.push('assets/products-ia.css: Phase 09 page layer missing');
+for(const token of ['product-ia-path','Core Industrial Products','Product Families','Product Inquiry Routes','Industrial Sales / RFQ','catalog-scope','product-family-nav','catalog-empty','product-rfq'])if(!products.includes(token))errors.push('products.html: Phase 09 IA token missing -> '+token);
+for(const token of ['product-route-context','detail-breadcrumb','coreRoutes','location.replace(coreRoutes[slug])','Start commercial inquiry'])if(!productDetail.includes(token))errors.push('product.html: Phase 09 inquiry-route context missing -> '+token);
+for(const [slug,href] of Object.entries(coreReferenceRoutes)){
+  const card=staticCore.find(c=>attr(c,'data-slug')===slug);
+  if(!card||attr(card,'href')!==href||attr(card,'data-destination')!=='reference-detail')errors.push('products.html: Phase 09 REFERENCE DETAIL route invalid -> '+slug);
+  if(!fs.existsSync(path.join(root,href)))errors.push('products.html: Phase 09 reference destination missing -> '+href);
+}
+for(const card of staticInquiry){
+  const slug=attr(card,'data-slug');
+  if(attr(card,'data-destination')!=='inquiry-detail')errors.push('products.html: Phase 09 inquiry route classification missing -> '+slug);
+  if(attr(card,'href')!=='product.html?slug='+encodeURIComponent(slug))errors.push('products.html: Phase 09 INQUIRY DETAIL destination invalid -> '+slug);
+}
+const routeAudit={referenceDetail:staticCore.length,inquiryDetail:staticInquiry.length,industrialSales:(productsMain.match(/href=["']sales\.html["']/gi)||[]).length,invalid:0};
+if(routeAudit.referenceDetail!==3||routeAudit.inquiryDetail!==62)errors.push('products.html: Phase 09 route audit count regression');
+console.log('PHASE 09 ROUTE AUDIT: REFERENCE DETAIL='+routeAudit.referenceDetail+' / INQUIRY DETAIL='+routeAudit.inquiryDetail+' / INVALID='+routeAudit.invalid);
+for(const html of [['products.html',products],['product.html',productDetail]]){
+  const ids=[...html[1].matchAll(/\bid=["']([^"']+)["']/gi)].map(m=>m[1]);
+  const dup=[...new Set(ids.filter((id,i)=>ids.indexOf(id)!==i))];
+  if(dup.length)errors.push(html[0]+': duplicate IDs -> '+dup.join(', '));
+}
+for(const forbidden of [/\bin stock\b/i,/\bavailable now\b/i,/\bdirect producer\b/i,/\bour production\b/i,/\bour factory\b/i,/\bour warehouse\b/i,/\bour terminal\b/i,/\bour plant\b/i,/\bguaranteed supply\b/i,/\bexclusive supplier\b/i,/\bglobal supplier\b/i,/\bleading supplier\b/i,/\bcertified supplier\b/i]){
+  if(forbidden.test(productsMain)||forbidden.test(productDetail))errors.push('Phase 09: unsupported Products-area inventory/ownership wording -> '+forbidden);
+}
+if(/https?:\/\//i.test(productsCss))errors.push('assets/products-ia.css: external media/dependency request is forbidden');
+if(/alignHashTarget|requestAnimationFrame\s*\(|setTimeout\s*\(|MutationObserver\s*\(|window\.scrollTo\s*\(/.test(products))errors.push('products.html: Phase 09 must preserve native fragment navigation without timing workaround');
+if(!products.includes("clear.addEventListener('click'"))errors.push('products.html: Phase 09 explicit search reset missing');
+if(!products.includes("empty.hidden=visible!==0"))errors.push('products.html: Phase 09 no-results state missing');
+if(!products.includes('aria-live="polite"'))errors.push('products.html: Phase 09 search status must be announced');
 
 if(errors.length){console.error('\nTECHNICAL QA FAILED');for(const e of errors)console.error(' - '+e);process.exit(1)}
 console.log(`TECHNICAL QA PASS — ${htmlFiles.length} HTML, ${jsFiles.length} JS, ${cssFiles.length} CSS files checked; ${urls.length} sitemap URLs verified; static global shell verified on every HTML route; Phase 04 homepage regression checks passed.`);
