@@ -29,7 +29,8 @@ jobs:
           node /tmp/build-phase09.cjs
           node /tmp/patch-phase09-qa.cjs
           node scripts/qa-site.mjs
-          test "$(git diff --name-only | sort)" = $'assets/products-ia.css\nproduct.html\nproducts.html\nscripts/qa-site.mjs'
+          FILES="$({ git diff --name-only; git ls-files --others --exclude-standard; } | sort -u)"
+          test "$FILES" = $'assets/products-ia.css\nproduct.html\nproducts.html\nscripts/qa-site.mjs'
           git diff --exit-code -- index.html assets/site.css
       - name: Commit exactly once to rebuild branch
         run: |
