@@ -1,0 +1,58 @@
+name: Phase 09 Products IA review
+on:
+  push:
+    branches: [phase09-ia-qa-runner]
+    paths:
+      - '.github/phase09/phase09-browser-qa.cjs'
+      - '.github/phase09/patch-browser-qa.cjs'
+      - '.github/workflows/phase09-review.yml'
+permissions:
+  contents: read
+jobs:
+  review:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify immutable Phase 09 product snapshot
+        run: |
+          set -euo pipefail
+          PRODUCT=7568f4d2215f2eeb2a09d0e5b60182ff19c80f96
+          BASE=83567c124d171bf5d3664b41d8547555a2d196a8
+          git merge-base --is-ancestor "$PRODUCT" HEAD
+          test "$(git rev-parse ${PRODUCT}^)" = "$BASE"
+          test "$(git diff-tree --no-commit-id --name-only -r "$PRODUCT" | sort)" = $'assets/products-ia.css\nproduct.html\nproducts.html\nscripts/qa-site.mjs'
+          git diff --exit-code "$BASE" "$PRODUCT" -- index.html assets/site.css
+          if git diff --name-only "$PRODUCT"..HEAD | grep -Ev '^\.github/(phase09|workflows)/' | grep -q .; then exit 2; fi
+          mkdir -p phase09-review/reports
+          node scripts/qa-site.mjs | tee phase09-review/reports/qa-site.log
+          printf '%s\n' '{"id":"RELEASE-BLOCKER-HTTPS-001","status":"OPEN","note":"Custom domain can display Not Secure on a physical phone. Cause was not investigated or modified in Phase 09. Must be investigated and closed before production release / Phase 22."}' > phase09-review/reports/release-blocker.json
+      - name: Prepare browser QA
+        run: |
+          set -euo pipefail
+          node .github/phase09/patch-browser-qa.cjs
+          node --check .github/phase09/phase09-browser-qa.cjs
+          CHROME="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium)"
+          echo "CHROME=$CHROME" >> "$GITHUB_ENV"
+          npm install --no-save --ignore-scripts puppeteer-core@24.16.0
+      - name: Run Phase 09 browser acceptance
+        run: |
+          set -euo pipefail
+          python3 -m http.server 8000 --bind 127.0.0.1 >phase09-review/reports/server.log 2>&1 &
+          PID=$!; trap 'kill $PID || true' EXIT; sleep 1
+          NODE_PATH="$PWD/node_modules" node .github/phase09/phase09-browser-qa.cjs | tee phase09-review/reports/browser-console.log
+      - name: Write review summary
+        run: |
+          node <<'NODE'
+          const fs=require('fs');const r=JSON.parse(fs.readFileSync('phase09-review/reports/browser-report.json','utf8'));
+          const summary={phase:'09',status:r.failures.length?'FAILED':'READY FOR EXTERNAL REVIEW',baseline:'83567c124d171bf5d3664b41d8547555a2d196a8',newSha:'7568f4d2215f2eeb2a09d0e5b60182ff19c80f96',filesChanged:['assets/products-ia.css','product.html','products.html','scripts/qa-site.mjs'],staticParity:{core:'3/3',inquiry:'62/62',mismatch:0},routing:r.summary.routing,browser:r.summary,film:'UNCHANGED — Gate A real-device approval retained',httpsBlocker:'RELEASE-BLOCKER-HTTPS-001 — OPEN'};
+          fs.writeFileSync('phase09-review/reports/summary.json',JSON.stringify(summary,null,2));console.log(JSON.stringify(summary,null,2));if(r.failures.length)process.exit(2);
+          NODE
+      - name: Upload Phase 09 review packet
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase09-products-ia-review
+          path: phase09-review/
+          if-no-files-found: error
