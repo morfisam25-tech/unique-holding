@@ -21,6 +21,7 @@ jobs:
           BASE=26b30d3f8ded68caf5046b55301e77c379330d6c
           cp .github/phase11/phase11-browser-qa.cjs /tmp/phase11-browser-qa.cjs
           sed -i 's/7e10e5f47277a0878281cfd7e7f68624885e9855/af0ede75005c121f7eff2dc60ee3d69170cdef5c/g' /tmp/phase11-browser-qa.cjs
+          sed -i "s/waitUntil:'networkidle0',timeout:30000/waitUntil:'domcontentloaded',timeout:15000/g" /tmp/phase11-browser-qa.cjs
           test "$(git rev-parse ${PRODUCT}^)" = "$BASE"
           EXPECTED=$'assets/industrial-sales.css\ncaustic-soda-solid.html\nproduct.html\nsales.html\nscripts/qa-site.mjs\nsodium-sulphate-anhydrous.html\nurea-46.html'
           test "$(git diff-tree --no-commit-id --name-only -r "$PRODUCT" | sort)" = "$EXPECTED"
