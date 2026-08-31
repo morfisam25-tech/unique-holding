@@ -4,6 +4,7 @@ on:
     branches: [phase09-ia-build-runner]
     paths:
       - '.github/phase09/build-phase09.cjs'
+      - '.github/phase09/patch-phase09-qa.cjs'
       - '.github/workflows/phase09-build.yml'
 permissions:
   contents: write
@@ -18,6 +19,7 @@ jobs:
         run: |
           set -euo pipefail
           cp .github/phase09/build-phase09.cjs /tmp/build-phase09.cjs
+          cp .github/phase09/patch-phase09-qa.cjs /tmp/patch-phase09-qa.cjs
           git fetch origin rebuild/award-level-corporate-v2
           git checkout -B phase09-product origin/rebuild/award-level-corporate-v2
           test "$(git rev-parse HEAD)" = "83567c124d171bf5d3664b41d8547555a2d196a8"
@@ -25,6 +27,7 @@ jobs:
         run: |
           set -euo pipefail
           node /tmp/build-phase09.cjs
+          node /tmp/patch-phase09-qa.cjs
           node scripts/qa-site.mjs
           test "$(git diff --name-only | sort)" = $'assets/products-ia.css\nproduct.html\nproducts.html\nscripts/qa-site.mjs'
           git diff --exit-code -- index.html assets/site.css
