@@ -15,7 +15,6 @@ const core=sandbox.window.UNIQUE_CORE_PRODUCTS||[];
 if(!Array.isArray(inquiry)||!Array.isArray(core))throw new Error('Product data arrays unavailable');
 
 let products=read('products.html');
-
 const coreHtml=core.map(p=>`<a class="product-link" data-product-kind="core" data-slug="${esc(p.slug)}" href="product.html?slug=${encodeURIComponent(p.slug)}"><small>${esc(p.family)}</small><h3>${esc(p.name)}</h3><p>${esc(p.abbr||p.category)}</p><span>Reference technical data ↗</span></a>`).join('');
 products=products.replace('<div class="product-grid" id="core-grid"></div>',`<div class="product-grid" id="core-grid">${coreHtml}</div>`);
 
@@ -42,9 +41,7 @@ const catalogEnd=products.indexOf(catalogEndMarker,catalogStart);
 if(catalogStart<0||catalogEnd<0)throw new Error('Catalog replacement markers not found');
 products=products.slice(0,catalogStart)+`<div id="catalog">${catalogHtml}</div></section>\n<section class="subsite-section paper">`+products.slice(catalogEnd+catalogEndMarker.length);
 
-if(!products.includes('.catalog-anchor{scroll-margin-top:96px}')){
-  products=products.replace('</head>','<style>@layer page{.catalog-anchor{scroll-margin-top:96px}}</style></head>');
-}
+if(!products.includes('.catalog-anchor{scroll-margin-top:96px}'))products=products.replace('</head>','<style>@layer page{.catalog-anchor{scroll-margin-top:96px}}</style></head>');
 
 const scriptStartMarker='<script src="assets/products-data.js"></script><script>';
 const scriptEndMarker='</script><script src="assets/site.js" defer></script>';
@@ -70,12 +67,12 @@ const inquiryData=productSandbox.window.UNIQUE_PRODUCTS||[];
 const coreData=productSandbox.window.UNIQUE_CORE_PRODUCTS||[];
 const htmlEsc=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 for(const id of ['petrochemical','chemical','energy-products']){
-  const matches=products.match(new RegExp(\\`<section\\\\b[^>]*id=["']\\${id}["'][^>]*data-catalog-category=\\`,'gi'))||[];
-  if(matches.length!==1)errors.push(\\`products.html: persistent family anchor #\\${id} must exist exactly once, found \\${matches.length}\\`);
+  const matches=products.match(new RegExp('<section\\\\b[^>]*id=["\\\']'+id+'["\\\'][^>]*data-catalog-category=','gi'))||[];
+  if(matches.length!==1)errors.push('products.html: persistent family anchor #'+id+' must exist exactly once, found '+matches.length);
 }
 if(!products.includes('.catalog-anchor{scroll-margin-top:96px}'))errors.push('products.html: standards-based catalog scroll-margin rule missing');
 if(/style=["'][^"']*scroll-margin-top/i.test(products))errors.push('products.html: catalog scroll-margin must not use repeated inline styles');
-for(const token of ['data-catalog-category="Petrochemical Products"','data-catalog-category="Chemical Products"','data-catalog-category="Energy & Hydrocarbon Products"','data-catalog-rows','data-catalog-family','data-product-kind="core"','data-product-kind="inquiry"'])if(!products.includes(token))errors.push(\\`products.html: Gate A static catalog architecture regression -> \\${token}\\`);
+for(const token of ['data-catalog-category="Petrochemical Products"','data-catalog-category="Chemical Products"','data-catalog-category="Energy & Hydrocarbon Products"','data-catalog-rows','data-catalog-family','data-product-kind="core"','data-product-kind="inquiry"'])if(!products.includes(token))errors.push('products.html: Gate A static catalog architecture regression -> '+token);
 if(/alignHashTarget|requestAnimationFrame\\s*\\(|setTimeout\\s*\\(|MutationObserver\\s*\\(|window\\.scrollTo\\s*\\(/.test(products))errors.push('products.html: timing fragment workaround must not return');
 if(/\\.innerHTML\\s*=/.test(products))errors.push('products.html: default catalog must not depend on post-load innerHTML construction');
 const staticCore=[...products.matchAll(/<a\\b[^>]*data-product-kind=["']core["'][^>]*>[\\s\\S]*?<\\/a>/gi)].map(m=>m[0]);
@@ -83,16 +80,17 @@ const staticInquiry=[...products.matchAll(/<a\\b[^>]*data-product-kind=["']inqui
 let productMismatches=0;
 const verifyCard=(p,kind,cards)=>{
   const card=cards.find(c=>attr(c,'data-slug')===p.slug);
-  if(!card){productMismatches++;errors.push(\\`products.html: static \\${kind} card missing -> \\${p.slug}\\`);return}
-  const expectedHref=\\`product.html?slug=\\${encodeURIComponent(p.slug)}\\`;
-  if(attr(card,'href')!==expectedHref){productMismatches++;errors.push(\\`products.html: static \\${kind} href drift -> \\${p.slug}\\`)}
-  for(const token of [\\`<small>\\${htmlEsc(p.family)}</small>\\`,\\`<h3>\\${htmlEsc(p.name)}</h3>\\`,\\`<p>\\${htmlEsc(p.abbr||(kind==='core'?p.category:'Specification-based inquiry'))}</p>\\`])if(!card.includes(token)){productMismatches++;errors.push(\\`products.html: static \\${kind} content drift -> \\${p.slug} / \\${token}\\`)}
-  if(kind==='inquiry'&&(attr(card,'data-category')!==htmlEsc(p.category)||attr(card,'data-family')!==htmlEsc(p.family))){productMismatches++;errors.push(\\`products.html: static inquiry metadata drift -> \\${p.slug}\\`)}
+  if(!card){productMismatches++;errors.push('products.html: static '+kind+' card missing -> '+p.slug);return}
+  const expectedHref='product.html?slug='+encodeURIComponent(p.slug);
+  if(attr(card,'href')!==expectedHref){productMismatches++;errors.push('products.html: static '+kind+' href drift -> '+p.slug)}
+  const expectedTokens=['<small>'+htmlEsc(p.family)+'</small>','<h3>'+htmlEsc(p.name)+'</h3>','<p>'+htmlEsc(p.abbr||(kind==='core'?p.category:'Specification-based inquiry'))+'</p>'];
+  for(const token of expectedTokens)if(!card.includes(token)){productMismatches++;errors.push('products.html: static '+kind+' content drift -> '+p.slug+' / '+token)}
+  if(kind==='inquiry'&&(attr(card,'data-category')!==htmlEsc(p.category)||attr(card,'data-family')!==htmlEsc(p.family))){productMismatches++;errors.push('products.html: static inquiry metadata drift -> '+p.slug)}
 };
 for(const p of coreData)verifyCard(p,'core',staticCore);
 for(const p of inquiryData)verifyCard(p,'inquiry',staticInquiry);
-if(staticCore.length!==coreData.length){productMismatches++;errors.push(\\`products.html: static core count \\${staticCore.length} != data count \\${coreData.length}\\`)}
-if(staticInquiry.length!==inquiryData.length){productMismatches++;errors.push(\\`products.html: static inquiry count \\${staticInquiry.length} != data count \\${inquiryData.length}\\`)}
+if(staticCore.length!==coreData.length){productMismatches++;errors.push('products.html: static core count '+staticCore.length+' != data count '+coreData.length)}
+if(staticInquiry.length!==inquiryData.length){productMismatches++;errors.push('products.html: static inquiry count '+staticInquiry.length+' != data count '+inquiryData.length)}
 if(new Set(staticCore.map(c=>attr(c,'data-slug'))).size!==staticCore.length){productMismatches++;errors.push('products.html: duplicate static core product slug')}
 if(new Set(staticInquiry.map(c=>attr(c,'data-slug'))).size!==staticInquiry.length){productMismatches++;errors.push('products.html: duplicate static inquiry product slug')}
 console.log('CORE DATA COUNT: '+coreData.length);
@@ -101,7 +99,7 @@ console.log('INQUIRY DATA COUNT: '+inquiryData.length);
 console.log('STATIC INQUIRY CARD COUNT: '+staticInquiry.length);
 console.log('MISMATCH COUNT: '+productMismatches);
 if(!products.includes("input.addEventListener('input'"))errors.push('products.html: progressive-enhancement search listener missing');
-if(!products.includes("card.hidden=!match"))errors.push('products.html: search must filter existing static cards');
+if(!products.includes('card.hidden=!match'))errors.push('products.html: search must filter existing static cards');
 if(!products.includes("group.hidden=!group.querySelector('[data-catalog-family]:not([hidden])')"))errors.push('products.html: search must hide empty catalog families without destroying anchors');
 `;
 qa=qa.slice(0,guardStart)+newGuards+qa.slice(guardEnd);
