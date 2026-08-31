@@ -17,9 +17,10 @@ jobs:
       - name: Verify immutable Phase 11 product snapshot
         run: |
           set -euo pipefail
-          PRODUCT=7e10e5f47277a0878281cfd7e7f68624885e9855
+          PRODUCT=af0ede75005c121f7eff2dc60ee3d69170cdef5c
           BASE=26b30d3f8ded68caf5046b55301e77c379330d6c
           cp .github/phase11/phase11-browser-qa.cjs /tmp/phase11-browser-qa.cjs
+          sed -i 's/7e10e5f47277a0878281cfd7e7f68624885e9855/af0ede75005c121f7eff2dc60ee3d69170cdef5c/g' /tmp/phase11-browser-qa.cjs
           test "$(git rev-parse ${PRODUCT}^)" = "$BASE"
           EXPECTED=$'assets/industrial-sales.css\ncaustic-soda-solid.html\nproduct.html\nsales.html\nscripts/qa-site.mjs\nsodium-sulphate-anhydrous.html\nurea-46.html'
           test "$(git diff-tree --no-commit-id --name-only -r "$PRODUCT" | sort)" = "$EXPECTED"
@@ -45,7 +46,7 @@ jobs:
         run: |
           node <<'NODE'
           const fs=require('fs');const r=JSON.parse(fs.readFileSync('phase11-review/reports/browser-report.json','utf8'));
-          const summary={phase:'11',status:r.failures.length?'FAILED':'READY FOR EXTERNAL REVIEW',baseline:'26b30d3f8ded68caf5046b55301e77c379330d6c',newSha:'7e10e5f47277a0878281cfd7e7f68624885e9855',filesChanged:['assets/industrial-sales.css','caustic-soda-solid.html','product.html','sales.html','scripts/qa-site.mjs','sodium-sulphate-anhydrous.html','urea-46.html'],browser:r.summary,routing:{reference:3,inquiry:62,invalid:0},film:'UNCHANGED — protected Phase 01/Gate A asset and code paths excluded from product diff',httpsBlocker:'RELEASE-BLOCKER-HTTPS-001 — OPEN'};
+          const summary={phase:'11',status:r.failures.length?'FAILED':'READY FOR EXTERNAL REVIEW',baseline:'26b30d3f8ded68caf5046b55301e77c379330d6c',newSha:'af0ede75005c121f7eff2dc60ee3d69170cdef5c',filesChanged:['assets/industrial-sales.css','caustic-soda-solid.html','product.html','sales.html','scripts/qa-site.mjs','sodium-sulphate-anhydrous.html','urea-46.html'],browser:r.summary,routing:{reference:3,inquiry:62,invalid:0},film:'UNCHANGED — protected Phase 01/Gate A asset and code paths excluded from product diff',httpsBlocker:'RELEASE-BLOCKER-HTTPS-001 — OPEN'};
           fs.writeFileSync('phase11-review/reports/summary.json',JSON.stringify(summary,null,2));console.log(JSON.stringify(summary,null,2));if(r.failures.length)process.exit(2);
           NODE
       - name: Upload Phase 11 review packet
