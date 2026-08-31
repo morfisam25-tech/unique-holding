@@ -1,0 +1,30 @@
+name: Gate A live caption playback verification
+on:
+  push:
+    branches: [gate-a-followup-qa-runner]
+    paths: ['.github/workflows/gate-a-live-caption.yml']
+permissions:
+  contents: read
+jobs:
+  caption:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare browser
+        run: |
+          CHROME="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium)"
+          echo "CHROME=$CHROME" >> "$GITHUB_ENV"
+          npm install --no-save --ignore-scripts puppeteer-core@24.16.0
+      - name: Verify live cues
+        run: |
+          mkdir -p gate-a-live-caption
+          python3 -m http.server 8000 --bind 127.0.0.1 >/tmp/server.log 2>&1 &
+          PID=$!; trap 'kill $PID || true' EXIT; sleep 1
+          NODE_PATH="$PWD/node_modules" node .github/qa/gate-a-live-caption.cjs
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gate-a-live-caption
+          path: gate-a-live-caption/
+          if-no-files-found: error
