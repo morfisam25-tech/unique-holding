@@ -35,7 +35,7 @@ jobs:
           new="ok(initialCta.top>=-1&&initialCta.bottom<=h+2,scope,'first-view CTA is outside initial viewport',{initialCta,height:h});"
           assert old in s;s=s.replace(old,new)
           old="ok(f.rect.left>=-1&&f.rect.right<=w+1,scope,'field overflows viewport',{id,rect:f.rect});"
-          new="ok(f.rect.left>=-1&&f.rect.right<=data.innerWidth+1,scope,'field overflows viewport',{id,rect:f.rect,innerWidth:data.innerWidth});"
+          new="ok(f.rect.x>=-1&&f.rect.right<=data.innerWidth+1,scope,'field overflows viewport',{id,rect:f.rect,innerWidth:data.innerWidth});"
           assert old in s;s=s.replace(old,new)
           old="ok(data.footer&&data.header,scope,'header/footer missing');"
           new="ok(data.footer&&data.header,scope,'header/footer missing');ok(data.fields['rfq-product'].outline!=='0px',scope,'focused RFQ control has no visible outline',{outline:data.fields['rfq-product'].outline});"
@@ -45,6 +45,9 @@ jobs:
           assert old in s;s=s.replace(old,new)
           old="await goto(page,'products.html#'+id);const first=await page.$eval('#'+id,e=>e.getBoundingClientRect().top);"
           new="await goto(page,'products.html#'+id);await page.waitForFunction(()=>document.readyState==='complete',{timeout:8000}).catch(()=>{});await new Promise(r=>setTimeout(r,250));const first=await page.$eval('#'+id,e=>e.getBoundingClientRect().top);"
+          assert old in s;s=s.replace(old,new)
+          old="await page.screenshot({path:path.join(shots,'products',`products-${label}.png`),fullPage:true});for(const id of ['petrochemical','chemical','energy-products'])"
+          new="await page.screenshot({path:path.join(shots,'products',`products-${label}.png`),fullPage:true});await page.click('#product-search-clear');await page.waitForFunction(()=>document.querySelectorAll('#catalog [data-product-kind=\"inquiry\"]:not([hidden])').length===62);for(const id of ['petrochemical','chemical','energy-products'])"
           assert old in s;s=s.replace(old,new)
           p.write_text(s)
           PY
