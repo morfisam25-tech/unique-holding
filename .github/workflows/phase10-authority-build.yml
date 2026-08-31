@@ -23,7 +23,8 @@ jobs:
           node /tmp/build-phase10.cjs
           node scripts/qa-site.mjs
           EXPECTED=$'assets/core-product-reference.css\ncaustic-soda-solid.html\nscripts/qa-site.mjs\nsodium-sulphate-anhydrous.html\nurea-46.html'
-          test "$(git diff HEAD --name-only | sort)" = "$EXPECTED"
+          ACTUAL="$( { git diff HEAD --name-only; git ls-files --others --exclude-standard; } | sort -u )"
+          test "$ACTUAL" = "$EXPECTED"
           git diff --exit-code "$BASE" -- index.html assets/site.css product.html products.html sales.html
       - name: Commit exactly one Phase 10 product commit
         run: |
