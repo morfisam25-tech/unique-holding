@@ -1,0 +1,90 @@
+name: Gate A follow-up product build
+on:
+  push:
+    branches: [gate-a-followup-build-runner]
+    paths: ['.github/workflows/gate-a-followup-build.yml']
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify parent
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^)" = "ac633ec0e431668b000c105cb05bc81da93ebd2d" || true
+          git merge-base --is-ancestor ac633ec0e431668b000c105cb05bc81da93ebd2d HEAD
+      - name: Apply authorized follow-up only
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          import hashlib, re
+
+          index_path=Path('index.html')
+          index=index_path.read_text()
+          old_rule='@media(max-width:980px) and (orientation:portrait){.hero-film{object-fit:contain;object-position:center center}}'
+          new_rule='@media(max-width:980px) and (orientation:portrait){.hero-film{position:absolute;left:0;top:50%;width:100%;height:auto;aspect-ratio:16/9;transform:translateY(-50%);object-fit:contain;object-position:center center}}'
+          assert index.count(old_rule)==1, 'expected old portrait film rule exactly once'
+          index=index.replace(old_rule,new_rule)
+          index_path.write_text(index)
+
+          products_path=Path('products.html')
+          products=products_path.read_text()
+          old_catalog='<div id="catalog"></div>'
+          new_catalog='''<div id="catalog"><section class="catalog-group" id="petrochemical" data-catalog-category="Petrochemical Products" style="scroll-margin-top:96px"><h2>Petrochemical Products</h2><p>Polymers, basic petrochemicals, aromatics, glycols, intermediates, ethanolamines and fertilizer-related inquiry families.</p><div data-catalog-rows></div></section><section class="catalog-group" id="chemical" data-catalog-category="Chemical Products" style="scroll-margin-top:96px"><h2>Chemical Products</h2><p>Industrial chemical inquiry families reviewed against requested specification and offered-lot availability.</p><div data-catalog-rows></div></section><section class="catalog-group" id="energy-products" data-catalog-category="Energy & Hydrocarbon Products" style="scroll-margin-top:96px"><h2>Energy &amp; Hydrocarbon Products</h2><p>Liquefied gases, refinery materials, base oils, waxes and hydrocarbon-stream inquiry families.</p><div data-catalog-rows></div></section></div>'''
+          assert products.count(old_catalog)==1, 'expected catalog host exactly once'
+          products=products.replace(old_catalog,new_catalog)
+          old_head="(function(){const core=window.UNIQUE_CORE_PRODUCTS||[];const data=window.UNIQUE_PRODUCTS||[];const coreGrid=document.getElementById('core-grid');const catalog=document.getElementById('catalog');const input=document.getElementById('product-search');const count=document.getElementById('product-count');const ids={'Petrochemical Products':'petrochemical','Chemical Products':'chemical','Energy & Hydrocarbon Products':'energy-products'};"
+          new_head="(function(){const core=window.UNIQUE_CORE_PRODUCTS||[];const data=window.UNIQUE_PRODUCTS||[];const coreGrid=document.getElementById('core-grid');const catalog=document.getElementById('catalog');const input=document.getElementById('product-search');const count=document.getElementById('product-count');const groups=[...catalog.querySelectorAll('[data-catalog-category]')];"
+          assert products.count(old_head)==1, 'expected old products bootstrap exactly once'
+          products=products.replace(old_head,new_head)
+          start=products.index("function render(q=''){")
+          end_marker="input.addEventListener('input',e=>render(e.target.value));render();alignHashTarget();window.addEventListener('hashchange',alignHashTarget);})();"
+          end=products.index(end_marker,start)
+          assert start>=0 and end>=0, 'expected timing-based render/hash block'
+          end+=len(end_marker)
+          new_block="function render(q=''){const term=q.trim().toLowerCase();const filtered=data.filter(p=>!term||[p.name,p.abbr,p.category,p.family].join(' ').toLowerCase().includes(term));count.textContent=filtered.length+' inquiry routes';for(const group of groups){const cat=group.dataset.catalogCategory;const rows=filtered.filter(p=>p.category===cat);const body=group.querySelector('[data-catalog-rows]');group.hidden=!rows.length;if(!body)continue;if(!rows.length){body.innerHTML='';continue;}const fams=[...new Set(rows.map(p=>p.family))];body.innerHTML=fams.map(f=>`<div class=\"catalog-group\"><p class=\"subsite-label\">${f}</p><div class=\"product-grid\">${rows.filter(p=>p.family===f).map(p=>`<a class=\"product-link\" href=\"product.html?slug=${encodeURIComponent(p.slug)}\"><small>${p.family}</small><h3>${p.name}</h3><p>${p.abbr||'Specification-based inquiry'}</p><span>Open inquiry route ↗</span></a>`).join('')}</div></div>`).join('');}}\ninput.addEventListener('input',e=>render(e.target.value));render();})();"
+          products=products[:start]+new_block+products[end:]
+          assert 'alignHashTarget' not in products
+          assert 'requestAnimationFrame(()=>requestAnimationFrame' not in products
+          products_path.write_text(products)
+
+          qa_path=Path('scripts/qa-site.mjs')
+          qa=qa_path.read_text()
+          assert qa.count(old_rule)==1, 'expected old film geometry guard exactly once'
+          qa=qa.replace(old_rule,new_rule)
+
+          style_start=index.index('  <style>')
+          style_end=index.index('  </style>',style_start)
+          css_slice=index[style_start:style_end+len('  </style>')]
+          css_hash=hashlib.sha256(css_slice.encode()).hexdigest()
+          old_hash='ea19f2952096f0b93d892f6923269ff406a04e8fce42d30fc4382d39286f46eb'
+          assert qa.count(old_hash)==1, 'expected previous Phase 01 CSS hash exactly once'
+          qa=qa.replace(old_hash,css_hash)
+
+          old_guard="const products=read('products.html');\nfor(const token of [\"'Petrochemical Products':'petrochemical'\",\"'Chemical Products':'chemical'\",\"'Energy & Hydrocarbon Products':'energy-products'\",'function alignHashTarget()','requestAnimationFrame(()=>requestAnimationFrame(()=>',\"window.addEventListener('hashchange',alignHashTarget)\"])if(!products.includes(token))errors.push(`products.html: Gate A family-hash regression -> ${token}`);"
+          new_guard="const products=read('products.html');\nfor(const id of ['petrochemical','chemical','energy-products'])if(!new RegExp(`<section\\\\b[^>]*id=[\\\"']${id}[\\\"'][^>]*data-catalog-category=`,'i').test(products))errors.push(`products.html: Gate A static family anchor missing -> #${id}`);\nfor(const token of ['data-catalog-category=\"Petrochemical Products\"','data-catalog-category=\"Chemical Products\"','data-catalog-category=\"Energy & Hydrocarbon Products\"','data-catalog-rows','scroll-margin-top:96px'])if(!products.includes(token))errors.push(`products.html: Gate A static family architecture regression -> ${token}`);\nif(/alignHashTarget|requestAnimationFrame\\s*\\(|setTimeout\\s*\\(|window\\.scrollTo\\s*\\(/.test(products))errors.push('products.html: timing-only family-hash workaround must not return');"
+          assert qa.count(old_guard)==1, 'expected previous Gate A family-hash guard block exactly once'
+          qa=qa.replace(old_guard,new_guard)
+          qa_path.write_text(qa)
+          print('NEW_PLAYER_CSS_HASH='+css_hash)
+          PY
+      - name: Technical QA
+        run: node scripts/qa-site.mjs
+      - name: Verify exact product scope
+        run: |
+          set -euo pipefail
+          changed=$(git diff --name-only | sort)
+          printf '%s\n' "$changed"
+          test "$changed" = $'index.html\nproducts.html\nscripts/qa-site.mjs'
+      - name: Commit helper product blobs
+        run: |
+          set -euo pipefail
+          git config user.name "morfisam25-tech"
+          git config user.email "morfisam25@gmail.com"
+          git add index.html products.html scripts/qa-site.mjs
+          git commit -m "BUILD — Gate A follow-up product files"
+          git push origin HEAD:gate-a-followup-build-runner
