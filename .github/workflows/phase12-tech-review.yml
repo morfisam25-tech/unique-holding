@@ -17,9 +17,10 @@ jobs:
       - name: Verify immutable Phase 12 product snapshot
         run: |
           set -euo pipefail
-          PRODUCT=8ebffede8e6219d1a3a89d8ab9e215a121188556
+          PRODUCT=1ecb43028b3b50b3a44e0b86f0cdef7b671f164f
           BASE=af0ede75005c121f7eff2dc60ee3d69170cdef5c
           cp .github/phase12/phase12-browser-qa.cjs /tmp/phase12-browser-qa.cjs
+          sed -i 's/8ebffede8e6219d1a3a89d8ab9e215a121188556/1ecb43028b3b50b3a44e0b86f0cdef7b671f164f/g' /tmp/phase12-browser-qa.cjs
           test "$(git rev-parse ${PRODUCT}^)" = "$BASE"
           EXPECTED=$'assets/technology-content.css\nscripts/qa-site.mjs\ntechnology.html'
           test "$(git diff-tree --no-commit-id --name-only -r "$PRODUCT" | sort)" = "$EXPECTED"
@@ -58,7 +59,7 @@ jobs:
         run: |
           node <<'NODE'
           const fs=require('fs');const r=JSON.parse(fs.readFileSync('phase12-review/reports/browser-report.json','utf8'));
-          const summary={phase:'12',status:r.failures.length?'FAILED':'READY FOR EXTERNAL REVIEW',baseline:'af0ede75005c121f7eff2dc60ee3d69170cdef5c',newSha:'8ebffede8e6219d1a3a89d8ab9e215a121188556',filesChanged:['assets/technology-content.css','scripts/qa-site.mjs','technology.html'],browser:r.summary,routing:{reference:3,inquiry:62,invalid:0},film:'UNCHANGED — protected Phase 01/Gate A asset, markup, CSS and behavior excluded from Phase 12 diff',phase11:'UNCHANGED — Industrial Sales/RFQ excluded from Phase 12 diff',httpsBlocker:'RELEASE-BLOCKER-HTTPS-001 — OPEN'};
+          const summary={phase:'12',status:r.failures.length?'FAILED':'READY FOR EXTERNAL REVIEW',baseline:'af0ede75005c121f7eff2dc60ee3d69170cdef5c',newSha:'1ecb43028b3b50b3a44e0b86f0cdef7b671f164f',filesChanged:['assets/technology-content.css','scripts/qa-site.mjs','technology.html'],browser:r.summary,routing:{reference:3,inquiry:62,invalid:0},film:'UNCHANGED — protected Phase 01/Gate A asset, markup, CSS and behavior excluded from Phase 12 diff',phase11:'UNCHANGED — Industrial Sales/RFQ excluded from Phase 12 diff',httpsBlocker:'RELEASE-BLOCKER-HTTPS-001 — OPEN'};
           fs.writeFileSync('phase12-review/reports/summary.json',JSON.stringify(summary,null,2));console.log(JSON.stringify(summary,null,2));if(r.failures.length)process.exit(2);
           NODE
       - name: Upload Phase 12 review packet
