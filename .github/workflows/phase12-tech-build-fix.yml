@@ -1,0 +1,31 @@
+name: Phase 12 build runner fix
+on:
+  push:
+    branches: [phase12-tech-build-runner]
+    paths: ['.github/workflows/phase12-tech-build-fix.yml']
+permissions:
+  contents: write
+jobs:
+  fix:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Fix escaped title in build workflow
+        run: |
+          set -euo pipefail
+          git config user.name "morfisam25-tech"
+          git config user.email "morfisam25@gmail.com"
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('.github/workflows/phase12-tech-build.yml')
+          s=p.read_text()
+          old='<title>Technology & Intelligence | Unique Holding</title>'
+          new='<title>Technology &amp; Intelligence | Unique Holding</title>'
+          assert old in s
+          p.write_text(s.replace(old,new))
+          PY
+          git add .github/workflows/phase12-tech-build.yml
+          git commit -m "QA — correct Phase 12 title escaping"
+          git push origin HEAD:phase12-tech-build-runner
