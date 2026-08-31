@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import vm from 'node:vm';
 
 const root=process.cwd();
 const errors=[];
@@ -262,9 +263,46 @@ for(const token of [
 ])if(!energyMain.includes(token))errors.push(`energy.html: Phase 07 required content missing -> ${token}`);
 for(const route of ['products.html#petrochemical','products.html#chemical','products.html#energy-products','urea-46.html','caustic-soda-solid.html','sodium-sulphate-anhydrous.html','products.html','sales.html'])if(!energyMain.includes(`href="${route}"`))errors.push(`energy.html: Phase 07 route missing -> ${route}`);
 const products=read('products.html');
-for(const id of ['petrochemical','chemical','energy-products'])if(!new RegExp(`<section\\b[^>]*id=[\"']${id}[\"'][^>]*data-catalog-category=`,'i').test(products))errors.push(`products.html: Gate A static family anchor missing -> #${id}`);
-for(const token of ['data-catalog-category="Petrochemical Products"','data-catalog-category="Chemical Products"','data-catalog-category="Energy & Hydrocarbon Products"','data-catalog-rows','scroll-margin-top:96px'])if(!products.includes(token))errors.push(`products.html: Gate A static family architecture regression -> ${token}`);
-if(/alignHashTarget|requestAnimationFrame\s*\(|setTimeout\s*\(|window\.scrollTo\s*\(/.test(products))errors.push('products.html: timing-only family-hash workaround must not return');
+const productSandbox={window:{}};
+try{vm.runInNewContext(read('assets/products-data.js'),productSandbox,{filename:'assets/products-data.js'})}catch(e){errors.push('assets/products-data.js: data evaluation failed -> '+e.message)}
+const inquiryData=productSandbox.window.UNIQUE_PRODUCTS||[];
+const coreData=productSandbox.window.UNIQUE_CORE_PRODUCTS||[];
+const htmlEsc=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+for(const id of ['petrochemical','chemical','energy-products']){
+  const matches=products.match(new RegExp('<section\\b[^>]*id=["\']'+id+'["\'][^>]*data-catalog-category=','gi'))||[];
+  if(matches.length!==1)errors.push('products.html: persistent family anchor #'+id+' must exist exactly once, found '+matches.length);
+}
+if(!products.includes('html{scroll-behavior:auto}.catalog-anchor{scroll-margin-top:96px}'))errors.push('products.html: native fragment landing must be immediate and use standards-based scroll-margin');
+if(/style=["'][^"']*scroll-margin-top/i.test(products))errors.push('products.html: catalog scroll-margin must not use repeated inline styles');
+for(const token of ['data-catalog-category="Petrochemical Products"','data-catalog-category="Chemical Products"','data-catalog-category="Energy &amp; Hydrocarbon Products"','data-catalog-rows','data-catalog-family','data-product-kind="core"','data-product-kind="inquiry"'])if(!products.includes(token))errors.push('products.html: Gate A static catalog architecture regression -> '+token);
+if(/alignHashTarget|requestAnimationFrame\s*\(|setTimeout\s*\(|MutationObserver\s*\(|window\.scrollTo\s*\(/.test(products))errors.push('products.html: timing fragment workaround must not return');
+if(/\.innerHTML\s*=/.test(products))errors.push('products.html: default catalog must not depend on post-load innerHTML construction');
+const staticCore=[...products.matchAll(/<a\b[^>]*data-product-kind=["']core["'][^>]*>[\s\S]*?<\/a>/gi)].map(m=>m[0]);
+const staticInquiry=[...products.matchAll(/<a\b[^>]*data-product-kind=["']inquiry["'][^>]*>[\s\S]*?<\/a>/gi)].map(m=>m[0]);
+let productMismatches=0;
+const verifyCard=(p,kind,cards)=>{
+  const card=cards.find(c=>attr(c,'data-slug')===p.slug);
+  if(!card){productMismatches++;errors.push('products.html: static '+kind+' card missing -> '+p.slug);return}
+  const expectedHref='product.html?slug='+encodeURIComponent(p.slug);
+  if(attr(card,'href')!==expectedHref){productMismatches++;errors.push('products.html: static '+kind+' href drift -> '+p.slug)}
+  const expectedTokens=['<small>'+htmlEsc(p.family)+'</small>','<h3>'+htmlEsc(p.name)+'</h3>','<p>'+htmlEsc(p.abbr||(kind==='core'?p.category:'Specification-based inquiry'))+'</p>'];
+  for(const token of expectedTokens)if(!card.includes(token)){productMismatches++;errors.push('products.html: static '+kind+' content drift -> '+p.slug+' / '+token)}
+  if(kind==='inquiry'&&(attr(card,'data-category')!==htmlEsc(p.category)||attr(card,'data-family')!==htmlEsc(p.family))){productMismatches++;errors.push('products.html: static inquiry metadata drift -> '+p.slug)}
+};
+for(const p of coreData)verifyCard(p,'core',staticCore);
+for(const p of inquiryData)verifyCard(p,'inquiry',staticInquiry);
+if(staticCore.length!==coreData.length){productMismatches++;errors.push('products.html: static core count '+staticCore.length+' != data count '+coreData.length)}
+if(staticInquiry.length!==inquiryData.length){productMismatches++;errors.push('products.html: static inquiry count '+staticInquiry.length+' != data count '+inquiryData.length)}
+if(new Set(staticCore.map(c=>attr(c,'data-slug'))).size!==staticCore.length){productMismatches++;errors.push('products.html: duplicate static core product slug')}
+if(new Set(staticInquiry.map(c=>attr(c,'data-slug'))).size!==staticInquiry.length){productMismatches++;errors.push('products.html: duplicate static inquiry product slug')}
+console.log('CORE DATA COUNT: '+coreData.length);
+console.log('STATIC CORE CARD COUNT: '+staticCore.length);
+console.log('INQUIRY DATA COUNT: '+inquiryData.length);
+console.log('STATIC INQUIRY CARD COUNT: '+staticInquiry.length);
+console.log('MISMATCH COUNT: '+productMismatches);
+if(!products.includes("input.addEventListener('input'"))errors.push('products.html: progressive-enhancement search listener missing');
+if(!products.includes('card.hidden=!match'))errors.push('products.html: search must filter existing static cards');
+if(!products.includes("group.hidden=!group.querySelector('[data-catalog-family]:not([hidden])')"))errors.push('products.html: search must hide empty catalog families without destroying anchors');
 for(const id of ['overview','product-families','trading','core-products','customers','operations'])if(!new RegExp(`id=["']${id}["']`,'i').test(energyMain))errors.push(`energy.html: required/compatibility anchor missing -> #${id}`);
 if(/S&P|Platts/i.test(energyMain))errors.push('energy.html: Platts/S&P market-context prestige proof must not appear in Phase 07');
 for(const country of [/\bGermany\b/i,/\bAustria\b/i,/\bSerbia\b/i])if(country.test(energyMain))errors.push(`energy.html: unsupported named-market claim -> ${country}`);
