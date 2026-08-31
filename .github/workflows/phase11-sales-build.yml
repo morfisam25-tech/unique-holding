@@ -1,0 +1,43 @@
+name: Phase 11 industrial sales candidate builder
+on:
+  push:
+    branches: [phase11-sales-build-runner]
+    paths:
+      - '.github/phase11/build-phase11.cjs'
+      - '.github/workflows/phase11-sales-build.yml'
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Build from approved Phase 10 baseline
+        run: |
+          set -euo pipefail
+          cp .github/phase11/build-phase11.cjs /tmp/build-phase11.cjs
+          BASE=26b30d3f8ded68caf5046b55301e77c379330d6c
+          git checkout -B phase11-candidate-work "$BASE"
+          node /tmp/build-phase11.cjs
+          node scripts/qa-site.mjs
+          EXPECTED=$'assets/industrial-sales.css\ncaustic-soda-solid.html\nproduct.html\nsales.html\nscripts/qa-site.mjs\nsodium-sulphate-anhydrous.html\nurea-46.html'
+          ACTUAL="$( { git diff HEAD --name-only; git ls-files --others --exclude-standard; } | sort -u )"
+          test "$ACTUAL" = "$EXPECTED"
+          git diff --exit-code "$BASE" -- index.html assets/site.css products.html energy.html assets/media/unique-holding-film-720p.mp4 assets/media/unique-holding-caption.vtt
+      - name: Commit exactly one Phase 11 product commit
+        run: |
+          set -euo pipefail
+          git config user.name "morfisam25-tech"
+          git config user.email "morfisam25@gmail.com"
+          git add assets/industrial-sales.css sales.html product.html urea-46.html caustic-soda-solid.html sodium-sulphate-anhydrous.html scripts/qa-site.mjs
+          git commit -m "PHASE 11 — Build industrial sales and RFQ experience"
+          BASE=26b30d3f8ded68caf5046b55301e77c379330d6c
+          test "$(git rev-parse HEAD^)" = "$BASE"
+          EXPECTED=$'assets/industrial-sales.css\ncaustic-soda-solid.html\nproduct.html\nsales.html\nscripts/qa-site.mjs\nsodium-sulphate-anhydrous.html\nurea-46.html'
+          test "$(git diff-tree --no-commit-id --name-only -r HEAD | sort)" = "$EXPECTED"
+          git push --force origin HEAD:phase11-sales-candidate
+          echo "CANDIDATE=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+      - name: Report candidate
+        run: echo "PHASE11_CANDIDATE=$CANDIDATE"
