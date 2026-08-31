@@ -1,0 +1,65 @@
+name: Gate A follow-up correction review
+on:
+  push:
+    branches: [gate-a-followup-qa-runner]
+    paths: ['.github/workflows/gate-a-followup-review.yml']
+permissions:
+  contents: read
+jobs:
+  gate-a:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify immutable product snapshot
+        run: |
+          set -euo pipefail
+          PRODUCT=bfdaeefcce715ff36bf8f9838b6401ffcc477b9c
+          git merge-base --is-ancestor "$PRODUCT" HEAD
+          git diff --name-only "$PRODUCT"..HEAD | sort | tee /tmp/qa-only-diff.txt
+          if git diff --name-only "$PRODUCT"..HEAD | grep -Ev '^\.github/(qa|workflows)/' | grep -q .; then echo 'non-QA file changed on QA branch' >&2; exit 2; fi
+          test "$(git rev-parse ${PRODUCT}^)" = ac633ec0e431668b000c105cb05bc81da93ebd2d
+          test "$(git diff --name-only ac633ec0e431668b000c105cb05bc81da93ebd2d..$PRODUCT | sort)" = $'index.html\nproducts.html\nscripts/qa-site.mjs'
+      - name: Technical QA and content regression
+        run: |
+          set -euo pipefail
+          mkdir -p gate-a-followup/reports
+          node scripts/qa-site.mjs | tee gate-a-followup/reports/qa-site.log
+          node <<'NODE'
+          const fs=require('fs');const routes=['index.html','corporate.html','energy.html','products.html','product.html','urea-46.html','caustic-soda-solid.html','sodium-sulphate-anhydrous.html','sales.html','technology.html','evidence-axis.html','ventures.html','contact.html','privacy.html','legal.html','404.html'];const rules={obsoleteCompany:/Unique Otomotiv Kimya Sanayi Limited Şirketi/gi,platts:/\b(?:S&P|Platts)\b/gi,placeholder:/\b(?:TODO|FIXME|TBD|Lorem ipsum)\b/gi,ownership:/\b(?:our vessels?|our tankers?|our terminals?|our warehouses?|our plants?|our refiner(?:y|ies)|owned vessels?|owned terminals?|owned warehouses?|owned plants?)\b/gi,leadership:/\b(?:CEO|Chief Executive Officer|Founder|Chairman|Managing Director|Board of Directors)\b/gi,revenueVolume:/\b(?:revenue|turnover|annual volume|million tonnes?|metric tons? per year|MT\/year)\b/gi,registration:/\b(?:MERS[Iİ]S|Ticaret Sicil|Trade Registry|Tax Number|Vergi No|VKN)\b/gi,partnerCertification:/\b(?:certified by|official partner|strategic partner|authorized distributor|exclusive distributor|ISO 9001|ISO 14001)\b/gi,internalQA:/\b(?:QA PASS|reviewer|phase 0[0-9]|phase 1[0-9]|verified public wording|internal audit|source-lock)\b/gi};const out={};let hits=0;for(const route of routes){const text=fs.readFileSync(route,'utf8');out[route]=[];for(const [rule,re] of Object.entries(rules)){re.lastIndex=0;let m;while((m=re.exec(text))){hits++;out[route].push({rule,match:m[0],context:text.slice(Math.max(0,m.index-100),Math.min(text.length,m.index+m[0].length+130)).replace(/\s+/g,' ')})}}}fs.writeFileSync('gate-a-followup/reports/content-scan.json',JSON.stringify({hits,routes:out},null,2));console.log('CONTENT_SCAN_HITS='+hits);if(hits)process.exit(2);
+          NODE
+      - name: Prepare browser QA
+        run: |
+          set -euo pipefail
+          CHROME="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || true)"
+          test -n "$CHROME"
+          echo "CHROME=$CHROME" >> "$GITHUB_ENV"
+          npm install --no-save --ignore-scripts puppeteer-core@24.16.0
+          node --check .github/qa/gate-a-followup-targeted.cjs
+          node --check .github/qa/gate-a-followup-full.cjs
+      - name: Targeted Gate A follow-up browser QA
+        run: |
+          set -euo pipefail
+          python3 -m http.server 8000 --bind 127.0.0.1 >gate-a-followup/reports/server.log 2>&1 &
+          PID=$!; trap 'kill $PID || true' EXIT; sleep 1
+          NODE_PATH="$PWD/node_modules" node .github/qa/gate-a-followup-targeted.cjs | tee gate-a-followup/reports/targeted-console.log
+      - name: Full cumulative 80-case browser QA
+        run: |
+          set -euo pipefail
+          python3 -m http.server 8000 --bind 127.0.0.1 >>gate-a-followup/reports/server.log 2>&1 &
+          PID=$!; trap 'kill $PID || true' EXIT; sleep 1
+          NODE_PATH="$PWD/node_modules" node .github/qa/gate-a-followup-full.cjs | tee gate-a-followup/reports/full-console.log
+      - name: Final gate summary
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs=require('fs'),t=require('./gate-a-followup/targeted/targeted-report.json'),f=require('./gate-a-followup/full/full-report.json');const summary={productSha:t.productSha,targetedAssertions:t.assertions.length,targetedFailures:t.failures.length,fullCases:f.summary.cases,fullFailures:f.failures.length,fullSummary:f.summary,finalSeverity:{BLOCKER:0,HIGH:0,MEDIUM:0}};fs.writeFileSync('gate-a-followup/reports/final-summary.json',JSON.stringify(summary,null,2));console.log(JSON.stringify(summary,null,2));if(t.failures.length||f.failures.length||f.summary.cases!==80)process.exit(2);
+          NODE
+      - name: Upload Gate A follow-up review packet
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gate-a-followup-correction-review
+          path: gate-a-followup/
+          if-no-files-found: error
