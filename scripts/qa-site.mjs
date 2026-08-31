@@ -119,6 +119,8 @@ for(const token of ["@layer tokens,base,components,page,polish,performance;","@i
 if(!read('assets/internal.css').startsWith('@layer components{'))errors.push('assets/internal.css: components layer missing');
 for(const file of ['assets/energy-visuals.css','assets/technology-visuals.css'])if(!read(file).startsWith('@layer page{'))errors.push(`${file}: page layer missing`);
 for(const token of ['.site-header .primary-nav .nav-cta','.global-footer-shell','body.nav-open','@media(max-width:1180px)','@media(prefers-reduced-motion:reduce)','html:not(.js) .site-header .primary-nav'])if(!siteCss.includes(token))errors.push(`assets/site.css: Phase 03 shell styling regression -> ${token}`);
+// Gate A correction guards — compact nav must remain a genuine viewport overlay.
+for(const token of ['body.nav-open .site-header{backdrop-filter:none;-webkit-backdrop-filter:none}','position:fixed;inset:0;min-height:100vh;min-height:100dvh'])if(!siteCss.includes(token))errors.push(`assets/site.css: Gate A compact-nav regression -> ${token}`);
 
 const siteJs=read('assets/site.js');
 if(siteJs.includes('Unique Otomotiv Kimya Sanayi Limited Şirketi'))errors.push('assets/site.js: obsolete operating-company spelling is forbidden in runtime structured data');
@@ -134,6 +136,7 @@ if(/\bautoplay\b/i.test(filmTag))errors.push('index.html: native autoplay must r
 if(!/\bplaysinline\b/i.test(filmTag))errors.push('index.html: approved film must preserve playsinline');
 for(const filmToken of ['assets/media/unique-holding-film-720p.mp4','assets/media/unique-holding-caption.vtt','data-film-sound','data-film-play','data-film-progress','data-film-time','data-film-mute','data-film-volume','data-film-captions','data-film-fullscreen','data-film-replay'])if(!index.includes(filmToken))errors.push(`index.html: Phase 01 film regression -> ${filmToken}`);
 for(const logicToken of ["const reducedMotion=window.matchMedia('(prefers-reduced-motion: reduce)').matches","if(reducedMotion){","const audibleStarted=await playSafely()","const mutedStarted=await playSafely()","if(!manualPaused&&!video.ended&&!reducedMotion)playSafely()"])if(!index.includes(logicToken))errors.push(`index.html: Phase 01 playback logic regression -> ${logicToken}`);
+if(!index.includes('@media(max-width:980px) and (orientation:portrait){.hero-film{object-fit:contain;object-position:center center}}'))errors.push('index.html: Gate A portrait film containment regression');
 
 const styleStart=index.indexOf('  <style>');
 const styleEnd=styleStart>=0?index.indexOf('  </style>',styleStart):-1;
@@ -145,7 +148,7 @@ const markerEnd=markerPos>=0?markerPos+filmScriptMarker.length:-1;
 const filmJsStart=markerEnd>=0?index.indexOf('  <script>',markerEnd):-1;
 const filmJsEnd=filmJsStart>=0?index.indexOf('  </script>',filmJsStart):-1;
 const protectedSlices=[
-  ['player inline CSS',styleStart>=0&&styleEnd>=0?index.slice(styleStart,styleEnd+'  </style>'.length):'', 'c7eeb7d7c334b92d50460a0e0bd4a2bd0f34ca3cb75550ecb485344620f4ba92'],
+  ['player inline CSS',styleStart>=0&&styleEnd>=0?index.slice(styleStart,styleEnd+'  </style>'.length):'', 'ea19f2952096f0b93d892f6923269ff406a04e8fce42d30fc4382d39286f46eb'],
   ['hero/player markup',heroStart>=0&&heroEnd>=0?index.slice(heroStart,heroEnd):'', 'd9c6628f5451049921b2a0bfd1f5f174c8c482101b156473204dd2a1c8012e9f'],
   ['player behavior script',filmJsStart>=0&&filmJsEnd>=0?index.slice(filmJsStart,filmJsEnd+'  </script>'.length):'', '1e1697cce9df7d454022d27a9925095a3a0b5a4f27c8a88dc02e4916b6d9afe1']
 ];
@@ -232,13 +235,14 @@ for(const token of [
   'https://www.ito.org.tr/en/sectoral-committees/member-firms/chemicals?page=543',
   'Industrial sales route','Direct commercial contact','Product, grade, quantity, destination and timing can be routed through the published industrial-sales channel.',
   'Public specialist output','Evidence Axis publishes an Intercom vs Zendesk intelligence sample that shows the specialist work in practice.',
-  'https://evidenceaxis.com/','Turkish corporate operations since 2020','Istanbul operating base','Public corporate and industrial contact routes'
+  'https://evidenceaxis.com/sample-report/','Turkish corporate operations since 2020','Istanbul operating base','Public corporate and industrial contact routes'
 ])if(!phase06Proof.includes(token))errors.push(`corporate.html: Phase 06 trust/proof statement missing -> ${token}`);
 if(/<img\b/i.test(phase06Proof))errors.push('corporate.html: Phase 06 must not introduce a leadership/stock image without approved provenance');
 for(const forbidden of [/\bChairman\b/i,/\bCEO\b/i,/\bPresident\b/i,/\bFounder\b/i,/\bBoard Member\b/i,/\bManaging Partner\b/i,/\bManaging Director\b/i])if(forbidden.test(phase06Proof))errors.push(`corporate.html: unsupported Phase 06 leadership title -> ${forbidden}`);
 for(const forbidden of [/trusted by/i,/certified by/i,/award[- ]winning/i,/advisory board/i,/management team/i,/team of \d+/i,/\d+ employees/i])if(forbidden.test(phase06Proof))errors.push(`corporate.html: unsupported Phase 06 trust/team language -> ${forbidden}`);
 if(/\b240294\b|MERS[Iİ]S|\bVKN\b|Tax Number|Vergi (?:No|Numara)/i.test(phase06Proof))errors.push('corporate.html: Phase 06 must not publish withheld registration identifiers');
 if(!/target=["']_blank["'][^>]*rel=["'][^"']*noopener/i.test(phase06Proof))errors.push('corporate.html: Phase 06 external trust links must use noopener');
+if(!/href=["']https:\/\/evidenceaxis\.com\/sample-report\/["'][^>]*target=["']_blank["'][^>]*rel=["'][^"']*noopener/i.test(phase06Proof))errors.push('corporate.html: Gate A Public sample must link directly to Evidence Axis sample report');
 
 
 
@@ -257,6 +261,8 @@ for(const token of [
   'Product','Grade / specification','Quantity','Destination','Timing'
 ])if(!energyMain.includes(token))errors.push(`energy.html: Phase 07 required content missing -> ${token}`);
 for(const route of ['products.html#petrochemical','products.html#chemical','products.html#energy-products','urea-46.html','caustic-soda-solid.html','sodium-sulphate-anhydrous.html','products.html','sales.html'])if(!energyMain.includes(`href="${route}"`))errors.push(`energy.html: Phase 07 route missing -> ${route}`);
+const products=read('products.html');
+for(const token of ["'Petrochemical Products':'petrochemical'","'Chemical Products':'chemical'","'Energy & Hydrocarbon Products':'energy-products'",'function alignHashTarget()','requestAnimationFrame(()=>requestAnimationFrame(()=>',"window.addEventListener('hashchange',alignHashTarget)"])if(!products.includes(token))errors.push(`products.html: Gate A family-hash regression -> ${token}`);
 for(const id of ['overview','product-families','trading','core-products','customers','operations'])if(!new RegExp(`id=["']${id}["']`,'i').test(energyMain))errors.push(`energy.html: required/compatibility anchor missing -> #${id}`);
 if(/S&P|Platts/i.test(energyMain))errors.push('energy.html: Platts/S&P market-context prestige proof must not appear in Phase 07');
 for(const country of [/\bGermany\b/i,/\bAustria\b/i,/\bSerbia\b/i])if(country.test(energyMain))errors.push(`energy.html: unsupported named-market claim -> ${country}`);
