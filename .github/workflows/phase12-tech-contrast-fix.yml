@@ -1,0 +1,53 @@
+name: Phase 12 contrast-safe candidate build
+on:
+  push:
+    branches: [phase12-tech-contrast-fix-runner]
+    paths: ['.github/workflows/phase12-tech-contrast-fix.yml']
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Build replacement from exact Phase 11 parent
+        run: |
+          set -euo pipefail
+          BASE=af0ede75005c121f7eff2dc60ee3d69170cdef5c
+          PRIOR=8ebffede8e6219d1a3a89d8ab9e215a121188556
+          git config user.name "morfisam25-tech"
+          git config user.email "morfisam25@gmail.com"
+          git checkout -B phase12-tech-candidate "$BASE"
+          git show "$PRIOR:technology.html" > technology.html
+          git show "$PRIOR:scripts/qa-site.mjs" > scripts/qa-site.mjs
+          git show "$PRIOR:assets/technology-content.css" > assets/technology-content.css
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('assets/technology-content.css');s=p.read_text()
+          old='.tech-definition-grid article>*{color:initial}'
+          new='.tech-definition-grid article>*{color:inherit}.paper .tech-definition-grid article>*{color:initial}'
+          assert old in s
+          p.write_text(s.replace(old,new))
+          PY
+          node scripts/qa-site.mjs
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          t=Path('technology.html').read_text();main=re.search(r'<main\b[\s\S]*?</main>',t,re.I).group(0)
+          phrases=['market leader','industry leader','leading ai','world-class','award-winning','trusted by','used by thousands','customers','enterprise customers','fortune 500','arr','mrr','revenue','users','downloads','global offices','proprietary ai','patented','strategic partners','subsidiary','wholly owned','soc 2','iso certified']
+          hits=[p for p in phrases if re.search(r'(?i)(?<![A-Za-z0-9])'+re.escape(p)+r'(?![A-Za-z0-9])',main)]
+          print('PHASE 12 CLAIM SWEEP HITS:',len(hits),hits)
+          assert not hits
+          PY
+          git add technology.html assets/technology-content.css scripts/qa-site.mjs
+          EXPECTED=$'assets/technology-content.css\nscripts/qa-site.mjs\ntechnology.html'
+          test "$(git diff --cached --name-only | sort)" = "$EXPECTED"
+          git diff --exit-code "$BASE" -- sales.html product.html products.html energy.html urea-46.html caustic-soda-solid.html sodium-sulphate-anhydrous.html index.html assets/site.css assets/media/unique-holding-film-720p.mp4 assets/media/unique-holding-caption.vtt
+          git commit -m "PHASE 12 — Establish technology and intelligence content system"
+          PRODUCT=$(git rev-parse HEAD)
+          test "$(git rev-parse ${PRODUCT}^)" = "$BASE"
+          test "$(git diff-tree --no-commit-id --name-only -r "$PRODUCT" | sort)" = "$EXPECTED"
+          echo "PRODUCT_SHA=$PRODUCT"
+          git push origin HEAD:refs/heads/phase12-tech-candidate --force
