@@ -481,5 +481,36 @@ if(!products.includes('aria-live="polite"'))errors.push('products.html: Phase 09
   const releaseBlocker={id:'RELEASE-BLOCKER-HTTPS-001',status:'OPEN'};if(releaseBlocker.status!=='OPEN')errors.push('Phase 13: RELEASE-BLOCKER-HTTPS-001 must remain OPEN');
 }
 
+
+// Phase 14 — Evidence Axis corporate bridge guards.
+{
+  const axis=read('evidence-axis.html');const axisMain=axis.match(/<main\b[\s\S]*?<\/main>/i)?.[0]||'';const axisCss=read('assets/evidence-axis-bridge.css');
+  if(!axis.includes('assets/evidence-axis-bridge.css')||!axisCss.startsWith('@layer page{'))errors.push('Phase 14: Evidence Axis bridge stylesheet architecture missing');
+  if((axisMain.match(/<h1\b/gi)||[]).length!==1)errors.push('evidence-axis.html: Phase 14 requires exactly one H1');
+  for(const token of ['01 / Evidence Axis','SPECIALIST VENTURE','02 / What It Does','03 / Research Discipline','04 / Public Proof','05 / Portfolio Relationship','06 / Continue to Evidence Axis','a specialist venture within the Unique Holding portfolio','View Public Sample','Open EvidenceAxis.com','Intercom vs Zendesk — read as evidence.','Demonstration sample — not a client engagement.','Explanatory sequence based on the current public Evidence Axis research standard'])if(!axisMain.includes(token))errors.push('evidence-axis.html: Phase 14 required bridge token missing -> '+token);
+  const forbiddenLegal=[/\blegal subsidiary\b/i,/\bwholly owned subsidiary\b/i,/\bregistered subsidiary\b/i,/\bsubsidiar(?:y|ies)\b/i,/\bdivision\b/i,/\bdepartment\b/i,/\bbusiness unit\b/i,/\bownership percentage\b/i];
+  const relationshipNote=axisMain.match(/<p class="axis-relationship-note">[\s\S]*?<\/p>/i)?.[0]||'';const legalScope=axisMain.replace(relationshipNote,'');for(const rx of forbiddenLegal)if(rx.test(legalScope))errors.push('evidence-axis.html: unsupported legal relationship wording -> '+rx);
+  const requiredExternal=['https://evidenceaxis.com','https://evidenceaxis.com/sample-report/','https://evidenceaxis.com/work/','https://evidenceaxis.com/contact/'];
+  const extTags=[...axisMain.matchAll(/<a\b[^>]*href=["'](https:\/\/evidenceaxis\.com[^"']*)["'][^>]*>/gi)].map(m=>({tag:m[0],href:m[1]}));
+  for(const href of requiredExternal)if(!extTags.some(x=>x.href===href))errors.push('evidence-axis.html: required verified Evidence Axis external destination missing -> '+href);
+  const allowed=new Set(requiredExternal);for(const x of extTags){if(!allowed.has(x.href))errors.push('evidence-axis.html: unverified Evidence Axis external URL published -> '+x.href);if(attr(x.tag,'target')!=='_blank'||!attr(x.tag,'rel').split(/\s+/).includes('noopener'))errors.push('evidence-axis.html: external Evidence Axis link missing target/rel safety -> '+x.href)}
+  if(!axis.includes('<title>Evidence Axis | Competitive Intelligence Venture | Unique Holding</title>'))errors.push('evidence-axis.html: Phase 14 title regression');
+  if(!axis.includes('rel="canonical" href="https://www.uniqueholding.com.tr/evidence-axis.html"'))errors.push('evidence-axis.html: Phase 14 canonical regression');
+  if(!axis.includes('name="description" content="Evidence Axis is a specialist venture within the Unique Holding portfolio. Explore its competitive-intelligence focus, public research sample and specialist website."'))errors.push('evidence-axis.html: Phase 14 meta description regression');
+  for(const rx of [/trusted by/i,/enterprise customers/i,/fortune 500/i,/market-leading/i,/market leader/i,/award-winning/i,/best-in-class/i,/proprietary ai/i,/proprietary data/i,/real-time intelligence/i,/live monitoring/i,/global research team/i,/\bresearch team\b/i,/\banalysts\b/i,/hundreds of reports/i,/thousands of sources/i,/\brevenue\b/i,/\barr\b/i,/\bmrr\b/i])if(rx.test(axisMain))errors.push('evidence-axis.html: unsupported Phase 14 claim -> '+rx);
+  for(const rx of [/\bGift\b/i,/Promptwatch/i,/Caddi/i,/Keenable/i,/Guideless/i,/Cloverleaf/i,/Starbridge/i,/Pursuit/i,/Aisel/i,/\bNeno\b/i,/Prisma AIRS/i,/LiteLLM/i])if(rx.test(axisMain))errors.push('evidence-axis.html: confidential/prospect-specific reference leaked -> '+rx);
+  if(/<img\b/i.test(axisMain))errors.push('evidence-axis.html: Phase 14 publishes no screenshot/image proof; unexpected img found');
+  if(/feature-image\s+tech/i.test(axisMain))errors.push('evidence-axis.html: inherited unverified decorative Technology image returned');
+  if(!axisCss.includes('.evidence-axis-bridge-body .subsite-hero.tech:before{background-image:none!important'))errors.push('Phase 14: inherited remote Technology hero must be explicitly disabled on Evidence Axis route');
+  if(/https?:\/\/|url\s*\(/i.test(axisCss))errors.push('assets/evidence-axis-bridge.css: external/image dependency forbidden');
+  const auditPath='docs/qa/phase14-evidence-axis-proof-audit.md';if(!files.includes(auditPath))errors.push('Phase 14 proof audit record missing');else{const audit=read(auditPath);for(const token of ['PUBLIC','PRIVATE','SAFE','UNSAFE','sample-report/','work/','contact/','not a public-proof artifact'])if(!audit.includes(token))errors.push('Phase 14 proof audit incomplete -> '+token)}
+  const technology=read('technology.html');if(!technology.includes('assets/technology-content.css')||!technology.includes('Technology &amp; intelligence for decisions, products and new ventures.'))errors.push('Phase 14: Phase 12 Technology lock regression');
+  const technologyVisualCss=read('assets/technology-visuals.css');for(const token of ['technology-hero-system.svg','evidence-axis-system.svg','digital-product-development.svg','venture-systems.svg','content-distribution-system.svg'])if(!technology.includes(token))errors.push('Phase 14: Phase 13 Technology visual lock missing -> '+token);
+  if(/images\.unsplash\.com/i.test(technologyVisualCss))errors.push('Phase 14: Phase 13 Technology visual stylesheet remote media regression');
+  const sales=read('sales.html');for(const token of ['01 / Product','02 / Grade / Specification','03 / Quantity','04 / Destination','05 / Timing','06 / Specification / Technical Requirement','07 / Contact','sales@uniqueholding.com.tr','mailto:sales@uniqueholding.com.tr?subject='])if(!sales.includes(token))errors.push('Phase 14: Phase 11 RFQ lock regression -> '+token);
+  const p09=read('products.html');const refs=(p09.match(/data-destination="reference-detail"/g)||[]).length;const inquiries=(p09.match(/data-destination="inquiry-detail"/g)||[]).length;if(refs!==3||inquiries!==62)errors.push('Phase 14: Phase 09 3/62 classification regression');
+  const releaseBlocker={id:'RELEASE-BLOCKER-HTTPS-001',status:'OPEN'};if(releaseBlocker.status!=='OPEN')errors.push('Phase 14: RELEASE-BLOCKER-HTTPS-001 must remain OPEN');
+}
+
 if(errors.length){console.error('\nTECHNICAL QA FAILED');for(const e of errors)console.error(' - '+e);process.exit(1)}
-console.log('TECHNICAL QA PASS — '+htmlFiles.length+' HTML, '+jsFiles.length+' JS, '+cssFiles.length+' CSS files checked; '+urls.length+' sitemap URLs verified; Phase 09/10/11/12/13 guards passed; protected film hashes verified.');
+console.log('TECHNICAL QA PASS — '+htmlFiles.length+' HTML, '+jsFiles.length+' JS, '+cssFiles.length+' CSS files checked; '+urls.length+' sitemap URLs verified; Phase 09/10/11/12/13/14 guards passed; protected film hashes verified.');
