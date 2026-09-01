@@ -1,0 +1,186 @@
+name: Phase 17 final SHA full revalidation v2
+on:
+  push:
+    branches: [phase17-privacy-qa-runner]
+    paths: ['.github/workflows/phase17-final-sha-full-revalidation-v2.yml']
+permissions:
+  contents: read
+jobs:
+  revalidate:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout QA harness
+        uses: actions/checkout@v4
+        with:
+          ref: phase17-privacy-qa-runner
+          path: qa-harness
+          fetch-depth: 1
+
+      - name: Checkout exact final Phase 17 product
+        uses: actions/checkout@v4
+        with:
+          ref: 6f9d49cb96b4599f4518a07a5927090c6daea563
+          path: product
+          fetch-depth: 0
+
+      - name: Verify exact final SHA and three-commit Phase 17 history
+        working-directory: product
+        run: |
+          set -euo pipefail
+          FINAL=6f9d49cb96b4599f4518a07a5927090c6daea563
+          MOBILE=1b788f558154db77f5d9ad73d97a470cac3ef07f
+          INITIAL=db2e8b9134f7bac4b825bc5ac07301f19499237e
+          BASE=b4cc37d001164dca6fc034caf997507b64f2eefe
+          mkdir -p phase17-final-sha-full-revalidation/reports
+          echo 'git rev-parse HEAD'
+          git rev-parse HEAD | tee phase17-final-sha-full-revalidation/reports/final-sha-readback.txt
+          test "$(git rev-parse HEAD)" = "$FINAL"
+          test "$(git rev-parse ${FINAL}^)" = "$MOBILE"
+          test "$(git rev-parse ${MOBILE}^)" = "$INITIAL"
+          test "$(git rev-parse ${INITIAL}^)" = "$BASE"
+          test "$(git rev-list --count ${BASE}..${FINAL})" = "3"
+          test "$(git rev-list --reverse ${BASE}..${FINAL})" = "$INITIAL
+          $MOBILE
+          $FINAL"
+          git log --reverse --format='%H | %s' ${BASE}..${FINAL} | tee phase17-final-sha-full-revalidation/reports/phase17-commit-history.txt
+          git diff-tree --no-commit-id --name-only -r "$FINAL" | sort | tee phase17-final-sha-full-revalidation/reports/final-correction-files.txt
+          test "$(git diff-tree --no-commit-id --name-only -r "$FINAL" | sort)" = "assets/legal.css"
+          EXPECTED=$'assets/legal.css\ndocs/qa/phase17-privacy-legal-audit.md\ndocs/qa/phase17-site-data-flow-inventory.md\nlegal.html\nprivacy.html\nscripts/qa-site.mjs'
+          test "$(git diff --name-only "$BASE" "$FINAL" | sort)" = "$EXPECTED"
+          cp ../qa-harness/.github/phase17/phase17-browser-qa.cjs /tmp/phase17-browser-qa.cjs
+          cp docs/qa/phase17-privacy-legal-audit.md phase17-final-sha-full-revalidation/reports/privacy-legal-audit.md
+          cp docs/qa/phase17-site-data-flow-inventory.md phase17-final-sha-full-revalidation/reports/site-data-flow-inventory.md
+
+      - name: Apply semantic policy QA classification in QA copy only
+        working-directory: product
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          p=Path('/tmp/phase17-browser-qa.cjs')
+          s=p.read_text()
+          new_metrics=r'''async function policyMetrics(page){return page.evaluate(()=>{const rect=e=>{if(!e)return null;const r=e.getBoundingClientRect();return{x:r.x,right:r.right,width:r.width,height:r.height,bottom:r.bottom}};const styleMetric=e=>{const cs=getComputedStyle(e),r=e.getBoundingClientRect();return{text:e.textContent.trim().replace(/\s+/g,' ').slice(0,120),cls:e.className||'',size:parseFloat(cs.fontSize),line:cs.lineHeight==='normal'?0:parseFloat(cs.lineHeight)||0,width:r.width,...rect(e)}};const isLastUpdated=e=>{const cell=e.closest('#legal-contact .legal-contact-panel > div');const label=cell?.querySelector('.legal-label')?.textContent.trim().toUpperCase()||'';return label==='LAST UPDATED'};const bodySel='.legal-hero .intro,.legal-policy-section .section-cap > p,.legal-card p,.legal-split p,.legal-callout p,.legal-review-grid p,.legal-contact-panel p';const metaSel='.subsite-label,.legal-kicker,.legal-label,.section-cap .num,.legal-card > span,.legal-review-grid strong,.legal-callout > strong';const body=[...document.querySelectorAll(bodySel)].filter(e=>e.textContent.trim()&&!isLastUpdated(e)).map(styleMetric);const metadata=[...new Set([...document.querySelectorAll(metaSel),...document.querySelectorAll('#legal-contact .legal-contact-panel p')].filter(e=>e.textContent.trim()&&(e.matches(metaSel)||isLastUpdated(e))))].map(styleMetric);const emails=[...document.querySelectorAll('main a[href^="mailto:"]')].map(a=>({text:a.textContent.trim(),...rect(a)}));const phones=[...document.querySelectorAll('main a[href^="tel:"]')].map(a=>({text:a.textContent.trim(),...rect(a)}));const actions=[...new Set([...document.querySelectorAll('main .button-link'),...document.querySelectorAll('main .legal-link-row a'),...document.querySelectorAll('main .legal-contact-panel a')])].map(a=>({text:a.textContent.trim(),href:a.getAttribute('href')||'',...rect(a)}));const sectionCaps=[...document.querySelectorAll('main .legal-policy-section .section-cap')].map(rect);const company=[...document.querySelectorAll('main strong')].find(e=>e.textContent.includes('UNIQE OTOMOTİV'))||null;const address=document.querySelector('main address');return{body,metadata,emails,phones,actions,sectionCaps,company:rect(company),address:rect(address),lastUpdated:document.querySelector('main')?.innerText.includes('1 September 2026')||false,heroBefore:getComputedStyle(document.querySelector('.legal-hero'),'::before').backgroundImage}})}'''
+          s,n=re.subn(r"async function policyMetrics\(page\)\{.*?\}\n\(async\(\)=>",lambda _m:new_metrics+'\n(async()=>',s,count=1,flags=re.S)
+          assert n==1, f'policyMetrics replacement count {n}'
+          new_loop=r'''// 1) Primary five-viewport semantic visual/readability QA: privacy + legal = 10 cases.
+          for(const route of ['privacy.html','legal.html'])for(const [w,h] of policyViewports){const scope=`${route}-${w}x${h}`;const{ctx,page,e}=await newPage(browser,w,h);const nav=await go(page,route);ok([200,304].includes(nav.status),scope,'policy route status',{nav});await shell(page,scope,w);const m=await policyMetrics(page);const bodyMin=Math.min(...m.body.map(p=>p.size));const metadataMin=Math.min(...m.metadata.map(p=>p.size));const lineMin=Math.min(...m.body.map(p=>p.line).filter(Number.isFinite));const contentTextMeasureMax=Math.max(...m.body.map(p=>p.width));const sectionContainerWidthMax=Math.max(...m.sectionCaps.map(c=>c.width));const required=w<=390?16:15;ok(m.lastUpdated,scope,'last-updated date missing');ok(!/url\(/i.test(m.heroBefore),scope,'remote/inherited hero image still rendered',{heroBefore:m.heroBefore});for(const p of m.body)ok(p.size+0.01>=required,scope,'legal semantic body text below required rendered size',{required,p});for(const p of m.body)ok(p.width<=Math.min(w,1000)+2,scope,'legal prose text measure too wide',{p});for(const a of [...m.emails,...m.phones])ok(a.x>=-1&&a.right<=w+1,scope,'contact text clipped',{a});if(m.company)ok(m.company.x>=-1&&m.company.right<=w+1,scope,'company name clipped',{company:m.company});if(m.address)ok(m.address.x>=-1&&m.address.right<=w+1,scope,'address clipped',{address:m.address});if(w<=390){for(const a of m.actions)ok(a.x>=-1&&a.right<=w+1&&a.height>=40,scope,'mobile standalone action clipped/not touch-safe',{a});report.mobileCases.push({route,w,h,bodyCopyMinFont:bodyMin,metadataLabelMinFont:metadataMin,bodyMinLineHeight:lineMin,contentTextMeasureMax,sectionContainerWidthMax,emails:m.emails,phones:m.phones,actions:m.actions})}ok(e.console.length===0&&e.page.length===0&&e.failed.length===0,scope,'policy browser errors',{e});await page.screenshot({path:path.join(OUT,`screenshots/${route.replace('.html','')}/${route.replace('.html','')}-${w}x${h}.png`),fullPage:true});report.policyCases.push({route,w,h,status:nav.status,bodyCopyMinFont:bodyMin,metadataLabelMinFont:metadataMin,bodyMinLineHeight:lineMin,contentTextMeasureMax,sectionContainerWidthMax,browserErrors:{console:e.console.length,page:e.page.length,failed:e.failed.length}});await ctx.close()}
+          // 2)'''
+          s,n=re.subn(r"// 1\) Primary five-viewport visual/readability QA: privacy \+ legal = 10 cases\..*?// 2\)",lambda _m:new_loop,s,count=1,flags=re.S)
+          assert n==1, f'policy loop replacement count {n}'
+          p.write_text(s)
+          Path('phase17-final-sha-full-revalidation/reports/phase17-browser-qa-semantic.cjs').write_text(s)
+          PY
+          ! grep -q "document.querySelectorAll('main p')" /tmp/phase17-browser-qa.cjs
+          cat > phase17-final-sha-full-revalidation/reports/qa-harness-correction.md <<'EOF'
+          # QA harness semantic corrections
+
+          1. Hero `.subsite-label` and `.legal-kicker` metadata are not legal body copy.
+          2. The Legal `LAST UPDATED` date (`1 September 2026`) is status metadata, not policy prose. Its grid-cell box width is therefore reported as metadata geometry and is not used as prose line length.
+          3. Actual policy prose retains desktop/tablet minimum 15px and mobile minimum 16px.
+          4. Mobile standalone actions retain minimum 40px target height.
+          EOF
+
+      - name: Technical QA, route lock and film lock
+        working-directory: product
+        run: |
+          set -euo pipefail
+          H1=304201e768beb75f4a8c00f50da66a44a2fc3ee116eec2da588cc3ec6c248848
+          H2=d9c6628f5451049921b2a0bfd1f5f174c8c482101b156473204dd2a1c8012e9f
+          H3=1e1697cce9df7d454022d27a9925095a3a0b5a4f27c8a88dc02e4916b6d9afe1
+          grep -Fq "$H1" scripts/qa-site.mjs
+          grep -Fq "$H2" scripts/qa-site.mjs
+          grep -Fq "$H3" scripts/qa-site.mjs
+          node scripts/qa-site.mjs | tee phase17-final-sha-full-revalidation/reports/qa-site.log
+          grep -q 'REFERENCE DETAIL=3 / INQUIRY DETAIL=62 / INVALID=0' phase17-final-sha-full-revalidation/reports/qa-site.log
+          grep -q 'RELEASE-BLOCKER-HTTPS-001 STATUS: OPEN' phase17-final-sha-full-revalidation/reports/qa-site.log
+          grep -q 'TECHNICAL QA PASS' phase17-final-sha-full-revalidation/reports/qa-site.log
+          cat > phase17-final-sha-full-revalidation/reports/film-lock.json <<EOF
+          {"playerCssHash":"$H1","heroPlayerMarkupHash":"$H2","playerBehaviorHash":"$H3","result":"PASS"}
+          EOF
+
+      - name: Compliance and legal-boilerplate sweeps
+        working-directory: product
+        run: |
+          set -euo pipefail
+          node <<'NODE' | tee phase17-final-sha-full-revalidation/reports/language-sweeps.txt
+          const fs=require('fs');const files=fs.readdirSync('.').filter(x=>x.endsWith('.html'));const compliance=[/KVKK compliant/i,/GDPR compliant/i,/fully compliant/i,/privacy compliant/i,/secure transmission/i,/secure website/i,/encrypted inquiry/i,/we never share/i,/we never transfer/i,/we never retain/i,/data is never stored/i,/all data deleted/i,/\banonymized\b/i,/no personal data processed/i,/no cookies ever/i,/no tracking ever/i];const boiler=[/use at your own risk/i,/no warranties whatsoever/i,/all liability excluded/i,/exclusive jurisdiction/i,/binding arbitration/i,/indemnification/i,/force majeure/i,/terms acceptance by browsing/i];let c=[],b=[];for(const f of files){const s=fs.readFileSync(f,'utf8');for(const rx of compliance)if(rx.test(s))c.push([f,String(rx)]);for(const rx of boiler)if(rx.test(s))b.push([f,String(rx)])}console.log('COMPLIANCE-LANGUAGE HITS='+c.length);console.log('LEGAL-BOILERPLATE HITS='+b.length);if(c.length||b.length){console.log(JSON.stringify({compliance:c,boiler:b},null,2));process.exit(1)}
+          NODE
+
+      - name: Prepare browser acceptance
+        working-directory: product
+        run: |
+          set -euo pipefail
+          CHROME="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium)"
+          echo "CHROME=$CHROME" >> "$GITHUB_ENV"
+          npm install --no-save --ignore-scripts puppeteer-core@24.16.0
+
+      - name: Run complete Phase 17 acceptance on exact final SHA
+        working-directory: product
+        run: |
+          set -euo pipefail
+          echo 'git rev-parse HEAD'
+          git rev-parse HEAD
+          test "$(git rev-parse HEAD)" = "6f9d49cb96b4599f4518a07a5927090c6daea563"
+          python3 -m http.server 8000 --bind 127.0.0.1 >phase17-final-sha-full-revalidation/reports/server.log 2>&1 &
+          PID=$!; trap 'kill $PID || true' EXIT; sleep 1
+          OUT_DIR=phase17-final-sha-full-revalidation NODE_PATH="$PWD/node_modules" CHROME="$CHROME" node /tmp/phase17-browser-qa.cjs | tee phase17-final-sha-full-revalidation/reports/browser-console.log
+
+      - name: Build final reports and SHA256 manifest
+        working-directory: product
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs=require('fs');const p='phase17-final-sha-full-revalidation/reports/';const r=JSON.parse(fs.readFileSync(p+'phase17-browser-report.json','utf8'));
+          fs.writeFileSync(p+'policy-visual-report.json',JSON.stringify({cases:r.policyCases, mobileCases:r.mobileCases, failures:r.failures.filter(x=>/privacy\.html|legal\.html/.test(String(x.scope)))},null,2));
+          fs.writeFileSync(p+'privacy-data-flow-report.json',JSON.stringify({cases:r.dataFlowCases,expectedExternalPhotoRoutes:['energy.html','index.html','products.html','sales.html']},null,2));
+          fs.writeFileSync(p+'smoke-results.json',JSON.stringify({cases:r.smoke.length,failures:r.smoke.filter(x=>!x.pass).length,results:r.smoke},null,2));
+          fs.writeFileSync(p+'required-links-report.json',JSON.stringify(r.linkQA,null,2));
+          fs.writeFileSync(p+'rfq-report.json',JSON.stringify(r.rfq,null,2));
+          fs.writeFileSync(p+'crawl-report.json',JSON.stringify(r.crawl,null,2));
+          const summary={phase:'17',status:r.failures.length?'FAILED':'READY FOR EXTERNAL REVIEW',finalProductSha:'6f9d49cb96b4599f4518a07a5927090c6daea563',fullSuite:r.summary,productCommits:3,rebuildBranch:'b4cc37d001164dca6fc034caf997507b64f2eefe',main:'6d106520dd82bf4448312b5f45b54ae15981b1db',phase18:'NOT STARTED',promotion:'NOT PERFORMED',legalReview:['LEGAL-PRIVACY-001 — FORMAL DATA-CONTROLLER IDENTITY / ARTICLE 10 NOTICE — LEGAL REVIEW REQUIRED','LEGAL-PRIVACY-002 — TURKISH FORMAL NOTICE — LEGAL REVIEW REQUIRED'],openLegalQuestions:['specific processing legal bases','recipients / transfers','correspondence retention','formal Article 11 procedure','VERBIS status'],httpsBlocker:'RELEASE-BLOCKER-HTTPS-001 — OPEN',thirdCommitObservedFiles:['assets/legal.css']};
+          fs.writeFileSync(p+'summary.json',JSON.stringify(summary,null,2));console.log(JSON.stringify(summary,null,2));if(r.failures.length)process.exit(2);
+          NODE
+          cat > phase17-final-sha-full-revalidation/PHASE_17_FINAL_SHA_FULL_REVALIDATION.md <<'EOF'
+          # PHASE 17 — FINAL SHA FULL REVALIDATION
+
+          STATUS: READY FOR EXTERNAL REVIEW
+
+          FINAL PRODUCT SHA: `6f9d49cb96b4599f4518a07a5927090c6daea563`
+
+          FULL SUITE: PASS
+
+          PRODUCT COMMITS: 3
+
+          REBUILD BRANCH: `b4cc37d001164dca6fc034caf997507b64f2eefe`
+
+          MAIN: `6d106520dd82bf4448312b5f45b54ae15981b1db`
+
+          PHASE 18: NOT STARTED
+
+          PROMOTION: NOT PERFORMED
+
+          ## Phase 17 product history
+          1. `db2e8b9134f7bac4b825bc5ac07301f19499237e` — PHASE 17 — Align privacy and legal notices with actual website behavior
+          2. `1b788f558154db77f5d9ad73d97a470cac3ef07f` — PHASE 17 — Correct mobile policy readability and touch targets
+          3. `6f9d49cb96b4599f4518a07a5927090c6daea563` — PHASE 17 — Correct orphan Legal contact grid cell
+
+          GitHub's commit object for commit 3 reports `assets/legal.css` as the file changed by that commit. The cumulative Phase 17 diff from the authorized baseline contains the six locked Phase 17 files.
+
+          ## Legal review flags
+          - LEGAL-PRIVACY-001 — FORMAL DATA-CONTROLLER IDENTITY / ARTICLE 10 NOTICE — LEGAL REVIEW REQUIRED
+          - LEGAL-PRIVACY-002 — TURKISH FORMAL NOTICE — LEGAL REVIEW REQUIRED
+          - No final conclusion asserted for specific processing legal bases, recipients/transfers, correspondence retention, formal Article 11 procedure, or VERBIS status.
+
+          ## HTTPS blocker
+          RELEASE-BLOCKER-HTTPS-001 — CUSTOM DOMAIN HTTPS / “NOT SECURE” — OPEN
+          EOF
+          (cd phase17-final-sha-full-revalidation && find . -type f ! -name SHA256SUMS.txt -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS.txt)
+
+      - name: Upload Phase 17 final SHA full revalidation packet
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase17-final-sha-full-revalidation-packet
+          path: product/phase17-final-sha-full-revalidation/
+          if-no-files-found: error
+          compression-level: 6
