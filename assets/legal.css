@@ -3,3 +3,16 @@
 @media(max-width:900px){.legal-grid,.legal-review-grid{grid-template-columns:1fr}.legal-card{min-height:0}.legal-card h3{margin-top:36px}.legal-split,.legal-contact-panel{grid-template-columns:1fr}.legal-hero{min-height:72svh}}
 @media(max-width:520px){.legal-policy-section{padding-top:70px;padding-bottom:70px}.legal-card,.legal-split>div,.legal-callout,.legal-contact-panel>div,.legal-review-grid article{padding:24px}.legal-policy-section .section-cap>p,.legal-card p,.legal-split p,.legal-callout p,.legal-review-grid p,.legal-contact-panel p{font-size:16px;line-height:1.72}.legal-link-row a{width:100%;justify-content:center}.legal-hero-links .button-link{min-height:46px}.legal-company-panel strong{font-size:25px}}
 }
+
+/* Phase 17 mobile accessibility correction: unlayered so these rendered-size rules
+   take precedence over legacy unlayered base typography without altering metadata. */
+@media(max-width:520px){
+.legal-policy-body .legal-hero .intro,
+.legal-policy-body .legal-policy-section .section-cap>p,
+.legal-policy-body .legal-card p,
+.legal-policy-body .legal-split p,
+.legal-policy-body .legal-callout p,
+.legal-policy-body .legal-review-grid p,
+.legal-policy-body .legal-contact-panel p{font-size:16px;line-height:1.72}
+.legal-policy-body .legal-contact-panel a{min-height:40px;display:flex;align-items:center}
+}
