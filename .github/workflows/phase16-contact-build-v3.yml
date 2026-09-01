@@ -1,0 +1,43 @@
+name: Phase 16 contact routing candidate build v3
+on:
+  push:
+    branches: [phase16-contact-build-runner]
+    paths: ['.github/workflows/phase16-contact-build-v3.yml']
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Rebuild one-commit Phase 16 candidate with context routes
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          src=Path('.github/workflows/phase16-contact-build.yml').read_text().splitlines()
+          start=next(i for i,l in enumerate(src) if l=='        run: |')+1
+          block=[]
+          for l in src[start:]:
+              if l.startswith('          '): block.append(l[10:])
+              elif not l.strip(): block.append('')
+              else: break
+          s='\n'.join(block)+'\n'
+          s=s.replace("'Who do you need to reach?'", "'Who do you<br>need to reach?'")
+          old='''<a class="text-link" href="mailto:farahmand@uniqueholding.com.tr?subject=Corporate%20Inquiry%20%E2%80%94%20Unique%20Holding">farahmand@uniqueholding.com.tr</a></div><div><span>TECHNOLOGY / VENTURE</span>'''
+          new='''<a class="text-link" href="mailto:farahmand@uniqueholding.com.tr?subject=Corporate%20Inquiry%20%E2%80%94%20Unique%20Holding">farahmand@uniqueholding.com.tr</a><div class="contact-context-links"><a href="corporate.html">Corporate Profile</a></div></div><div><span>TECHNOLOGY / VENTURE</span>'''
+          assert old in s;s=s.replace(old,new)
+          old='''<a class="text-link" href="mailto:farahmand@uniqueholding.com.tr?subject=Technology%20%2F%20Venture%20Inquiry%20%E2%80%94%20Unique%20Holding">Email Technology / Venture Inquiry</a></div></div></section>'''
+          new='''<a class="text-link" href="mailto:farahmand@uniqueholding.com.tr?subject=Technology%20%2F%20Venture%20Inquiry%20%E2%80%94%20Unique%20Holding">Email Technology / Venture Inquiry</a><div class="contact-context-links"><a href="technology.html">Technology Context</a><a href="ventures.html">Portfolio Status</a></div></div></div></section>'''
+          assert old in s;s=s.replace(old,new)
+          old=".contact-communication-grid .text-link{margin-top:20px}"
+          new=old+".contact-context-links{display:flex;gap:16px;flex-wrap:wrap;margin-top:20px}.contact-context-links a{color:#c8cdcd;font-size:9px;letter-spacing:.08em;text-decoration:none;border-bottom:1px solid rgba(255,255,255,.25);padding-bottom:3px}"
+          assert old in s;s=s.replace(old,new)
+          old="if(!main.includes('href=\"sales.html\"'))errors.push('contact.html: Industrial Sales must route to sales.html');"
+          new=old+"for(const href of ['corporate.html','technology.html','ventures.html'])if(!main.includes('href=\"'+href+'\"'))errors.push('contact.html: required context destination missing -> '+href);"
+          assert old in s;s=s.replace(old,new)
+          Path('/tmp/phase16-build-v3.sh').write_text(s)
+          PY
+          bash /tmp/phase16-build-v3.sh
