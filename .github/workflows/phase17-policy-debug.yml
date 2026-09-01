@@ -17,17 +17,17 @@ jobs:
           ref: phase17-privacy-qa-runner
           path: qa-harness
           fetch-depth: 1
-      - name: Checkout exact immutable Phase 17 product
+      - name: Checkout exact corrected Phase 17 product
         uses: actions/checkout@v4
         with:
-          ref: db2e8b9134f7bac4b825bc5ac07301f19499237e
+          ref: 1b788f558154db77f5d9ad73d97a470cac3ef07f
           path: product
           fetch-depth: 1
       - name: Verify exact product SHA and prepare browser
         working-directory: product
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = "db2e8b9134f7bac4b825bc5ac07301f19499237e"
+          test "$(git rev-parse HEAD)" = "1b788f558154db77f5d9ad73d97a470cac3ef07f"
           printf 'DIAGNOSTIC_PRODUCT_SHA=%s\n' "$(git rev-parse HEAD)"
           cp ../qa-harness/.github/phase17/phase17-policy-debug.cjs /tmp/phase17-policy-debug.cjs
           CHROME="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium)"
@@ -44,7 +44,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: phase17-semantic-policy-diagnostic
+          name: phase17-semantic-policy-diagnostic-corrected
           path: |
             product/phase17-policy-diagnostic
             product/phase17-policy-diagnostic-console.log
