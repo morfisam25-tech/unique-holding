@@ -16,3 +16,9 @@
 .legal-policy-body .legal-contact-panel p{font-size:16px;line-height:1.72}
 .legal-policy-body .legal-contact-panel a{min-height:40px;display:flex;align-items:center}
 }
+
+/* Phase 17 desktop Legal contact-grid correction: when the Legal contact panel has
+   an odd final card, span it across both columns instead of exposing an empty cell. */
+@media(min-width:901px){
+.legal-policy-body #legal-contact .legal-contact-panel>div:last-child:nth-child(odd){grid-column:1/-1}
+}
