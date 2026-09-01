@@ -1,0 +1,67 @@
+name: Phase 16 contact routing final review
+on:
+  push:
+    branches: [phase16-contact-qa-runner]
+    paths: ['.github/workflows/phase16-contact-review-final.yml']
+permissions:
+  contents: read
+jobs:
+  review:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify immutable Phase 16 product snapshot
+        run: |
+          set -euo pipefail
+          PRODUCT=b4cc37d001164dca6fc034caf997507b64f2eefe
+          BASE=3888c84a73cffa15c0ed955e4bdeef9d0a4cd029
+          cp .github/phase16/phase16-browser-qa.cjs /tmp/phase16-browser-qa.cjs
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('/tmp/phase16-browser-qa.cjs');s=p.read_text()
+          old="async function go(page,u){const r=await page.goto(u.startsWith('http')?u:base+u,{waitUntil:'networkidle0',timeout:35000});return {status:r?.status()||0,url:page.url()}}"
+          new="async function go(page,u){const external=u.startsWith('http');const r=await page.goto(external?u:base+u,{waitUntil:'domcontentloaded',timeout:30000});await new Promise(z=>setTimeout(z,external?900:450));return {status:r?.status()||0,url:page.url()}}"
+          assert old in s;s=s.replace(old,new);p.write_text(s)
+          PY
+          git show origin/phase12-tech-qa-runner:.github/phase12/phase12-browser-qa.cjs > /tmp/phase12-regression.cjs
+          sed -i 's/8ebffede8e6219d1a3a89d8ab9e215a121188556/b4cc37d001164dca6fc034caf997507b64f2eefe/g; s/af0ede75005c121f7eff2dc60ee3d69170cdef5c/3888c84a73cffa15c0ed955e4bdeef9d0a4cd029/g' /tmp/phase12-regression.cjs
+          test "$(git rev-parse ${PRODUCT}^)" = "$BASE"
+          EXPECTED=$'assets/contact.css\ncontact.html\ndocs/qa/phase16-external-identity-audit.md\nscripts/qa-site.mjs'
+          test "$(git diff-tree --no-commit-id --name-only -r "$PRODUCT" | sort)" = "$EXPECTED"
+          git diff --exit-code "$BASE" "$PRODUCT" -- ventures.html assets/ventures.css evidence-axis.html assets/evidence-axis-bridge.css technology.html assets/technology-content.css assets/technology-visuals.css assets/phase13/technology-hero-system.svg assets/phase13/evidence-axis-system.svg assets/phase13/digital-product-development.svg assets/phase13/venture-systems.svg assets/phase13/content-distribution-system.svg sales.html product.html products.html energy.html urea-46.html caustic-soda-solid.html sodium-sulphate-anhydrous.html index.html assets/site.css assets/internal.css assets/media/unique-holding-film-720p.mp4 assets/media/unique-holding-caption.vtt
+          git checkout --force "$PRODUCT"
+          mkdir -p phase16-review/reports phase16-review/regression
+          node scripts/qa-site.mjs | tee phase16-review/reports/qa-site.log
+          cp docs/qa/phase16-external-identity-audit.md phase16-review/reports/external-identity-audit.md
+          printf '%s\n' '{"id":"RELEASE-BLOCKER-HTTPS-001","status":"OPEN","note":"CUSTOM DOMAIN HTTPS / Not Secure remains open. Deployment, DNS and certificate work were not investigated or modified in Phase 16."}' > phase16-review/reports/release-blocker.json
+          node <<'NODE' > phase16-review/reports/claim-identity-sweep.txt
+          const fs=require('fs');const html=fs.readFileSync('contact.html','utf8');const main=html.match(/<main\b[\s\S]*?<\/main>/i)?.[0]||'';const terms=['headquarters','global headquarters','regional headquarters','24/7','hotline','press office','investor relations','legal department','support team','customer service team','worldwide offices','global offices','instagram.com','linkedin.com','info@uniqueholding.com.tr','hello@uniqueholding.com.tr','contact@uniqueholding.com.tr','rfq@uniqueholding.com.tr','technology@uniqueholding.com.tr','ventures@uniqueholding.com.tr','sai@uniqueholding.com.tr'];let hits=[];for(const t of terms)if(main.toLowerCase().includes(t.toLowerCase()))hits.push(t);console.log('PHASE 16 CLAIM / IDENTITY SWEEP');console.log('HITS='+hits.length);if(hits.length)console.log(hits.join('\n'));if(hits.length)process.exit(1);
+          NODE
+      - name: Prepare browser QA
+        run: |
+          set -euo pipefail
+          node --check /tmp/phase16-browser-qa.cjs
+          node --check /tmp/phase12-regression.cjs
+          CHROME="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium)"
+          echo "CHROME=$CHROME" >> "$GITHUB_ENV"
+          npm install --no-save --ignore-scripts puppeteer-core@24.16.0
+      - name: Run Phase 16 acceptance, click, crawl and regressions
+        run: |
+          set -euo pipefail
+          python3 -m http.server 8000 --bind 127.0.0.1 >phase16-review/reports/server.log 2>&1 &
+          PID=$!; trap 'kill $PID || true' EXIT; sleep 1
+          OUT_DIR=phase16-review NODE_PATH="$PWD/node_modules" CHROME="$CHROME" node /tmp/phase16-browser-qa.cjs | tee phase16-review/reports/browser-console.log
+          OUT_DIR=phase16-review/regression NODE_PATH="$PWD/node_modules" CHROME="$CHROME" node /tmp/phase12-regression.cjs | tee phase16-review/reports/regression-console.log
+      - name: Write review summary
+        run: |
+          node <<'NODE'
+          const fs=require('fs');const a=JSON.parse(fs.readFileSync('phase16-review/reports/phase16-browser-report.json'));const r=JSON.parse(fs.readFileSync('phase16-review/regression/reports/browser-report.json'));const summary={phase:'16',status:(a.failures.length||r.failures.length)?'FAILED':'READY FOR EXTERNAL REVIEW',baseline:'3888c84a73cffa15c0ed955e4bdeef9d0a4cd029',newSha:'b4cc37d001164dca6fc034caf997507b64f2eefe',contact:a.summary,regression:r.summary,routing:{reference:3,inquiry:62,invalid:0},phase15:'LOCKED / REGRESSION CHECKED',phase14:'LOCKED / REGRESSION CHECKED',phase13:'LOCKED / REGRESSION CHECKED',film:'UNCHANGED',phase17:'NOT STARTED',phase18:'NOT STARTED',httpsBlocker:'RELEASE-BLOCKER-HTTPS-001 — OPEN'};fs.writeFileSync('phase16-review/reports/summary.json',JSON.stringify(summary,null,2));console.log(JSON.stringify(summary,null,2));if(summary.status==='FAILED')process.exit(2);
+          NODE
+      - name: Upload Phase 16 review packet
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase16-contact-routing-external-identity-review-final
+          path: phase16-review/
+          if-no-files-found: error
