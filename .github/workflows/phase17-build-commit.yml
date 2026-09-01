@@ -1,0 +1,54 @@
+name: Phase 17 privacy legal one-commit build
+on:
+  push:
+    branches: [phase17-privacy-build-runner]
+    paths: ['.github/workflows/phase17-build-commit.yml']
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Build candidate fresh from approved baseline
+        run: |
+          set -euo pipefail
+          cp .github/phase17/build-phase17.py /tmp/build-phase17.py
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('/tmp/build-phase17.py');s=p.read_text();old="['no cookies were observed','images.unsplash.com'";new="['No website-set cookie or browser-storage item was observed','images.unsplash.com'";assert old in s;s=s.replace(old,new);p.write_text(s)
+          PY
+          git config user.name "morfisam25-tech"
+          git config user.email "morfisam25@gmail.com"
+          git checkout -B phase17-privacy-candidate b4cc37d001164dca6fc034caf997507b64f2eefe
+          python3 /tmp/build-phase17.py
+      - name: Re-prove candidate data flows
+        run: |
+          set -euo pipefail
+          CHROME="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium)"
+          npm install --no-save --ignore-scripts puppeteer-core@24.16.0
+          python3 -m http.server 8000 --bind 127.0.0.1 > /tmp/phase17-server.log 2>&1 &
+          PID=$!; trap 'kill $PID || true' EXIT; sleep 1
+          NODE_PATH="$PWD/node_modules" CHROME="$CHROME" node /tmp/phase17-instrument.cjs | tee /tmp/phase17-instrument.log
+          rm -rf phase17-build-report node_modules
+      - name: Technical QA and exact product scope
+        run: |
+          set -euo pipefail
+          node scripts/qa-site.mjs | tee /tmp/phase17-qa-site.log
+          EXPECTED=$'assets/legal.css\ndocs/qa/phase17-privacy-legal-audit.md\ndocs/qa/phase17-site-data-flow-inventory.md\nlegal.html\nprivacy.html\nscripts/qa-site.mjs'
+          ACTUAL="$(git status --porcelain | cut -c4- | sort)"
+          test "$ACTUAL" = "$EXPECTED"
+          test "$(git rev-parse HEAD)" = "b4cc37d001164dca6fc034caf997507b64f2eefe"
+          git diff --exit-code b4cc37d001164dca6fc034caf997507b64f2eefe -- contact.html assets/contact.css ventures.html assets/ventures.css evidence-axis.html assets/evidence-axis-bridge.css technology.html assets/technology-content.css assets/technology-visuals.css sales.html product.html products.html energy.html urea-46.html caustic-soda-solid.html sodium-sulphate-anhydrous.html index.html assets/site.css assets/internal.css assets/media/unique-holding-film-720p.mp4 assets/media/unique-holding-caption.vtt
+      - name: Create exactly one Phase 17 product commit
+        run: |
+          set -euo pipefail
+          git add assets/legal.css docs/qa/phase17-privacy-legal-audit.md docs/qa/phase17-site-data-flow-inventory.md legal.html privacy.html scripts/qa-site.mjs
+          git commit -m "PHASE 17 — Align privacy and legal notices with actual website behavior"
+          PRODUCT_SHA=$(git rev-parse HEAD)
+          test "$(git rev-parse HEAD^)" = "b4cc37d001164dca6fc034caf997507b64f2eefe"
+          test "$(git rev-list --count b4cc37d001164dca6fc034caf997507b64f2eefe..HEAD)" = "1"
+          echo "PRODUCT_SHA=$PRODUCT_SHA"
+          git push --force origin HEAD:phase17-privacy-candidate
