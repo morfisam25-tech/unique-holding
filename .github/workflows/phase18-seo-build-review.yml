@@ -1,0 +1,276 @@
+name: Phase 18 SEO build and review
+
+on:
+  push:
+    branches: ["phase18-seo-qa-runner"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  phase18:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout QA runner
+        uses: actions/checkout@v4
+        with:
+          ref: phase18-seo-qa-runner
+          path: qa-harness
+          fetch-depth: 1
+
+      - name: Checkout exact Phase 18 baseline
+        uses: actions/checkout@v4
+        with:
+          ref: 6f9d49cb96b4599f4518a07a5927090c6daea563
+          path: product
+          fetch-depth: 0
+
+      - name: Preflight branch safety
+        working-directory: product
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE=6f9d49cb96b4599f4518a07a5927090c6daea563
+          MAIN=6d106520dd82bf4448312b5f45b54ae15981b1db
+          echo 'git rev-parse HEAD'
+          git rev-parse HEAD
+          test "$(git rev-parse HEAD)" = "$BASE"
+          TARGET_REMOTE="$(git ls-remote origin refs/heads/rebuild/award-level-corporate-v2 | cut -f1)"
+          MAIN_REMOTE="$(git ls-remote origin refs/heads/main | cut -f1)"
+          echo "TARGET_BEFORE=$TARGET_REMOTE"
+          echo "MAIN_BEFORE=$MAIN_REMOTE"
+          test "$TARGET_REMOTE" = "$BASE"
+          test "$MAIN_REMOTE" = "$MAIN"
+          mkdir -p /tmp/phase18-review-packet/reports
+          printf 'BASELINE=%s\nTARGET_BEFORE=%s\nMAIN_BEFORE=%s\n' "$BASE" "$TARGET_REMOTE" "$MAIN_REMOTE" > /tmp/phase18-review-packet/reports/preflight.txt
+
+      - name: Build Phase 18 candidate in working tree
+        working-directory: product
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --quiet Pillow==11.3.0
+          python3 -m py_compile ../qa-harness/.github/phase18/build_phase18.py ../qa-harness/.github/phase18/sanitize_runtime_seo.py
+          python3 ../qa-harness/.github/phase18/build_phase18.py | tee /tmp/phase18-review-packet/reports/build.log
+          python3 ../qa-harness/.github/phase18/sanitize_runtime_seo.py | tee /tmp/phase18-review-packet/reports/runtime-seo-cleanup.log
+          node --check scripts/qa-seo.mjs
+
+      - name: Enforce exact Phase 18 product scope
+        working-directory: product
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > /tmp/phase18-expected-files.txt <<'EOF'
+          404.html
+          assets/site.js
+          assets/social/evidence-axis.png
+          assets/social/group-corporate.png
+          assets/social/industrial-trade.png
+          assets/social/technology-intelligence.png
+          assets/social/venture-portfolio.png
+          caustic-soda-solid.html
+          contact.html
+          corporate.html
+          docs/qa/phase18-seo-social-audit.md
+          docs/qa/phase18-social-assets.md
+          docs/qa/phase18-structured-data-audit.md
+          energy.html
+          evidence-axis.html
+          index.html
+          legal.html
+          privacy.html
+          product.html
+          products.html
+          sales.html
+          scripts/qa-seo.mjs
+          sodium-sulphate-anhydrous.html
+          technology.html
+          urea-46.html
+          ventures.html
+          EOF
+          sed -i 's/^          //' /tmp/phase18-expected-files.txt
+          { git diff --name-only; git ls-files --others --exclude-standard; } | sort -u > /tmp/phase18-actual-files.txt
+          echo 'EXPECTED FILES:'
+          cat /tmp/phase18-expected-files.txt
+          echo 'ACTUAL FILES:'
+          cat /tmp/phase18-actual-files.txt
+          diff -u /tmp/phase18-expected-files.txt /tmp/phase18-actual-files.txt
+          git diff --check
+          cp /tmp/phase18-actual-files.txt /tmp/phase18-review-packet/reports/exact-files-changed.txt
+
+      - name: Static technical and SEO QA before commit
+        working-directory: product
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/qa-site.mjs | tee /tmp/phase18-review-packet/reports/qa-site-precommit.log
+          PHASE18_QA_OUT=/tmp/phase18-review-packet/reports node scripts/qa-seo.mjs | tee /tmp/phase18-review-packet/reports/qa-seo-precommit.log
+          grep -q 'TECHNICAL QA PASS' /tmp/phase18-review-packet/reports/qa-site-precommit.log
+          grep -q 'REFERENCE DETAIL=3 / INQUIRY DETAIL=62 / INVALID=0' /tmp/phase18-review-packet/reports/qa-site-precommit.log
+          grep -q 'RELEASE-BLOCKER-HTTPS-001 STATUS: OPEN' /tmp/phase18-review-packet/reports/qa-site-precommit.log
+          grep -q 'PHASE 18 SEO QA PASS' /tmp/phase18-review-packet/reports/qa-seo-precommit.log
+
+      - name: Prepare browser acceptance
+        shell: bash
+        run: |
+          set -euo pipefail
+          CHROME="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium)"
+          test -n "$CHROME"
+          echo "CHROME=$CHROME" >> "$GITHUB_ENV"
+          mkdir -p /tmp/phase18-node
+          cd /tmp/phase18-node
+          npm init -y >/dev/null 2>&1
+          npm install --no-save --ignore-scripts puppeteer-core@24.16.0 >/dev/null
+          echo "NODE_PATH=/tmp/phase18-node/node_modules" >> "$GITHUB_ENV"
+
+      - name: Run complete Phase 18 browser acceptance
+        working-directory: product
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "6f9d49cb96b4599f4518a07a5927090c6daea563"
+          python3 -m http.server 8000 --bind 127.0.0.1 >/tmp/phase18-review-packet/reports/server.log 2>&1 &
+          PID=$!
+          trap 'kill $PID || true' EXIT
+          sleep 1
+          PHASE18_BROWSER_OUT=/tmp/phase18-review-packet NODE_PATH="$NODE_PATH" CHROME="$CHROME" node ../qa-harness/.github/phase18/browser_phase18.cjs | tee /tmp/phase18-review-packet/reports/browser-console.log
+          kill $PID || true
+          trap - EXIT
+
+      - name: Create exactly one Phase 18 product commit and fast-forward rebuild branch
+        working-directory: product
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE=6f9d49cb96b4599f4518a07a5927090c6daea563
+          MAIN=6d106520dd82bf4448312b5f45b54ae15981b1db
+          test "$(git rev-parse HEAD)" = "$BASE"
+          mapfile -t FILES < /tmp/phase18-expected-files.txt
+          git add -- "${FILES[@]}"
+          test -z "$(git status --porcelain | grep '^??' || true)"
+          TESTED_TREE="$(git write-tree)"
+          echo "TESTED_TREE=$TESTED_TREE" | tee /tmp/phase18-review-packet/reports/tested-tree.txt
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'PHASE 18 — Establish search, structured data and social discovery'
+          NEW="$(git rev-parse HEAD)"
+          test "$(git rev-parse HEAD^)" = "$BASE"
+          test "$(git rev-parse HEAD^{tree})" = "$TESTED_TREE"
+          REMOTE_TARGET="$(git ls-remote origin refs/heads/rebuild/award-level-corporate-v2 | cut -f1)"
+          REMOTE_MAIN="$(git ls-remote origin refs/heads/main | cut -f1)"
+          test "$REMOTE_TARGET" = "$BASE"
+          test "$REMOTE_MAIN" = "$MAIN"
+          git push origin HEAD:refs/heads/rebuild/award-level-corporate-v2
+          TARGET_AFTER="$(git ls-remote origin refs/heads/rebuild/award-level-corporate-v2 | cut -f1)"
+          MAIN_AFTER="$(git ls-remote origin refs/heads/main | cut -f1)"
+          test "$TARGET_AFTER" = "$NEW"
+          test "$MAIN_AFTER" = "$MAIN"
+          echo "NEW_SHA=$NEW" >> "$GITHUB_ENV"
+          printf 'NEW_SHA=%s\nREBUILD_BRANCH=%s\nMAIN=%s\n' "$NEW" "$TARGET_AFTER" "$MAIN_AFTER" | tee /tmp/phase18-review-packet/reports/branch-readback.txt
+          git diff-tree --no-commit-id --name-only -r "$NEW" | sort > /tmp/phase18-commit-files.txt
+          diff -u /tmp/phase18-expected-files.txt /tmp/phase18-commit-files.txt
+          cp /tmp/phase18-commit-files.txt /tmp/phase18-review-packet/reports/commit-files.txt
+          git show --stat --oneline --decorate=short "$NEW" > /tmp/phase18-review-packet/reports/commit-stat.txt
+          git show --no-patch --format=fuller "$NEW" > /tmp/phase18-review-packet/reports/commit-metadata.txt
+
+      - name: Re-run static QA on exact committed SHA
+        working-directory: product
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$NEW_SHA"
+          node scripts/qa-site.mjs | tee /tmp/phase18-review-packet/reports/qa-site-postcommit.log
+          PHASE18_QA_OUT=/tmp/phase18-review-packet/reports node scripts/qa-seo.mjs | tee /tmp/phase18-review-packet/reports/qa-seo-postcommit.log
+          grep -q 'TECHNICAL QA PASS' /tmp/phase18-review-packet/reports/qa-site-postcommit.log
+          grep -q 'PHASE 18 SEO QA PASS' /tmp/phase18-review-packet/reports/qa-seo-postcommit.log
+          test -z "$(git status --porcelain)"
+
+      - name: Assemble Phase 18 review packet
+        working-directory: product
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/phase18-review-packet/audits /tmp/phase18-review-packet/social-assets
+          cp docs/qa/phase18-seo-social-audit.md /tmp/phase18-review-packet/audits/
+          cp docs/qa/phase18-structured-data-audit.md /tmp/phase18-review-packet/audits/
+          cp docs/qa/phase18-social-assets.md /tmp/phase18-review-packet/audits/
+          cp assets/social/*.png /tmp/phase18-review-packet/social-assets/
+          python3 - <<'PY'
+          from pathlib import Path
+          import json, os
+          root=Path('/tmp/phase18-review-packet')
+          seo=json.loads((root/'reports/phase18-seo-qa-report.json').read_text())
+          browser=json.loads((root/'reports/phase18-browser-report.json').read_text())
+          new=os.environ['NEW_SHA']
+          changed=(root/'reports/commit-files.txt').read_text().strip().splitlines()
+          lines=[
+          '# PHASE 18 — REVIEW PACKET','',
+          'STATUS: READY FOR EXTERNAL REVIEW','',
+          'BASELINE SHA: `6f9d49cb96b4599f4518a07a5927090c6daea563`','',
+          f'NEW SHA: `{new}`','',
+          '1. EXACT FILES CHANGED','']
+          lines += [f'- `{x}`' for x in changed]
+          lines += [
+          '', '2. INDEXABILITY MATRIX — ALL 16 ROUTES', 'Full matrix: `audits/phase18-seo-social-audit.md`. Result: 14 indexable / 2 noindex.',
+          '', '3. TITLE MATRIX', 'Full matrix: `audits/phase18-seo-social-audit.md`. Duplicate titles across indexable routes: 0.',
+          '', '4. META DESCRIPTION MATRIX', 'Full matrix: `audits/phase18-seo-social-audit.md`. Duplicate descriptions across indexable routes: 0.',
+          '', '5. CANONICAL MATRIX', 'Full matrix: `audits/phase18-seo-social-audit.md`. Indexable canonical duplicates: 0.',
+          '', '6. ROBOTS META MATRIX', '14 × `index,follow`; `product.html` and `404.html` = `noindex,follow`.',
+          '', '7. GENERIC PRODUCT ROUTER SEO DECISION', '`product.html` remains crawlable but `noindex,follow`, self-canonical to `/product.html`; query variants are not sitemap entries.',
+          '', '8. 404 SEO DECISION', '`404.html` = `noindex,follow`, no canonical, excluded from sitemap. Production HTTP-status behavior is not claimed from local testing.',
+          '', '9. OPEN GRAPH MATRIX', 'All 14 indexable routes have static OG title/description/type/url/image/dimensions/alt/site_name/locale. `og:type=website`.',
+          '', '10. TWITTER CARD MATRIX', 'All 14 indexable routes use static `summary_large_image`; no twitter:site or twitter:creator.',
+          '', '11. SOCIAL IMAGE SYSTEM', 'Five controlled local 1200×630 PNG cards: group, industrial trade, technology, Evidence Axis, venture portfolio.',
+          '', '12. SOCIAL ASSET PROVENANCE', 'Full provenance record: `audits/phase18-social-assets.md`.',
+          '', '13. REMOTE SOCIAL IMAGE REMOVAL', 'All OG/Twitter image URLs resolve under `https://www.uniqueholding.com.tr/assets/social/`; no Unsplash social-preview URL remains.',
+          '', '14. ORGANIZATION STRUCTURED DATA', 'Homepage only: conservative `Organization` with stable `#organization`, `name` and `url`; no legalName, sameAs or legal/entity relationship fields.',
+          '', '15. WEBSITE STRUCTURED DATA', 'Homepage only: `WebSite` with `#website`, canonical URL, name, `inLanguage=en`, publisher reference; no SearchAction.',
+          '', '16. WEBPAGE STRUCTURED DATA', 'AboutPage for Corporate, CollectionPage for Products, ContactPage for Contact, WebPage for other indexable content routes.',
+          '', '17. CORE PRODUCT STRUCTURED DATA', 'Minimal Product mainEntity on the three reference pages; no Offer, price, availability, seller, manufacturer, brand, identifier or rating claims.',
+          '', '18. PRODUCT TECHNICAL VALUE SCHEMA AUDIT', 'PASS — exact locked values validated against the visible reference pages. Details: `audits/phase18-structured-data-audit.md`.',
+          '', '19. EVIDENCE AXIS SCHEMA BOUNDARY', 'WebPage only; no subOrganization/parentOrganization/subsidiary/Service/SoftwareApplication encoding.',
+          '', '20. YEKI HAST SCHEMA BOUNDARY', 'No standalone schema entity; no Product/SoftwareApplication/MobileApplication/Offer/public-availability implication.',
+          '', '21. SAMEAS / SOCIAL IDENTITY DECISION', 'No social sameAs entries. Evidence Axis external site is not sameAs for Unique Holding.',
+          '', '22. LINKEDIN DECISION', 'UNVERIFIED — NOT PUBLISHED.',
+          '', '23. INSTAGRAM DECISION', 'UNVERIFIED — NOT PUBLISHED.',
+          '', '24. ROBOTS.TXT', 'Audited unchanged: crawl allowed; canonical sitemap URL declared; product router not blocked.',
+          '', '25. SITEMAP.XML', 'Audited unchanged: canonical HTTPS domain only; no query, 404, product router, fragments or external domains.',
+          '', '26. SITEMAP ENTRY COUNT', f"{seo['summary']['sitemapEntries']} / 14 PASS.",
+          '', '27. FAVICON AUDIT', '`assets/favicon.svg` remains local, valid square 64×64 source viewBox and is referenced statically by all 16 routes.',
+          '', '28. JSON-LD PARSE RESULTS', f"PASS — {seo['summary']['jsonLdEntities']} typed entities parsed; failures 0.",
+          '', '29. STRUCTURED-DATA CLAIM AUDIT', 'PASS — no forbidden schema types/properties and no conflicting full @id entities.',
+          '', '30. MACHINE-READABLE CLAIM SWEEP', f"Unsupported hits: {seo['summary']['machineReadableHits']}.",
+          '', '31. TITLE / DESCRIPTION DUPLICATION QA', f"Title duplicates {seo['summary']['titleDuplicates']}; description duplicates {seo['summary']['descriptionDuplicates']}; canonical duplicates {seo['summary']['canonicalDuplicates']}.",
+          '', '32. STATIC SOURCE METADATA QA', 'PASS on required representative routes. Legacy runtime OG/Twitter/Organization JSON-LD injection removed from `assets/site.js`.',
+          '', '33. SOCIAL CARD VISUAL QA', f"{browser['summary']['socialCardCases']} direct browser checks (native + reduced) / failures {browser['summary']['socialCardFailures']}. Original cards are included under `social-assets/`.",
+          '', '34. 25 REPRESENTATIVE FIVE-VIEWPORT CASES', f"{browser['summary']['representativeCases']} cases / failures {browser['summary']['representativeFailures']}. Screenshots under `screenshots/representative/`.",
+          '', '35. 32 SITE-WIDE SMOKE CASES', f"{browser['summary']['smokeCases']} cases / failures {browser['summary']['smokeFailures']}.",
+          '', '36. CORE PRODUCT REGRESSION', f"{browser['summary']['coreProductCases']} mobile cases / failures {browser['summary']['coreProductFailures']}; exact technical values and Reference Detail status retained.",
+          '', '37. PRIVACY / LEGAL REGRESSION', f"{browser['summary']['privacyLegalCases']} mobile cases / failures {browser['summary']['privacyLegalFailures']}; Phase 17 typography and legal-review boundaries retained.",
+          '', '38. ROBOTS / SITEMAP FETCH QA', f"Served-local result: {'PASS' if browser['summary']['robotsSitemapPass'] else 'FAIL'}.",
+          '', '39. TECHNICAL QA', 'PASS — `node scripts/qa-site.mjs` and `node scripts/qa-seo.mjs`; Phase 09–17 locks and protected film hashes retained.',
+          '', '40. EXTERNAL LIVE VALIDATION LIMITATION', 'No claim that Google, LinkedIn, Facebook or X fetched production metadata/social cards while custom-domain HTTPS remains unresolved.',
+          '', '41. PHASE18-LIVE-SOCIAL-VALIDATION STATUS', 'DEFERRED UNTIL HTTPS RELEASE BLOCKER IS CLOSED.',
+          '', '42. RELEASE-BLOCKER-HTTPS-001 STATUS', 'OPEN.',
+          '', '43. LEGAL-PRIVACY-001 STATUS', 'OPEN / LEGAL REVIEW REQUIRED.',
+          '', '44. LEGAL-PRIVACY-002 STATUS', 'OPEN / LEGAL REVIEW REQUIRED.',
+          '', '45. SCREENSHOTS / ARTIFACT', '25 representative screenshots + 3 core-product mobile + 2 privacy/legal mobile + 10 social-card native/reduced captures, browser/static reports and original social cards.',
+          '', '46. LIMITATIONS', 'Phase 18 performs local/static metadata, schema, social-asset and browser validation. It does not deploy, resolve HTTPS, validate live social crawlers or establish production HTTP 404 behavior.',
+          '', '47. rebuild branch SHA', f'`{new}`',
+          '', '48. main SHA', '`6d106520dd82bf4448312b5f45b54ae15981b1db`',
+          '', 'PHASE 19: NOT STARTED', 'PRODUCTION DEPLOYMENT: NOT PERFORMED', 'MAIN MERGE: NOT PERFORMED',
+          '', 'WAITING FOR: REVIEWER APPROVED PHASE 18','']
+          (root/'PHASE_18_REVIEW_PACKET.md').write_text('\n'.join(lines),encoding='utf-8')
+          PY
+          (cd /tmp/phase18-review-packet && find . -type f ! -name SHA256SUMS.txt -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS.txt)
+          echo 'Review packet files:'
+          find /tmp/phase18-review-packet -type f | sort
+
+      - name: Upload Phase 18 review packet
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase18-review-packet
+          path: /tmp/phase18-review-packet/
+          if-no-files-found: error
+          compression-level: 6
