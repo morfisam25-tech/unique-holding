@@ -1,0 +1,63 @@
+name: Phase 17 baseline privacy audit
+on:
+  push:
+    branches: [phase17-privacy-audit-runner]
+    paths: ['.github/workflows/phase17-baseline-privacy-audit.yml']
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify Phase 16 baseline
+        run: |
+          test "$(git rev-parse HEAD^)" = "b4cc37d001164dca6fc034caf997507b64f2eefe" || true
+          git checkout --force b4cc37d001164dca6fc034caf997507b64f2eefe
+          test "$(git rev-parse HEAD)" = "b4cc37d001164dca6fc034caf997507b64f2eefe"
+      - name: Prepare browser audit
+        run: |
+          CHROME="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium)"
+          echo "CHROME=$CHROME" >> "$GITHUB_ENV"
+          npm install --no-save --ignore-scripts puppeteer-core@24.16.0
+      - name: Run 16-route technical privacy instrumentation
+        run: |
+          set -euo pipefail
+          mkdir -p phase17-baseline-audit/reports
+          python3 -m http.server 8000 --bind 127.0.0.1 >phase17-baseline-audit/reports/server.log 2>&1 &
+          PID=$!; trap 'kill $PID || true' EXIT; sleep 1
+          cat > /tmp/phase17-audit.cjs <<'NODE'
+          const fs=require('fs'),puppeteer=require('puppeteer-core');
+          const routes=['index.html','corporate.html','energy.html','products.html','product.html','urea-46.html','caustic-soda-solid.html','sodium-sulphate-anhydrous.html','sales.html','technology.html','evidence-axis.html','ventures.html','contact.html','privacy.html','legal.html','404.html'];
+          const base='http://127.0.0.1:8000/';
+          const report={baseline:'b4cc37d001164dca6fc034caf997507b64f2eefe',routes:[],aggregate:{},failures:[]};
+          const classify=(u)=>{try{const x=new URL(u);return {url:u,host:x.hostname,external:x.origin!==new URL(base).origin}}catch{return {url:u,host:'',external:false}}};
+          (async()=>{const browser=await puppeteer.launch({executablePath:process.env.CHROME,headless:true,args:['--no-sandbox','--disable-dev-shm-usage']});try{
+            for(const route of routes){
+              const ctx=await browser.createBrowserContext();const page=await ctx.newPage();await page.setViewport({width:1440,height:900});
+              const requests=[];const failures=[];page.on('request',r=>requests.push({...classify(r.url()),method:r.method(),type:r.resourceType()}));page.on('requestfailed',r=>failures.push({url:r.url(),error:r.failure()?.errorText||''}));
+              await page.evaluateOnNewDocument(()=>{window.__p17={fetch:[],beacon:[]};const of=window.fetch;window.fetch=function(...a){try{window.__p17.fetch.push(String(a[0]))}catch{}return of.apply(this,a)};const ob=navigator.sendBeacon?.bind(navigator);if(ob)navigator.sendBeacon=function(u,d){try{window.__p17.beacon.push(String(u))}catch{}return ob(u,d)}});
+              const cdp=await page.createCDPSession();await cdp.send('Network.enable');const before=(await cdp.send('Network.getAllCookies')).cookies||[];
+              let status=0;try{const r=await page.goto(base+route,{waitUntil:'domcontentloaded',timeout:30000});status=r?.status()||0;await new Promise(z=>setTimeout(z,900));}catch(e){report.failures.push({route,msg:'navigation',error:String(e)})}
+              const after=(await cdp.send('Network.getAllCookies')).cookies||[];
+              const observed=await page.evaluate(async()=>{
+                const idb=typeof indexedDB?.databases==='function'?await indexedDB.databases().catch(()=>[]):[];
+                const sw='serviceWorker' in navigator?await navigator.serviceWorker.getRegistrations().then(x=>x.map(r=>({scope:r.scope,active:r.active?.scriptURL||null}))).catch(()=>[]):[];
+                const forms=[...document.forms].map(f=>({id:f.id||null,action:f.getAttribute('action')||'',method:(f.getAttribute('method')||'get').toLowerCase(),fields:[...f.elements].map(e=>({name:e.name||'',type:e.type||e.tagName.toLowerCase()}))}));
+                return {documentCookie:document.cookie,localStorage:Object.keys(localStorage),sessionStorage:Object.keys(sessionStorage),indexedDB:idb.map(x=>({name:x.name||null,version:x.version||null})),serviceWorkers:sw,forms,hooks:window.__p17||{fetch:[],beacon:[]}};
+              });
+              const ext=requests.filter(x=>x.external);const byType={};for(const r of ext)(byType[r.type]??=[]).push(r.url);
+              report.routes.push({route,status,cookiesBefore:before.map(c=>({name:c.name,domain:c.domain,path:c.path,session:c.session,expires:c.expires,httpOnly:c.httpOnly,secure:c.secure,sameSite:c.sameSite})),cookiesAfter:after.map(c=>({name:c.name,domain:c.domain,path:c.path,session:c.session,expires:c.expires,httpOnly:c.httpOnly,secure:c.secure,sameSite:c.sameSite})),...observed,requests,thirdPartyRequests:ext,thirdPartyByType:byType,requestFailures:failures});
+              await ctx.close();
+            }
+          }finally{await browser.close()}
+          const hosts={};let cookieCount=0,ls=0,ss=0,idb=0,sw=0,xhrFetchBeacon=0;for(const r of report.routes){cookieCount+=r.cookiesAfter.length;ls+=r.localStorage.length;ss+=r.sessionStorage.length;idb+=r.indexedDB.length;sw+=r.serviceWorkers.length;for(const q of r.thirdPartyRequests){hosts[q.host]=(hosts[q.host]||0)+1;if(['xhr','fetch'].includes(q.type))xhrFetchBeacon++}xhrFetchBeacon+=r.hooks.beacon.length}
+          report.aggregate={routeCount:report.routes.length,cookieObservations:cookieCount,localStorageKeys:ls,sessionStorageKeys:ss,indexedDBDatabases:idb,serviceWorkers:sw,thirdPartyHosts:hosts,xhrFetchBeacon};fs.writeFileSync('phase17-baseline-audit/reports/data-flow.json',JSON.stringify(report,null,2));console.log(JSON.stringify(report.aggregate,null,2));if(report.routes.length!==16||report.failures.length)process.exit(1)})();
+          NODE
+          NODE_PATH="$PWD/node_modules" CHROME="$CHROME" node /tmp/phase17-audit.cjs | tee phase17-baseline-audit/reports/console.log
+      - uses: actions/upload-artifact@v4
+        with:
+          name: phase17-baseline-privacy-audit
+          path: phase17-baseline-audit/
