@@ -543,5 +543,36 @@ if(!products.includes('aria-live="polite"'))errors.push('products.html: Phase 09
   const releaseBlocker={id:'RELEASE-BLOCKER-HTTPS-001',status:'OPEN'};if(releaseBlocker.status!=='OPEN')errors.push('Phase 15: RELEASE-BLOCKER-HTTPS-001 must remain OPEN');
 }
 
+
+// Phase 16 — Contact routing / verified external identity guards.
+{
+  const contact=read('contact.html');const main=contact.match(/<main\b[\s\S]*?<\/main>/i)?.[0]||'';const css=read('assets/contact.css');
+  if(!contact.includes('assets/contact.css')||!css.startsWith('@layer page{'))errors.push('Phase 16: Contact stylesheet architecture missing');
+  if((main.match(/<h1\b/gi)||[]).length!==1)errors.push('contact.html: Phase 16 requires exactly one H1');
+  for(const token of ['01 / Contact','ROUTE BY BUSINESS NEED','02 / Choose the Route','03 / Industrial Sales','04 / Corporate Communication','05 / Specialist Venture','06 / Istanbul Office','07 / Verified External Identity','Who do you<br>need to reach?'])if(!main.includes(token))errors.push('contact.html: Phase 16 IA/routing token missing -> '+token);
+  const legal='UNIQE OTOMOTİV KİMYA SANAYİ LİMİTED ŞİRKETİ';if(!main.includes(legal))errors.push('contact.html: approved legal operating-company spelling missing');
+  for(const token of ['29 Ekim Cad. Yenibosna Merkez Mah.','İstanbul Vizyon Park Plazaları A1 Blok','Kat: 9, Daire: 98','Bahçelievler / İstanbul, Türkiye','+90 212 727 22 22','+90 539 380 91 97','farahmand@uniqueholding.com.tr','sales@uniqueholding.com.tr'])if(!main.includes(token))errors.push('contact.html: approved public contact data missing -> '+token);
+  const uniqueEmails=[...main.matchAll(/(?:mailto:)?([A-Z0-9._%+-]+@uniqueholding\.com\.tr)/gi)].map(m=>m[1].toLowerCase());for(const email of new Set(uniqueEmails))if(!['farahmand@uniqueholding.com.tr','sales@uniqueholding.com.tr'].includes(email))errors.push('contact.html: invented/unapproved Unique Holding email published -> '+email);
+  if(!main.includes('href="sales.html"'))errors.push('contact.html: Industrial Sales must route to sales.html');for(const href of ['corporate.html','technology.html','ventures.html'])if(!main.includes('href="'+href+'"'))errors.push('contact.html: required context destination missing -> '+href);
+  const axisContact=[...main.matchAll(/<a\b[^>]*href=["']https:\/\/evidenceaxis\.com\/contact\/["'][^>]*>/gi)].map(m=>m[0]);if(axisContact.length<2)errors.push('contact.html: direct Evidence Axis specialist contact route missing from route and specialist sections');for(const tag of axisContact)if(attr(tag,'target')!=='_blank'||!attr(tag,'rel').split(/\s+/).includes('noopener'))errors.push('contact.html: Evidence Axis external contact link safety missing');
+  if(/<form\b/i.test(main)||/Message sent|we received your inquiry|Ticket created/i.test(main))errors.push('contact.html: fake form/submission confirmation forbidden');
+  for(const rx of [/\bheadquarters\b/i,/global headquarters/i,/regional headquarters/i,/\b24\/7\b/i,/\bhotline\b/i,/press office/i,/investor relations/i,/legal department/i,/support team/i,/customer service team/i,/worldwide offices/i,/global offices/i])if(rx.test(main))errors.push('contact.html: unsupported contact/identity claim -> '+rx);
+  for(const rx of [/instagram\.com/i,/linkedin\.com/i])if(rx.test(main))errors.push('contact.html: unverified social identity must not be published in Phase 16');
+  if(!main.includes('tel:+902127272222')||!main.includes('tel:+905393809197'))errors.push('contact.html: normalized tel routes missing');
+  for(const token of ['subject=Corporate%20Inquiry%20%E2%80%94%20Unique%20Holding','subject=Technology%20%2F%20Venture%20Inquiry%20%E2%80%94%20Unique%20Holding','subject=Industrial%20Sales%20Inquiry%20%E2%80%94%20Unique%20Holding'])if(!main.includes(token))errors.push('contact.html: useful encoded mailto subject missing -> '+token);
+  const map='https://www.google.com/maps/search/?api=1&amp;query=29%20Ekim%20Cad.%20Yenibosna%20Merkez%20Mah.%20%C4%B0stanbul%20Vizyon%20Park%20Plazalar%C4%B1%20A1%20Blok%20Kat%209%20Daire%2098%20Bah%C3%A7elievler%20%C4%B0stanbul%20T%C3%BCrkiye';if(!main.includes(map))errors.push('contact.html: exact approved-address Google Maps query missing');
+  if(!contact.includes('<title>Contact &amp; Business Routing | Unique Holding</title>'))errors.push('contact.html: Phase 16 title regression');
+  if(!contact.includes('rel="canonical" href="https://www.uniqueholding.com.tr/contact.html"'))errors.push('contact.html: Phase 16 canonical regression');
+  if(!contact.includes('name="description" content="Contact Unique Holding through the correct business route for industrial sales, corporate communication, Evidence Axis specialist inquiries, technology or venture context, and the Istanbul office."'))errors.push('contact.html: Phase 16 meta description regression');
+  if(/https?:\/\/|url\s*\(/i.test(css))errors.push('assets/contact.css: remote/image dependency forbidden');
+  const auditPath='docs/qa/phase16-external-identity-audit.md';if(!files.includes(auditPath))errors.push('Phase 16 external identity audit missing');else{const audit=read(auditPath);for(const token of ['Routing matrix','VERIFIED','UNVERIFIED — NOT PUBLISHED','Published?','https://evidenceaxis.com/contact/','Google Maps','No other `@uniqueholding.com.tr` contact address is approved'])if(!audit.includes(token))errors.push('Phase 16 external identity audit incomplete -> '+token)}
+  const ventures=read('ventures.html');if(!ventures.includes('DEVELOPMENT-STAGE DIGITAL PRODUCT')||!ventures.includes('ACTIVE BUILD'))errors.push('Phase 16: Phase 15 Ventures status lock regression');
+  const axis=read('evidence-axis.html');if(!axis.includes('a specialist venture within the Unique Holding portfolio')||!axis.includes('https://evidenceaxis.com/contact/'))errors.push('Phase 16: Phase 14 Evidence Axis lock regression');
+  const technology=read('technology.html');for(const token of ['technology-hero-system.svg','evidence-axis-system.svg','digital-product-development.svg','venture-systems.svg','content-distribution-system.svg'])if(!technology.includes(token))errors.push('Phase 16: Phase 13 Technology visual lock missing -> '+token);
+  const sales=read('sales.html');for(const token of ['01 / Product','02 / Grade / Specification','03 / Quantity','04 / Destination','05 / Timing','06 / Specification / Technical Requirement','07 / Contact','sales@uniqueholding.com.tr'])if(!sales.includes(token))errors.push('Phase 16: Phase 11 RFQ lock regression -> '+token);
+  const p09=read('products.html');const refs=(p09.match(/data-destination="reference-detail"/g)||[]).length;const inquiries=(p09.match(/data-destination="inquiry-detail"/g)||[]).length;if(refs!==3||inquiries!==62)errors.push('Phase 16: Phase 09 3/62 classification regression');
+  const releaseBlocker={id:'RELEASE-BLOCKER-HTTPS-001',status:'OPEN'};if(releaseBlocker.status!=='OPEN')errors.push('Phase 16: RELEASE-BLOCKER-HTTPS-001 must remain OPEN');
+}
+
 if(errors.length){console.error('\nTECHNICAL QA FAILED');for(const e of errors)console.error(' - '+e);process.exit(1)}
-console.log('TECHNICAL QA PASS — '+htmlFiles.length+' HTML, '+jsFiles.length+' JS, '+cssFiles.length+' CSS files checked; '+urls.length+' sitemap URLs verified; Phase 09/10/11/12/13/14/15 guards passed; protected film hashes verified.');
+console.log('TECHNICAL QA PASS — '+htmlFiles.length+' HTML, '+jsFiles.length+' JS, '+cssFiles.length+' CSS files checked; '+urls.length+' sitemap URLs verified; Phase 09/10/11/12/13/14/15/16 guards passed; protected film hashes verified.');
