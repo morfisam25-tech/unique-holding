@@ -1,0 +1,68 @@
+name: Phase 13 technology visual review
+on:
+  push:
+    branches: [phase13-tech-qa-runner]
+    paths:
+      - '.github/phase13/phase13-visual-qa.cjs'
+      - '.github/workflows/phase13-tech-review.yml'
+permissions:
+  contents: read
+jobs:
+  review:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify immutable Phase 13 product snapshot
+        run: |
+          set -euo pipefail
+          PRODUCT=20e5c65595d6e02cc7b517714b34ce1d969950ad
+          BASE=1ecb43028b3b50b3a44e0b86f0cdef7b671f164f
+          cp .github/phase13/phase13-visual-qa.cjs /tmp/phase13-visual-qa.cjs
+          git show origin/phase12-tech-qa-runner:.github/phase12/phase12-browser-qa.cjs > /tmp/phase12-regression.cjs
+          sed -i 's/8ebffede8e6219d1a3a89d8ab9e215a121188556/20e5c65595d6e02cc7b517714b34ce1d969950ad/g; s/af0ede75005c121f7eff2dc60ee3d69170cdef5c/1ecb43028b3b50b3a44e0b86f0cdef7b671f164f/g' /tmp/phase12-regression.cjs
+          test "$(git rev-parse ${PRODUCT}^)" = "$BASE"
+          EXPECTED=$'assets/phase13/content-distribution-system.svg\nassets/phase13/digital-product-development.svg\nassets/phase13/evidence-axis-system.svg\nassets/phase13/technology-hero-system.svg\nassets/phase13/venture-systems.svg\nassets/technology-visuals.css\ndocs/qa/phase13-technology-visual-provenance.md\nscripts/qa-site.mjs\ntechnology.html'
+          test "$(git diff-tree --no-commit-id --name-only -r "$PRODUCT" | sort)" = "$EXPECTED"
+          git diff --exit-code "$BASE" "$PRODUCT" -- sales.html product.html products.html energy.html urea-46.html caustic-soda-solid.html sodium-sulphate-anhydrous.html index.html assets/site.css assets/internal.css assets/technology-content.css assets/media/unique-holding-film-720p.mp4 assets/media/unique-holding-caption.vtt evidence-axis.html ventures.html
+          git checkout --force "$PRODUCT"
+          mkdir -p phase13-review/reports phase13-review/regression
+          node scripts/qa-site.mjs | tee phase13-review/reports/qa-site.log
+          printf '%s\n' '{"id":"RELEASE-BLOCKER-HTTPS-001","status":"OPEN","note":"CUSTOM DOMAIN HTTPS / Not Secure remains open. DNS, CNAME, GitHub Pages, certificates and HTTPS enforcement were not investigated or modified in Phase 13."}' > phase13-review/reports/release-blocker.json
+          python3 - <<'PY' > phase13-review/reports/asset-inventory.json
+          import json,os,re
+          assets=['assets/phase13/technology-hero-system.svg','assets/phase13/evidence-axis-system.svg','assets/phase13/digital-product-development.svg','assets/phase13/venture-systems.svg','assets/phase13/content-distribution-system.svg']
+          out=[]
+          for a in assets:
+              s=open(a).read();m=re.search(r'<svg[^>]*width="(\d+)"[^>]*height="(\d+)"',s)
+              out.append({'path':a,'width':int(m.group(1)),'height':int(m.group(2)),'bytes':os.path.getsize(a),'format':'SVG'})
+          print(json.dumps(out,indent=2))
+          PY
+      - name: Prepare browser QA
+        run: |
+          set -euo pipefail
+          node --check /tmp/phase13-visual-qa.cjs
+          node --check /tmp/phase12-regression.cjs
+          CHROME="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium)"
+          echo "CHROME=$CHROME" >> "$GITHUB_ENV"
+          npm install --no-save --ignore-scripts puppeteer-core@24.16.0
+      - name: Run Phase 13 visual acceptance and regressions
+        run: |
+          set -euo pipefail
+          python3 -m http.server 8000 --bind 127.0.0.1 >phase13-review/reports/server.log 2>&1 &
+          PID=$!; trap 'kill $PID || true' EXIT; sleep 1
+          OUT_DIR=phase13-review NODE_PATH="$PWD/node_modules" node /tmp/phase13-visual-qa.cjs | tee phase13-review/reports/visual-console.log
+          OUT_DIR=phase13-review/regression NODE_PATH="$PWD/node_modules" node /tmp/phase12-regression.cjs | tee phase13-review/reports/regression-console.log
+      - name: Write review summary
+        run: |
+          node <<'NODE'
+          const fs=require('fs');const v=JSON.parse(fs.readFileSync('phase13-review/reports/visual-report.json'));const r=JSON.parse(fs.readFileSync('phase13-review/regression/reports/browser-report.json'));
+          const summary={phase:'13',status:(v.failures.length||r.failures.length)?'FAILED':'READY FOR EXTERNAL REVIEW',baseline:'1ecb43028b3b50b3a44e0b86f0cdef7b671f164f',newSha:'20e5c65595d6e02cc7b517714b34ce1d969950ad',visual:v.summary,regression:r.summary,routing:{reference:3,inquiry:62,invalid:0},film:'UNCHANGED',phase12Content:'UNCHANGED — visible Technology content lock verified',httpsBlocker:'RELEASE-BLOCKER-HTTPS-001 — OPEN'};fs.writeFileSync('phase13-review/reports/summary.json',JSON.stringify(summary,null,2));console.log(JSON.stringify(summary,null,2));if(summary.status==='FAILED')process.exit(2);
+          NODE
+      - name: Upload Phase 13 review packet
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase13-technology-visual-review
+          path: phase13-review/
+          if-no-files-found: error
