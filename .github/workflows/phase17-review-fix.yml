@@ -1,3 +1,4 @@
+# QA-only trigger: full corrected Phase 17 acceptance after semantic diagnostic + manual 10-screen review PASS
 name: Phase 17 privacy legal corrected final review
 on:
   push:
