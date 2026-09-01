@@ -1,0 +1,73 @@
+name: Phase 17 final SHA failure capture
+on:
+  push:
+    branches: [phase17-privacy-qa-runner]
+    paths: ['.github/workflows/phase17-final-sha-failure-capture.yml']
+permissions:
+  contents: read
+jobs:
+  capture:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout QA harness
+        uses: actions/checkout@v4
+        with:
+          ref: phase17-privacy-qa-runner
+          path: qa-harness
+          fetch-depth: 1
+      - name: Checkout exact final Phase 17 product
+        uses: actions/checkout@v4
+        with:
+          ref: 6f9d49cb96b4599f4518a07a5927090c6daea563
+          path: product
+          fetch-depth: 1
+      - name: Verify exact SHA and prepare semantic QA copy
+        working-directory: product
+        run: |
+          set -euo pipefail
+          echo 'git rev-parse HEAD'
+          git rev-parse HEAD
+          test "$(git rev-parse HEAD)" = "6f9d49cb96b4599f4518a07a5927090c6daea563"
+          cp ../qa-harness/.github/phase17/phase17-browser-qa.cjs /tmp/phase17-browser-qa.cjs
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          p=Path('/tmp/phase17-browser-qa.cjs')
+          s=p.read_text()
+          new_metrics=r'''async function policyMetrics(page){return page.evaluate(()=>{const rect=e=>{if(!e)return null;const r=e.getBoundingClientRect();return{x:r.x,right:r.right,width:r.width,height:r.height,bottom:r.bottom}};const styleMetric=e=>{const cs=getComputedStyle(e),r=e.getBoundingClientRect();return{text:e.textContent.trim().replace(/\s+/g,' ').slice(0,120),cls:e.className||'',size:parseFloat(cs.fontSize),line:cs.lineHeight==='normal'?0:parseFloat(cs.lineHeight)||0,width:r.width,...rect(e)}};const bodySel='.legal-hero .intro,.legal-policy-section .section-cap > p,.legal-card p,.legal-split p,.legal-callout p,.legal-review-grid p,.legal-contact-panel p';const metaSel='.subsite-label,.legal-kicker,.legal-label,.section-cap .num,.legal-card > span,.legal-review-grid strong,.legal-callout > strong';const body=[...document.querySelectorAll(bodySel)].filter(e=>e.textContent.trim()).map(styleMetric);const metadata=[...document.querySelectorAll(metaSel)].filter(e=>e.textContent.trim()).map(styleMetric);const emails=[...document.querySelectorAll('main a[href^="mailto:"]')].map(a=>({text:a.textContent.trim(),...rect(a)}));const phones=[...document.querySelectorAll('main a[href^="tel:"]')].map(a=>({text:a.textContent.trim(),...rect(a)}));const actions=[...new Set([...document.querySelectorAll('main .button-link'),...document.querySelectorAll('main .legal-link-row a'),...document.querySelectorAll('main .legal-contact-panel a')])].map(a=>({text:a.textContent.trim(),href:a.getAttribute('href')||'',...rect(a)}));const sectionCaps=[...document.querySelectorAll('main .legal-policy-section .section-cap')].map(rect);const company=[...document.querySelectorAll('main strong')].find(e=>e.textContent.includes('UNIQE OTOMOTİV'))||null;const address=document.querySelector('main address');return{body,metadata,emails,phones,actions,sectionCaps,company:rect(company),address:rect(address),lastUpdated:document.querySelector('main')?.innerText.includes('1 September 2026')||false,heroBefore:getComputedStyle(document.querySelector('.legal-hero'),'::before').backgroundImage}})}'''
+          s,n=re.subn(r"async function policyMetrics\(page\)\{.*?\}\n\(async\(\)=>",lambda _m:new_metrics+'\n(async()=>',s,count=1,flags=re.S)
+          assert n==1
+          new_loop=r'''// 1) Primary five-viewport semantic visual/readability QA: privacy + legal = 10 cases.
+          for(const route of ['privacy.html','legal.html'])for(const [w,h] of policyViewports){const scope=`${route}-${w}x${h}`;const{ctx,page,e}=await newPage(browser,w,h);const nav=await go(page,route);ok([200,304].includes(nav.status),scope,'policy route status',{nav});await shell(page,scope,w);const m=await policyMetrics(page);const bodyMin=Math.min(...m.body.map(p=>p.size));const metadataMin=Math.min(...m.metadata.map(p=>p.size));const lineMin=Math.min(...m.body.map(p=>p.line).filter(Number.isFinite));const contentTextMeasureMax=Math.max(...m.body.map(p=>p.width));const sectionContainerWidthMax=Math.max(...m.sectionCaps.map(c=>c.width));const required=w<=390?16:15;ok(m.lastUpdated,scope,'last-updated date missing');ok(!/url\(/i.test(m.heroBefore),scope,'remote/inherited hero image still rendered',{heroBefore:m.heroBefore});for(const p of m.body)ok(p.size+0.01>=required,scope,'legal semantic body text below required rendered size',{required,p});for(const p of m.body)ok(p.width<=Math.min(w,1000)+2,scope,'legal prose text measure too wide',{p});for(const a of [...m.emails,...m.phones])ok(a.x>=-1&&a.right<=w+1,scope,'contact text clipped',{a});if(m.company)ok(m.company.x>=-1&&m.company.right<=w+1,scope,'company name clipped',{company:m.company});if(m.address)ok(m.address.x>=-1&&m.address.right<=w+1,scope,'address clipped',{address:m.address});if(w<=390){for(const a of m.actions)ok(a.x>=-1&&a.right<=w+1&&a.height>=40,scope,'mobile standalone action clipped/not touch-safe',{a});report.mobileCases.push({route,w,h,bodyCopyMinFont:bodyMin,metadataLabelMinFont:metadataMin,bodyMinLineHeight:lineMin,contentTextMeasureMax,sectionContainerWidthMax,emails:m.emails,phones:m.phones,actions:m.actions})}ok(e.console.length===0&&e.page.length===0&&e.failed.length===0,scope,'policy browser errors',{e});await page.screenshot({path:path.join(OUT,`screenshots/${route.replace('.html','')}/${route.replace('.html','')}-${w}x${h}.png`),fullPage:true});report.policyCases.push({route,w,h,status:nav.status,bodyCopyMinFont:bodyMin,metadataLabelMinFont:metadataMin,bodyMinLineHeight:lineMin,contentTextMeasureMax,sectionContainerWidthMax,browserErrors:{console:e.console.length,page:e.page.length,failed:e.failed.length}});await ctx.close()}
+          // 2)'''
+          s,n=re.subn(r"// 1\) Primary five-viewport visual/readability QA: privacy \+ legal = 10 cases\..*?// 2\)",lambda _m:new_loop,s,count=1,flags=re.S)
+          assert n==1
+          p.write_text(s)
+          PY
+          CHROME="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium)"
+          echo "CHROME=$CHROME" >> "$GITHUB_ENV"
+          npm install --no-save --ignore-scripts puppeteer-core@24.16.0
+      - name: Run full suite and preserve failure report
+        working-directory: product
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "6f9d49cb96b4599f4518a07a5927090c6daea563"
+          mkdir -p phase17-failure-capture/reports
+          python3 -m http.server 8000 --bind 127.0.0.1 >phase17-failure-capture/reports/server.log 2>&1 &
+          PID=$!; trap 'kill $PID || true' EXIT; sleep 1
+          set +e
+          OUT_DIR=phase17-failure-capture NODE_PATH="$PWD/node_modules" CHROME="$CHROME" node /tmp/phase17-browser-qa.cjs | tee phase17-failure-capture/reports/browser-console.log
+          STATUS=${PIPESTATUS[0]}
+          set -e
+          echo "BROWSER_EXIT_STATUS=$STATUS" | tee phase17-failure-capture/reports/browser-exit-status.txt
+          test -f phase17-failure-capture/reports/phase17-browser-report.json
+          node <<'NODE' | tee phase17-failure-capture/reports/failure-list.txt
+          const fs=require('fs');const p='phase17-failure-capture/reports/phase17-browser-report.json';const r=JSON.parse(fs.readFileSync(p,'utf8'));console.log(JSON.stringify({summary:r.summary,failures:r.failures},null,2));
+          NODE
+      - name: Upload failure capture
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase17-final-sha-failure-capture
+          path: product/phase17-failure-capture/
+          if-no-files-found: error
