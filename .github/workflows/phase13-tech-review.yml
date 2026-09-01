@@ -26,7 +26,11 @@ jobs:
           old="async function goto(page,route){const r=await page.goto(BASE+route,{waitUntil:'domcontentloaded'});await page.waitForFunction(()=>document.readyState==='complete',{timeout:8000}).catch(()=>{});await page.waitForFunction(()=>[...document.querySelectorAll('[data-tech-visual]')].every(i=>i.complete&&i.naturalWidth>0),{timeout:8000});await sleep(180);return r?.status()||0}"
           new="async function goto(page,route){const r=await page.goto(BASE+route,{waitUntil:'domcontentloaded'});await page.waitForFunction(()=>document.readyState==='complete',{timeout:8000}).catch(()=>{});const count=await page.$$eval('[data-tech-visual]',els=>els.length);for(let i=0;i<count;i++){await page.$$eval('[data-tech-visual]',(els,i)=>els[i].scrollIntoView({block:'center'}),i);await sleep(120);await page.waitForFunction(i=>{const el=document.querySelectorAll('[data-tech-visual]')[i];return !!el&&el.complete&&el.naturalWidth>0},{timeout:8000},i)}await page.evaluate(()=>window.scrollTo(0,0));await sleep(180);return r?.status()||0}"
           assert old in s
-          p.write_text(s.replace(old,new))
+          s=s.replace(old,new)
+          old2="for(const [name,sel] of Object.entries(focusSelectors)){const el=await page.$(sel);if(!el){fail(scope,'focus target missing',{name,sel});continue}await el.screenshot({path:path.join(SHOTS,'focus',`${name}-${label}.png`)});report.focusCaptures.push({viewport:label,name,selector:sel});}"
+          new2="for(const [name,sel] of Object.entries(focusSelectors)){const el=await page.$(sel);if(!el){fail(scope,'focus target missing',{name,sel});continue}const box=await page.$eval(sel,e=>{const r=e.getBoundingClientRect();return{x:r.left+window.scrollX,y:r.top+window.scrollY,width:r.width,height:r.height}});await page.screenshot({path:path.join(SHOTS,'focus',`${name}-${label}.png`),clip:box,captureBeyondViewport:true});report.focusCaptures.push({viewport:label,name,selector:sel,clip:box});}"
+          assert old2 in s
+          p.write_text(s.replace(old2,new2))
           PY
           git show origin/phase12-tech-qa-runner:.github/phase12/phase12-browser-qa.cjs > /tmp/phase12-regression.cjs
           sed -i 's/8ebffede8e6219d1a3a89d8ab9e215a121188556/20e5c65595d6e02cc7b517714b34ce1d969950ad/g; s/af0ede75005c121f7eff2dc60ee3d69170cdef5c/1ecb43028b3b50b3a44e0b86f0cdef7b671f164f/g' /tmp/phase12-regression.cjs
