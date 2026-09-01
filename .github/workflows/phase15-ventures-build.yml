@@ -1,0 +1,158 @@
+name: Phase 15 venture portfolio candidate build
+on:
+  push:
+    branches: [phase15-ventures-build-runner]
+    paths:
+      - '.github/workflows/phase15-ventures-build.yml'
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Build one-commit Phase 15 candidate
+        run: |
+          set -euo pipefail
+          BASE=def3696a6d69b0762c9c72a765c729c481de3d57
+          git config user.name "morfisam25-tech"
+          git config user.email "morfisam25@gmail.com"
+          git checkout -B phase15-ventures-candidate "$BASE"
+          mkdir -p docs/qa
+
+          cat > ventures.html <<'HTML'
+          <!doctype html>
+          <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#080a0b"><title>Venture Development | Unique Holding</title><meta name="description" content="Venture development at Unique Holding: Evidence Axis as a specialist operating venture and YEKI HAST as a development-stage digital product under active build."><link rel="canonical" href="https://www.uniqueholding.com.tr/ventures.html"><script>document.documentElement.classList.add('js')</script><link rel="stylesheet" href="assets/site.css"><link rel="stylesheet" href="assets/internal.css"><link rel="stylesheet" href="assets/ventures.css"></head>
+          <body class="subsite-body ventures-body"><a class="skip-link" href="#main">Skip to content</a>
+          <header class="site-header" data-header><div class="nav-shell"><a class="brand" href="index.html" aria-label="Unique Holding home"><span class="brand-symbol" aria-hidden="true"><i></i><i></i></span><span class="sub-brand"><b>UNIQUE HOLDING</b><small>Venture Development</small></span></a><button class="menu-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" aria-label="Open navigation"><span></span><span></span></button><nav id="primary-nav" class="primary-nav" aria-label="Primary navigation"><a href="corporate.html" data-nav-key="corporate">Corporate</a><a href="energy.html" data-nav-key="energy">Energy &amp; Trade</a><a href="technology.html" data-nav-key="technology">Technology</a><a href="ventures.html" data-nav-key="portfolio" aria-current="page">Portfolio</a><a href="contact.html" data-nav-key="contact">Contact</a><a class="sales-link nav-cta" href="sales.html" data-nav-key="sales">Industrial Sales</a></nav></div></header>
+          <main id="main">
+          <section class="subsite-hero tech ventures-hero" id="venture-development"><div class="inner"><p class="subsite-label">01 / Venture Development</p><p class="ventures-status-principle">STATUS-LED PORTFOLIO</p><h1>Venture<br>development.</h1><p class="intro">Unique Holding develops selected specialist ventures and digital products at different stages. This portfolio records the stage that can be supported today rather than presenting every build as an operating business.</p><div class="ventures-hero-actions"><a class="button-link primary" href="#portfolio-status">View Portfolio Status</a><a class="button-link" href="technology.html">Technology Context</a></div></div></section>
+
+          <section class="subsite-section paper ventures-section" id="portfolio-status"><div class="section-cap"><span class="num">02 / Portfolio Status</span><h2>Different stages should look different.</h2><p>The portfolio distinguishes an operating specialist venture from a digital product still under development. Status is descriptive, not promotional.</p></div><div class="ventures-status-grid"><article class="venture-status-card venture-status-card--operating" data-venture-state="operating"><div class="venture-state-row"><span class="venture-state">SPECIALIST OPERATING VENTURE</span><span class="venture-state-note">OPERATING</span></div><h3>Evidence Axis</h3><p>Evidence Axis is a specialist venture within the Unique Holding portfolio. It operates through its own specialist brand and public website.</p><a class="text-link" href="evidence-axis.html">Evidence Axis corporate bridge <span>↗</span></a></article><article class="venture-status-card venture-status-card--development" data-venture-state="development"><div class="venture-state-row"><span class="venture-state">DEVELOPMENT-STAGE DIGITAL PRODUCT</span><span class="venture-state-note">ACTIVE BUILD</span></div><h3>YEKI HAST</h3><p>Structured human-listening service workflows and supporting product and operating systems are under active development.</p><p class="venture-boundary">Active build means current development work. It does not signal public availability or operating status.</p></article></div></section>
+
+          <section class="subsite-section ventures-section" id="evidence-axis-status"><div class="section-cap"><span class="num">03 / Evidence Axis</span><h2>An operating specialist destination.</h2><p>Portfolio status is intentionally concise here. The approved Evidence Axis bridge carries the group relationship and routes visitors to the specialist source.</p></div><div class="venture-operating-band"><div><span>PORTFOLIO STATE</span><strong>SPECIALIST OPERATING VENTURE</strong></div><p>Evidence Axis is a specialist venture within the Unique Holding portfolio.</p><a class="button-link" href="evidence-axis.html">Open Evidence Axis Bridge</a></div></section>
+
+          <section class="subsite-section alt ventures-section" id="yeki-hast-status"><div class="section-cap"><span class="num">04 / YEKI HAST</span><h2>A product under development.</h2><p>YEKI HAST is a development-stage digital product within the Technology &amp; Intelligence track.</p></div><div class="yeki-status-panel" aria-labelledby="yeki-status-title"><div class="yeki-status-head"><div><span>DEVELOPMENT-STAGE DIGITAL PRODUCT</span><h3 id="yeki-status-title">YEKI HAST</h3></div><strong>ACTIVE BUILD</strong></div><div class="yeki-status-body"><p>Current work is centered on structured human-listening service workflows and the product and operating systems required to develop them responsibly.</p><p class="yeki-active-definition"><b>What “active build” means here:</b> current product development and testing work. The label does not represent a public service or an operating-stage product.</p></div><div class="yeki-context-actions"><a class="button-link" href="technology.html">Technology Context</a><a class="button-link" href="contact.html">Corporate Contact</a></div></div></section>
+
+          <section class="subsite-section paper ventures-section" id="development-discipline"><div class="section-cap"><span class="num">05 / Development Discipline</span><h2>Make the current stage explicit.</h2><p>This is an explanatory development path, not a named proprietary method and not a completion checklist.</p></div><div class="venture-path" aria-label="Explanatory venture development path"><div class="venture-path-step" data-stage-state="explanatory"><span>01</span><small>EXPLANATORY STAGE</small><h3>Problem Definition</h3><p>Frame the problem and the intended service logic.</p></div><div class="venture-path-step" data-stage-state="explanatory"><span>02</span><small>EXPLANATORY STAGE</small><h3>Research</h3><p>Test assumptions and shape the product direction.</p></div><div class="venture-path-step venture-path-step--current" data-stage-state="current"><span>03</span><small>CURRENT DEVELOPMENT</small><h3>Build</h3><p>Develop the product and supporting operating systems.</p></div><div class="venture-path-step venture-path-step--current" data-stage-state="current"><span>04</span><small>CURRENT DEVELOPMENT</small><h3>Test</h3><p>Check behavior, reliability and readiness criteria as development continues.</p></div><div class="venture-path-step venture-path-step--future" data-stage-state="future"><span>05</span><small>FUTURE GATE</small><h3>Operating Preparation</h3><p>A later stage for verified operational preparation.</p></div><div class="venture-path-step venture-path-step--future" data-stage-state="future"><span>06</span><small>FUTURE GATE</small><h3>Operation</h3><p>A later stage only after the required evidence supports that status.</p></div></div><p class="venture-path-note">For YEKI HAST, Build and Test are the current development zone. Later stages describe progression and are not presented as achieved.</p></section>
+
+          <section class="subsite-section ventures-section ventures-context" id="portfolio-context"><div class="section-cap"><span class="num">06 / Portfolio Context</span><h2>Follow the status to the right context.</h2><p>Use the specialist bridge for Evidence Axis, the Technology route for product-development context, and corporate routes for group or business inquiries.</p></div><div class="route-grid"><a class="route-card" href="evidence-axis.html"><span class="k">Operating venture</span><h3>Evidence Axis</h3><p>Portfolio relationship and specialist-site handoff.</p><b>↗</b></a><a class="route-card" href="technology.html"><span class="k">Development context</span><h3>Technology &amp; Intelligence</h3><p>Digital product development and the wider technology track.</p><b>↗</b></a><a class="route-card" href="corporate.html"><span class="k">Group context</span><h3>Corporate Profile</h3><p>Unique Holding identity, structure and operating context.</p><b>↗</b></a><a class="route-card" href="contact.html"><span class="k">Business inquiry</span><h3>Corporate Contact</h3><p>Use the established group contact route for venture or business context.</p><b>↗</b></a></div></section>
+          </main>
+          <footer class="site-footer" aria-label="Global footer"><div class="global-footer-shell"><div class="global-footer-lead"><a class="global-footer-brand" href="index.html" aria-label="Unique Holding home"><span class="brand-symbol" aria-hidden="true"><i></i><i></i></span><span><b>UNIQUE HOLDING</b><small>Istanbul · Türkiye</small></span></a><p>Industrial trade, technology and specialist ventures under one corporate identity.</p><a class="global-footer-cta" href="sales.html">Industrial Sales <span aria-hidden="true">↗</span></a></div><nav class="global-footer-nav" aria-label="Footer navigation"><div><h2>Business Areas</h2><a href="energy.html">Energy &amp; Trade</a><a href="technology.html">Technology</a><a href="ventures.html">Portfolio</a><a href="evidence-axis.html">Evidence Axis</a></div><div><h2>Corporate</h2><a href="corporate.html">Corporate Profile</a><a href="contact.html">Contact</a></div><div><h2>Commercial</h2><a href="products.html">Products</a><a href="sales.html">Industrial Sales</a></div><div><h2>Legal</h2><a href="privacy.html">Privacy &amp; Cookies</a><a href="legal.html">Legal Notice</a></div></nav><div class="global-footer-company"><div class="global-footer-company-name"><span>Industrial operating company</span><strong>UNIQE OTOMOTİV KİMYA SANAYİ LİMİTED ŞİRKETİ</strong></div><address>29 Ekim Cad. Yenibosna Merkez Mah.<br>İstanbul Vizyon Park Plazaları A1 Blok, Kat 9, Daire 98<br>Bahçelievler / İstanbul, Türkiye</address><div class="global-footer-contact"><a href="tel:+902127272222">+90 212 727 22 22</a><a href="tel:+905393809197">+90 539 380 91 97</a><a href="mailto:farahmand@uniqueholding.com.tr">farahmand@uniqueholding.com.tr</a><a href="mailto:sales@uniqueholding.com.tr">sales@uniqueholding.com.tr</a></div></div><div class="global-footer-bottom"><span>© 2026 Unique Holding</span><span>Istanbul · Türkiye</span></div></div></footer><script src="assets/site.js" defer></script></body></html>
+          HTML
+
+          cat > assets/ventures.css <<'CSS'
+          @layer page{
+          .ventures-body .subsite-hero.tech:before{background-image:none!important;background:linear-gradient(135deg,#080a0b 0%,#101617 58%,#17110d 100%)!important}
+          .ventures-hero{min-height:84svh;background:#080a0b}
+          .ventures-hero:after{background:radial-gradient(circle at 78% 36%,rgba(238,106,36,.12),transparent 22%),linear-gradient(90deg,rgba(3,5,6,.95),rgba(3,5,6,.56) 62%,rgba(3,5,6,.25)),linear-gradient(0deg,rgba(3,5,6,.9),transparent 62%)}
+          .ventures-status-principle{display:inline-flex;align-items:center;min-height:28px;margin:0 0 24px;padding:0 12px;border:1px solid rgba(238,106,36,.55);color:#f28a52;font-size:8px;font-weight:700;letter-spacing:.18em;text-transform:uppercase}
+          .ventures-hero-actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:30px}.ventures-hero-actions .button-link{border-color:rgba(255,255,255,.36)}
+          .ventures-section{position:relative}
+          .ventures-status-grid{display:grid;grid-template-columns:1.12fr .88fr;gap:18px;align-items:stretch}
+          .venture-status-card{min-height:430px;padding:38px;border:1px solid rgba(0,0,0,.17);background:#eee9e0;display:flex;flex-direction:column;position:relative;overflow:hidden}
+          .venture-status-card--operating{background:#f2eee6}.venture-status-card--development{background:#e2ddd4}
+          .venture-status-card--operating:before,.venture-status-card--development:before{content:'';position:absolute;inset:0 auto 0 0;width:4px;background:#a34b1d}.venture-status-card--development:before{background:#77716a}
+          .venture-state-row{display:flex;justify-content:space-between;align-items:flex-start;gap:20px}.venture-state,.venture-state-note{font-size:8px;letter-spacing:.16em;text-transform:uppercase;font-weight:700}.venture-state{color:#823d1b}.venture-state-note{color:#666;padding:7px 9px;border:1px solid rgba(0,0,0,.16)}
+          .venture-status-card h3{font:400 clamp(46px,5vw,76px)/.94 Georgia,'Times New Roman',serif;letter-spacing:-.05em;margin:86px 0 24px;color:#111}.venture-status-card p{max-width:680px;color:#505556;line-height:1.75;margin:0 0 18px}.venture-status-card .text-link{margin-top:auto;color:#111;border-color:rgba(0,0,0,.32);align-self:flex-start}.venture-boundary{padding-top:18px;border-top:1px solid rgba(0,0,0,.14);font-size:12px}
+          .venture-operating-band{display:grid;grid-template-columns:.8fr 1.1fr auto;gap:34px;align-items:center;border-top:1px solid rgba(255,255,255,.16);border-bottom:1px solid rgba(255,255,255,.16);padding:34px 0}.venture-operating-band>div{display:flex;flex-direction:column;gap:12px}.venture-operating-band span{color:#ee6a24;font-size:8px;letter-spacing:.17em}.venture-operating-band strong{font:400 26px/1.1 Georgia,'Times New Roman',serif}.venture-operating-band p{color:#9aa1a3;line-height:1.7;margin:0}.venture-operating-band .button-link{white-space:nowrap}
+          .yeki-status-panel{border:1px solid rgba(255,255,255,.17);background:#0b0f10}.yeki-status-head{display:flex;justify-content:space-between;gap:28px;align-items:flex-start;padding:34px 36px;border-bottom:1px solid rgba(255,255,255,.15)}.yeki-status-head span{display:block;color:#b7b9b7;font-size:8px;letter-spacing:.17em;text-transform:uppercase}.yeki-status-head h3{font:400 clamp(52px,6vw,88px)/.92 Georgia,'Times New Roman',serif;letter-spacing:-.05em;margin:38px 0 0}.yeki-status-head>strong{padding:9px 11px;border:1px solid rgba(238,106,36,.5);color:#ee6a24;font-size:8px;letter-spacing:.17em;white-space:nowrap}.yeki-status-body{display:grid;grid-template-columns:1.1fr .9fr}.yeki-status-body>p{padding:38px 36px;margin:0;color:#a1a8aa;line-height:1.8}.yeki-status-body>p:first-child{border-right:1px solid rgba(255,255,255,.15)}.yeki-active-definition b{display:block;color:#ece8df;margin-bottom:10px;font-weight:600}.yeki-context-actions{display:flex;gap:12px;flex-wrap:wrap;padding:24px 36px;border-top:1px solid rgba(255,255,255,.15)}
+          .venture-path{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:rgba(0,0,0,.16);border:1px solid rgba(0,0,0,.16)}.venture-path-step{min-height:265px;padding:28px;background:#e8e3da;display:flex;flex-direction:column}.venture-path-step>span{color:#8b4b2a;font-size:10px;letter-spacing:.16em}.venture-path-step small{margin-top:14px;color:#74706b;font-size:8px;letter-spacing:.15em;font-weight:700}.venture-path-step h3{font:400 29px/1.05 Georgia,'Times New Roman',serif;margin:54px 0 14px;color:#111}.venture-path-step p{color:#555;line-height:1.65;margin:auto 0 0;font-size:12px}.venture-path-step--current{background:#f2ede5;box-shadow:inset 0 4px 0 #a34b1d}.venture-path-step--current small{color:#a34b1d}.venture-path-step--future{background:#d8d3cb}.venture-path-step--future small{color:#666}.venture-path-note{max-width:860px;margin:24px 0 0;color:#666;font-size:11px;line-height:1.7}
+          .ventures-context .route-grid{grid-template-columns:repeat(4,1fr)}
+          .ventures-hero a:focus-visible,.ventures-section a:focus-visible{outline:2px solid #f28a52;outline-offset:4px}
+          @media(max-width:1100px){.ventures-status-grid{grid-template-columns:1fr}.venture-operating-band{grid-template-columns:1fr}.venture-path{grid-template-columns:repeat(2,1fr)}.ventures-context .route-grid{grid-template-columns:repeat(2,1fr)}}
+          @media(max-width:760px){.ventures-hero{min-height:auto;align-items:flex-start}.ventures-hero .inner{width:calc(100% - 40px);padding:122px 0 56px}.ventures-status-principle{margin-bottom:18px}.ventures-hero h1{font-size:clamp(56px,17vw,74px);line-height:.88}.ventures-hero .intro{font-size:14px;line-height:1.62;margin-top:20px}.ventures-hero-actions{margin-top:24px;gap:10px}.ventures-hero-actions .button-link{width:100%;min-height:46px;padding:0 14px}.venture-status-card{min-height:340px;padding:28px}.venture-state-row{flex-direction:column;gap:12px}.venture-status-card h3{margin-top:52px;font-size:50px}.venture-operating-band{gap:22px}.venture-operating-band .button-link{width:100%}.yeki-status-head{padding:28px 24px;flex-direction:column}.yeki-status-head h3{font-size:54px;margin-top:28px}.yeki-status-body{grid-template-columns:1fr}.yeki-status-body>p{padding:28px 24px}.yeki-status-body>p:first-child{border-right:0;border-bottom:1px solid rgba(255,255,255,.15)}.yeki-context-actions{padding:22px 24px;flex-direction:column}.yeki-context-actions .button-link{width:100%}.venture-path{grid-template-columns:1fr}.venture-path-step{min-height:210px;padding:24px}.venture-path-step h3{margin-top:38px}.ventures-context .route-grid{grid-template-columns:1fr}}
+          @media(max-width:390px){.ventures-hero .inner{width:calc(100% - 32px);padding-top:116px}.ventures-hero h1{font-size:56px}.venture-status-card h3{font-size:46px}.yeki-status-head h3{font-size:50px}}
+          }
+          CSS
+
+          cat > docs/qa/phase15-yeki-hast-public-evidence.md <<'MD'
+          # Phase 15 — YEKI HAST public-evidence and publication audit
+
+          Internal QA record for publication discipline. The YEKI HAST repository is used only as evidence input; operational implementation details are intentionally excluded from the Holding website and from this record.
+
+          | Public statement | Source | Supported internally? | Appropriate to publish? | Keep / Remove |
+          | --- | --- | --- | --- | --- |
+          | YEKI HAST is a development-stage digital product | Current YEKI HAST launch-status source | YES | YES — accurately communicates maturity without exposing engineering detail | KEEP |
+          | Active build means current product-development work | Current YEKI HAST launch-status source | YES | YES — only with an explicit boundary that active build is not operating status | KEEP |
+          | Product context concerns human-listening workflows and supporting application / operating systems | Current YEKI HAST repository overview and source structure | YES | YES — high-level only | KEEP |
+          | Current development includes build and testing work | Current YEKI HAST launch-status source and repository test/QA structure | YES | YES — generic stage language only; no counts or implementation details | KEEP |
+          | Public operation / production readiness | Current YEKI HAST launch-status source | NO | NO | REMOVE |
+          | Public adoption, customer activity, transaction volume or commercial traction | Current YEKI HAST repository | NOT ESTABLISHED | NO | REMOVE |
+          | Feature availability inferred from source code | Source files may contain implementation work | CODE MAY EXIST | NO — code existence does not establish public availability | REMOVE |
+          | Internal infrastructure, release gates, credentials, providers or environment state | Internal engineering records | SUPPORTED INTERNALLY | NO — not corporate public proof | REMOVE |
+
+          ## Status language
+
+          Approved public status:
+
+          - `SPECIALIST OPERATING VENTURE` — Evidence Axis.
+          - `DEVELOPMENT-STAGE DIGITAL PRODUCT` — YEKI HAST.
+          - `ACTIVE BUILD` — YEKI HAST only when explicitly defined as current development work rather than operating status.
+
+          ## Visual provenance
+
+          | Asset / treatment | Provenance | Public implication | Safe / Unsafe | Decision |
+          | --- | --- | --- | --- | --- |
+          | Inherited `.subsite-hero.tech:before` remote background | Shared legacy remote Technology treatment; asset-specific provenance not recorded for YEKI HAST | Could imply actual product interface, staff or live operating activity | UNSAFE | REMOVE FROM RENDERED VENTURES PAGE |
+          | Existing `.feature-image.tech` decorative block | Shared remote Technology image treatment | Could be mistaken for an actual YEKI HAST interface or operating environment | UNSAFE | REMOVE |
+          | Phase 15 status-led typography, borders and CSS geometry | Created in-repo from CSS only | Communicates maturity/status without pretending to be product proof | SAFE | KEEP |
+
+          Phase 15 publishes no YEKI HAST screenshot, no user data, no private development artifact and no dedicated public YEKI HAST CTA.
+          MD
+
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('scripts/qa-site.mjs'); s=p.read_text()
+          marker="\nif(errors.length){console.error('\\nTECHNICAL QA FAILED');"
+          assert marker in s
+          block=r'''
+
+          // Phase 15 — Venture portfolio / YEKI HAST maturity guards.
+          {
+            const ventures=read('ventures.html');const venturesMain=ventures.match(/<main\b[\s\S]*?<\/main>/i)?.[0]||'';const venturesCss=read('assets/ventures.css');
+            if(!ventures.includes('assets/ventures.css')||!venturesCss.startsWith('@layer page{'))errors.push('Phase 15: ventures stylesheet architecture missing');
+            if((venturesMain.match(/<h1\b/gi)||[]).length!==1)errors.push('ventures.html: Phase 15 requires exactly one H1');
+            for(const token of ['01 / Venture Development','STATUS-LED PORTFOLIO','02 / Portfolio Status','03 / Evidence Axis','04 / YEKI HAST','05 / Development Discipline','06 / Portfolio Context','SPECIALIST OPERATING VENTURE','DEVELOPMENT-STAGE DIGITAL PRODUCT','ACTIVE BUILD','a specialist venture within the Unique Holding portfolio','Build and Test are the current development zone','FUTURE GATE'])if(!venturesMain.includes(token))errors.push('ventures.html: Phase 15 required status/IA token missing -> '+token);
+            if((venturesMain.match(/data-venture-state="operating"/g)||[]).length!==1||(venturesMain.match(/data-venture-state="development"/g)||[]).length!==1)errors.push('ventures.html: Phase 15 must expose exactly one operating and one development portfolio state');
+            if((venturesMain.match(/data-stage-state="current"/g)||[]).length!==2||(venturesMain.match(/data-stage-state="future"/g)||[]).length!==2)errors.push('ventures.html: YEKI HAST current/future path semantics regression');
+            const yeki=venturesMain.match(/<section class="subsite-section alt ventures-section" id="yeki-hast-status">[\s\S]*?<\/section>/i)?.[0]||'';
+            for(const token of ['DEVELOPMENT-STAGE DIGITAL PRODUCT','ACTIVE BUILD','structured human-listening service workflows','current product development and testing work','Technology Context','Corporate Contact'])if(!yeki.includes(token))errors.push('ventures.html: YEKI HAST public boundary missing -> '+token);
+            for(const rx of [/\blaunched\b/i,/\blive now\b/i,/\bavailable now\b/i,/\bproduction[- ]ready\b/i,/\bmarket[- ]ready\b/i,/\bactive users\b/i,/\bcommunity\b/i,/\bcustomers\b/i,/\bdownloads\b/i,/\brevenue\b/i,/\btransactions\b/i,/\btraction\b/i,/\bvalidated\b/i,/\bsuccessful launch\b/i,/\bgrowing\b/i,/\bscaled\b/i,/platform uptime/i,/global service/i,/\bmarketplace\b/i,/\bleading\b/i,/award-winning/i,/\bfunded\b/i,/\binvestment\b/i,/portfolio company/i])if(rx.test(venturesMain))errors.push('ventures.html: unsupported Phase 15 launch/traction/fund wording -> '+rx);
+            for(const rx of [/\bVercel\b/i,/\bNeon\b/i,/\bSMTP\b/i,/\bOTP\b/i,/\bdatabase\b/i,/\bmigration\b/i,/\brollback\b/i,/\bGitHub\b/i,/project id/i,/\bcredential/i,/\bDB region\b/i,/\bRunner\b/i,/\btest count\b/i,/payment provider/i])if(rx.test(venturesMain))errors.push('ventures.html: private YEKI HAST engineering detail leaked -> '+rx);
+            for(const rx of [/Open YEKI/i,/Try YEKI/i,/Join YEKI/i,/Download App/i,/Get Started/i,/Waitlist/i])if(rx.test(venturesMain))errors.push('ventures.html: fake YEKI HAST public CTA returned -> '+rx);
+            if(/feature-image\s+tech/i.test(venturesMain)||/<img\b/i.test(venturesMain))errors.push('ventures.html: unverified/fake venture visual must not be rendered in Phase 15');
+            if(!venturesCss.includes('.ventures-body .subsite-hero.tech:before{background-image:none!important'))errors.push('Phase 15: inherited remote ventures hero must be explicitly disabled');
+            if(/https?:\/\/|url\s*\(/i.test(venturesCss))errors.push('assets/ventures.css: remote/image dependency forbidden');
+            for(const href of ['evidence-axis.html','technology.html','corporate.html','contact.html'])if(!venturesMain.includes('href="'+href+'"'))errors.push('ventures.html: required Phase 15 route missing -> '+href);
+            if(/https?:\/\//i.test(venturesMain))errors.push('ventures.html: no external or fake YEKI HAST public route is approved in Phase 15');
+            if(/YEKI HAST[\s\S]{0,900}\b(?:company|subsidiary|division|department|business unit|registered venture)\b/i.test(venturesMain))errors.push('ventures.html: invented YEKI HAST legal relationship wording');
+            if(!ventures.includes('<title>Venture Development | Unique Holding</title>'))errors.push('ventures.html: Phase 15 title regression');
+            if(!ventures.includes('rel="canonical" href="https://www.uniqueholding.com.tr/ventures.html"'))errors.push('ventures.html: Phase 15 canonical regression');
+            if(!ventures.includes('name="description" content="Venture development at Unique Holding: Evidence Axis as a specialist operating venture and YEKI HAST as a development-stage digital product under active build."'))errors.push('ventures.html: Phase 15 meta description regression');
+            const auditPath='docs/qa/phase15-yeki-hast-public-evidence.md';if(!files.includes(auditPath))errors.push('Phase 15 YEKI HAST evidence audit missing');else{const audit=read(auditPath);for(const token of ['Supported internally?','Appropriate to publish?','KEEP','REMOVE','UNSAFE','SAFE','code existence does not establish public availability'])if(!audit.includes(token))errors.push('Phase 15 YEKI HAST evidence audit incomplete -> '+token)}
+            const axis=read('evidence-axis.html');const axisCss=read('assets/evidence-axis-bridge.css');for(const token of ['01 / Evidence Axis','SPECIALIST VENTURE','a specialist venture within the Unique Holding portfolio','View Public Sample','Open EvidenceAxis.com'])if(!axis.includes(token))errors.push('Phase 15: Phase 14 Evidence Axis lock regression -> '+token);if(!axisCss.includes('.evidence-axis-bridge-body .subsite-hero.tech:before{background-image:none!important'))errors.push('Phase 15: Phase 14 Evidence Axis visual lock regression');
+            const technology=read('technology.html');const technologyVisualCss=read('assets/technology-visuals.css');for(const token of ['technology-hero-system.svg','evidence-axis-system.svg','digital-product-development.svg','venture-systems.svg','content-distribution-system.svg'])if(!technology.includes(token))errors.push('Phase 15: Phase 13 Technology visual lock missing -> '+token);if(/images\.unsplash\.com/i.test(technologyVisualCss))errors.push('Phase 15: Phase 13 Technology remote visual regression');
+            const sales=read('sales.html');for(const token of ['01 / Product','02 / Grade / Specification','03 / Quantity','04 / Destination','05 / Timing','06 / Specification / Technical Requirement','07 / Contact','sales@uniqueholding.com.tr'])if(!sales.includes(token))errors.push('Phase 15: Phase 11 RFQ lock regression -> '+token);
+            const p09=read('products.html');const refs=(p09.match(/data-destination="reference-detail"/g)||[]).length;const inquiries=(p09.match(/data-destination="inquiry-detail"/g)||[]).length;if(refs!==3||inquiries!==62)errors.push('Phase 15: Phase 09 3/62 classification regression');
+            const releaseBlocker={id:'RELEASE-BLOCKER-HTTPS-001',status:'OPEN'};if(releaseBlocker.status!=='OPEN')errors.push('Phase 15: RELEASE-BLOCKER-HTTPS-001 must remain OPEN');
+          }
+          '''
+          s=s.replace(marker,block+marker)
+          s=s.replace('Phase 09/10/11/12/13/14 guards passed; protected film hashes verified.','Phase 09/10/11/12/13/14/15 guards passed; protected film hashes verified.')
+          p.write_text(s)
+          PY
+
+          node scripts/qa-site.mjs
+          git add ventures.html assets/ventures.css docs/qa/phase15-yeki-hast-public-evidence.md scripts/qa-site.mjs
+          EXPECTED=$'assets/ventures.css\ndocs/qa/phase15-yeki-hast-public-evidence.md\nscripts/qa-site.mjs\nventures.html'
+          test "$(git diff --cached --name-only | sort)" = "$EXPECTED"
+          git diff --exit-code "$BASE" -- evidence-axis.html assets/evidence-axis-bridge.css technology.html assets/technology-content.css assets/technology-visuals.css assets/phase13/technology-hero-system.svg assets/phase13/evidence-axis-system.svg assets/phase13/digital-product-development.svg assets/phase13/venture-systems.svg assets/phase13/content-distribution-system.svg sales.html product.html products.html energy.html urea-46.html caustic-soda-solid.html sodium-sulphate-anhydrous.html index.html assets/site.css assets/internal.css assets/media/unique-holding-film-720p.mp4 assets/media/unique-holding-caption.vtt
+          git commit -m "PHASE 15 — Establish venture portfolio and YEKI HAST development status"
+          PRODUCT=$(git rev-parse HEAD)
+          test "$(git rev-parse HEAD^)" = "$BASE"
+          test "$(git diff-tree --no-commit-id --name-only -r "$PRODUCT" | sort)" = "$EXPECTED"
+          echo "PRODUCT_SHA=$PRODUCT"
+          git push origin HEAD:refs/heads/phase15-ventures-candidate --force
