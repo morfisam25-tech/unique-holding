@@ -1,0 +1,220 @@
+name: Phase 13 technology visual candidate build
+on:
+  push:
+    branches: [phase13-tech-build-runner]
+    paths:
+      - '.github/workflows/phase13-tech-build.yml'
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Build one-commit Phase 13 candidate
+        run: |
+          set -euo pipefail
+          BASE=1ecb43028b3b50b3a44e0b86f0cdef7b671f164f
+          git config user.name "morfisam25-tech"
+          git config user.email "morfisam25@gmail.com"
+          git checkout -B phase13-tech-candidate "$BASE"
+          mkdir -p assets/phase13 docs/qa
+
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('technology.html'); s=p.read_text()
+          hero='<section class="subsite-hero tech tech-phase12-hero"><div class="inner">'
+          hero_new='<section class="subsite-hero tech tech-phase12-hero"><div class="tech-phase13-hero-visual"><img data-tech-visual="hero" src="assets/phase13/technology-hero-system.svg" width="2400" height="1350" alt="Abstract editorial system of connected evidence, product and decision nodes." decoding="async" fetchpriority="high"></div><div class="inner">'
+          assert hero in s
+          s=s.replace(hero,hero_new,1)
+          inserts={
+            '<a class="route-card tech-overview-card tech-card--evidence-axis" data-tech-area="evidence-axis" href="evidence-axis.html">':'<a class="route-card tech-overview-card tech-card--evidence-axis" data-tech-area="evidence-axis" href="evidence-axis.html"><span class="tech-card-media"><img data-tech-visual="evidence-axis" src="assets/phase13/evidence-axis-system.svg" width="1600" height="900" alt="Abstract evidence map connecting source records, verification points and a decision axis." loading="lazy" decoding="async"></span>',
+            '<a class="route-card tech-overview-card tech-card--digital-products" data-tech-area="digital-products" href="#digital-products">':'<a class="route-card tech-overview-card tech-card--digital-products" data-tech-area="digital-products" href="#digital-products"><span class="tech-card-media"><img data-tech-visual="digital-products" src="assets/phase13/digital-product-development.svg" width="1600" height="900" alt="Abstract development flow from research through build and testing." loading="lazy" decoding="async"></span>',
+            '<a class="route-card tech-overview-card tech-card--advisory" data-tech-area="venture-advisory" href="#venture-systems">':'<a class="route-card tech-overview-card tech-card--advisory" data-tech-area="venture-advisory" href="#venture-systems"><span class="tech-card-media"><img data-tech-visual="venture-advisory" src="assets/phase13/venture-systems.svg" width="1600" height="900" alt="Abstract decision framework linking problem framing, commercial logic and operating design." loading="lazy" decoding="async"></span>',
+            '<a class="route-card tech-overview-card tech-card--content" data-tech-area="content-distribution" href="#content-distribution">':'<a class="route-card tech-overview-card tech-card--content" data-tech-area="content-distribution" href="#content-distribution"><span class="tech-card-media"><img data-tech-visual="content-distribution" src="assets/phase13/content-distribution-system.svg" width="1600" height="900" alt="Abstract editorial workflow linking content blocks to distribution paths." loading="lazy" decoding="async"></span>'
+          }
+          for old,new in inserts.items():
+              assert old in s
+              s=s.replace(old,new,1)
+          p.write_text(s)
+          PY
+
+          cat > assets/technology-visuals.css <<'CSS'
+          @layer page{
+          /* Phase 13 — provenance-safe Technology visuals. No remote imagery. */
+          .subsite-hero.tech:before{background-image:none!important;background:#080a0b!important}
+          .tech-phase13-hero-visual{position:absolute;inset:0;z-index:0;overflow:hidden;background:#080a0b}
+          .tech-phase13-hero-visual:after{content:"";position:absolute;inset:0;background:radial-gradient(circle at 73% 42%,rgba(255,122,50,.08),transparent 28%),linear-gradient(90deg,rgba(3,5,6,.22),rgba(3,5,6,.08) 60%,rgba(3,5,6,.2));pointer-events:none}
+          .tech-phase13-hero-visual img{display:block;width:100%;height:100%;object-fit:cover;object-position:50% 50%;filter:saturate(.92) contrast(1.04)}
+          .subsite-hero.tech:after{z-index:1;background:linear-gradient(90deg,rgba(3,5,6,.88),rgba(3,5,6,.45) 57%,rgba(3,5,6,.22)),linear-gradient(0deg,rgba(3,5,6,.9),transparent 58%)}
+          .subsite-hero.tech .inner{z-index:2}
+
+          .tech-overview-card{position:relative;isolation:isolate;overflow:hidden;min-height:340px;background:#0b0e0f!important;background-image:none!important}
+          .tech-overview-card>.tech-card-media{position:absolute;inset:0;z-index:0;display:block;overflow:hidden;background:#0a0d0e}
+          .tech-card-media img{display:block;width:100%;height:100%;object-fit:cover;object-position:50% 50%;opacity:.9;filter:saturate(.92) contrast(1.06)}
+          .tech-overview-card::before{content:"";position:absolute;inset:0;z-index:1;background:linear-gradient(180deg,rgba(3,5,6,.18) 0%,rgba(3,5,6,.5) 42%,rgba(3,5,6,.96) 100%),linear-gradient(90deg,rgba(3,5,6,.38),transparent 72%);pointer-events:none}
+          .tech-overview-card>*:not(.tech-card-media){position:relative;z-index:2}
+          .tech-overview-card .k{color:#ff7a32;text-shadow:0 1px 12px rgba(0,0,0,.55)}
+          .tech-overview-card h3{color:#f4f0e8;text-shadow:0 2px 18px rgba(0,0,0,.72);margin-top:auto;padding-top:84px}
+          .tech-overview-card p{color:#d0d4d5;text-shadow:0 1px 12px rgba(0,0,0,.7)}
+          .tech-overview-card b{color:#ff7a32}
+          .route-card.tech-overview-card:hover{filter:brightness(1.04)}
+          .tech-card--evidence-axis .tech-card-media img{object-position:50% 48%;opacity:.96}
+          .tech-card--digital-products .tech-card-media img{object-position:50% 50%;opacity:.88}
+          .tech-card--advisory .tech-card-media img{object-position:50% 50%;opacity:.86}
+          .tech-card--content .tech-card-media img{object-position:50% 52%;opacity:.88}
+          .tech-card--evidence-axis::after{content:"EVIDENCE AXIS  /  SPECIALIST INTELLIGENCE";position:absolute;z-index:2;right:22px;top:24px;max-width:180px;color:rgba(244,240,232,.72);font-size:7px;line-height:1.45;letter-spacing:.22em;text-align:right;text-transform:uppercase;padding-right:12px;border-right:1px solid rgba(255,122,50,.75);pointer-events:none}
+
+          @media(max-width:1100px){.tech-overview-card{min-height:320px}.tech-overview-card h3{padding-top:70px}}
+          @media(max-width:760px){
+            .tech-phase13-hero-visual img{object-position:50% 50%}
+            .tech-overview-card{min-height:300px}
+            .tech-overview-card h3{padding-top:64px}
+            .tech-card-media img{object-position:50% 50%}
+            .tech-card--evidence-axis::after{right:18px;top:20px;max-width:150px;font-size:6px}
+          }
+          }
+          CSS
+
+          cat > assets/phase13/technology-hero-system.svg <<'SVG'
+          <svg xmlns="http://www.w3.org/2000/svg" width="2400" height="1350" viewBox="0 0 2400 1350" role="img">
+            <title>Abstract technology and decision system</title><desc>Editorial geometric composition of evidence records, connected nodes and decision axes.</desc>
+            <defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0a0d0e"/><stop offset="1" stop-color="#151b1d"/></linearGradient><radialGradient id="glow"><stop stop-color="#ff7a32" stop-opacity=".24"/><stop offset="1" stop-color="#ff7a32" stop-opacity="0"/></radialGradient></defs>
+            <rect width="2400" height="1350" fill="url(#bg)"/><g stroke="#c9c3b8" stroke-opacity=".08"><path d="M0 150H2400M0 300H2400M0 450H2400M0 600H2400M0 750H2400M0 900H2400M0 1050H2400M0 1200H2400"/><path d="M150 0V1350M300 0V1350M450 0V1350M600 0V1350M750 0V1350M900 0V1350M1050 0V1350M1200 0V1350M1350 0V1350M1500 0V1350M1650 0V1350M1800 0V1350M1950 0V1350M2100 0V1350M2250 0V1350"/></g>
+            <circle cx="1420" cy="630" r="510" fill="url(#glow)"/><g fill="none" stroke="#f4f0e8" stroke-opacity=".2" stroke-width="2"><circle cx="1420" cy="630" r="340"/><circle cx="1420" cy="630" r="220"/><path d="M770 630H2090M1420 120V1140"/></g>
+            <g fill="#101416" stroke="#f4f0e8" stroke-opacity=".24" stroke-width="2"><rect x="1030" y="340" width="350" height="210" rx="8"/><rect x="1510" y="470" width="390" height="245" rx="8"/><rect x="1140" y="760" width="420" height="240" rx="8"/></g>
+            <g stroke="#ff7a32" stroke-width="6" fill="none" stroke-linecap="round"><path d="M1180 443H1300M1180 478H1260M1620 580H1780M1620 620H1730M1265 870H1450M1265 910H1390"/></g>
+            <g fill="#ff7a32"><circle cx="1420" cy="630" r="13"/><circle cx="1030" cy="445" r="9"/><circle cx="1900" cy="590" r="9"/><circle cx="1350" cy="1000" r="9"/></g><g stroke="#ff7a32" stroke-width="3" stroke-opacity=".72" fill="none"><path d="M1030 445C1180 445 1260 505 1420 630S1715 590 1900 590"/><path d="M1420 630C1420 770 1390 880 1350 1000"/></g>
+            <g fill="#f4f0e8" fill-opacity=".72"><circle cx="940" cy="630" r="5"/><circle cx="1580" cy="250" r="5"/><circle cx="1740" cy="820" r="5"/><circle cx="920" cy="940" r="5"/></g>
+          </svg>
+          SVG
+
+          cat > assets/phase13/evidence-axis-system.svg <<'SVG'
+          <svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" role="img"><title>Abstract evidence map</title><desc>Editorial diagram of source records, verification points and a decision axis.</desc><defs><linearGradient id="b" x1="0" x2="1"><stop stop-color="#0b0e0f"/><stop offset="1" stop-color="#1a1410"/></linearGradient></defs><rect width="1600" height="900" fill="url(#b)"/><g stroke="#f4f0e8" stroke-opacity=".12" fill="#101416"><rect x="150" y="170" width="360" height="160" rx="8"/><rect x="150" y="370" width="360" height="160" rx="8"/><rect x="150" y="570" width="360" height="160" rx="8"/></g><g stroke="#ff7a32" stroke-width="5"><path d="M210 225H390M210 260H340M210 425H420M210 460H360M210 625H370M210 660H430"/></g><g stroke="#f4f0e8" stroke-opacity=".24" stroke-width="2" fill="none"><path d="M650 100V800M570 450H1450"/><circle cx="1030" cy="450" r="250"/><circle cx="1030" cy="450" r="145"/></g><g stroke="#ff7a32" stroke-width="3" fill="none"><path d="M510 250C650 250 760 350 900 425M510 450H900M510 650C660 650 760 550 900 475"/></g><g fill="#ff7a32"><circle cx="900" cy="425" r="10"/><circle cx="900" cy="450" r="10"/><circle cx="900" cy="475" r="10"/><circle cx="1030" cy="450" r="14"/></g><path d="M1030 450L1280 300M1030 450L1320 620" stroke="#f4f0e8" stroke-opacity=".36" stroke-width="2"/></svg>
+          SVG
+
+          cat > assets/phase13/digital-product-development.svg <<'SVG'
+          <svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" role="img"><title>Abstract digital product development flow</title><desc>Editorial flow from research to build to testing using generic wireframe blocks.</desc><rect width="1600" height="900" fill="#0a0d0e"/><g stroke="#f4f0e8" stroke-opacity=".1"><path d="M0 180H1600M0 360H1600M0 540H1600M0 720H1600"/></g><g fill="#111719" stroke="#f4f0e8" stroke-opacity=".18" stroke-width="2"><rect x="120" y="220" width="360" height="430" rx="10"/><rect x="620" y="170" width="360" height="530" rx="10"/><rect x="1120" y="240" width="360" height="390" rx="10"/></g><g stroke="#ff7a32" stroke-width="5" fill="none"><path d="M190 300H390M190 350H330M690 250H900M690 300H850M690 420H910M1190 320H1390M1190 370H1330"/><path d="M480 435H620M980 435H1120"/></g><g fill="#ff7a32"><circle cx="550" cy="435" r="10"/><circle cx="1050" cy="435" r="10"/></g><g fill="#f4f0e8" fill-opacity=".08"><rect x="190" y="440" width="220" height="120" rx="6"/><rect x="690" y="520" width="220" height="100" rx="6"/><rect x="1190" y="450" width="220" height="90" rx="6"/></g></svg>
+          SVG
+
+          cat > assets/phase13/venture-systems.svg <<'SVG'
+          <svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" role="img"><title>Abstract venture decision framework</title><desc>Editorial decision matrix connecting problem framing, commercial logic and operating design.</desc><defs><linearGradient id="g" x1="0" y1="1" x2="1" y2="0"><stop stop-color="#0a0d0e"/><stop offset="1" stop-color="#141719"/></linearGradient></defs><rect width="1600" height="900" fill="url(#g)"/><g fill="none" stroke="#f4f0e8" stroke-opacity=".16" stroke-width="2"><rect x="220" y="160" width="1160" height="580"/><path d="M800 160V740M220 450H1380"/><rect x="480" y="290" width="640" height="320"/><circle cx="800" cy="450" r="120"/></g><g stroke="#ff7a32" stroke-width="4" fill="none"><path d="M310 600C500 520 560 300 800 450S1120 620 1290 310"/><path d="M300 230H470M1130 670H1300"/></g><g fill="#ff7a32"><circle cx="310" cy="600" r="11"/><circle cx="800" cy="450" r="14"/><circle cx="1290" cy="310" r="11"/></g><g fill="#f4f0e8" fill-opacity=".12"><rect x="300" y="230" width="170" height="12"/><rect x="1130" y="658" width="170" height="12"/></g></svg>
+          SVG
+
+          cat > assets/phase13/content-distribution-system.svg <<'SVG'
+          <svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" role="img"><title>Abstract content and distribution workflow</title><desc>Editorial system of content blocks moving through structured distribution paths without metrics.</desc><rect width="1600" height="900" fill="#0a0d0e"/><g fill="#111719" stroke="#f4f0e8" stroke-opacity=".16" stroke-width="2"><rect x="150" y="180" width="430" height="150" rx="8"/><rect x="150" y="375" width="430" height="150" rx="8"/><rect x="150" y="570" width="430" height="150" rx="8"/></g><g stroke="#ff7a32" stroke-width="5"><path d="M220 235H440M220 275H380M220 430H470M220 470H400M220 625H420M220 665H480"/></g><g stroke="#f4f0e8" stroke-opacity=".24" stroke-width="2" fill="none"><path d="M700 450H980M980 220V680"/><circle cx="980" cy="220" r="12"/><circle cx="980" cy="450" r="12"/><circle cx="980" cy="680" r="12"/><path d="M980 220H1320M980 450H1420M980 680H1270"/></g><g fill="#ff7a32"><circle cx="700" cy="450" r="12"/><circle cx="1320" cy="220" r="10"/><circle cx="1420" cy="450" r="10"/><circle cx="1270" cy="680" r="10"/></g><g fill="#f4f0e8" fill-opacity=".08"><rect x="1120" y="175" width="200" height="90" rx="6"/><rect x="1180" y="405" width="240" height="90" rx="6"/><rect x="1080" y="635" width="190" height="90" rx="6"/></g></svg>
+          SVG
+
+          cat > docs/qa/phase13-technology-visual-provenance.md <<'MD'
+          # Phase 13 — Technology Visual Provenance Record
+
+          Internal QA record. Not public site copy.
+
+          ## Before audit
+
+          | Asset / source | Page location | Subject seen in Phase 12 render | Provenance class | Public implication risk | Decision |
+          | --- | --- | --- | --- | --- | --- |
+          | `images.unsplash.com/photo-1779896411954-9129882c996d` | Technology hero | People gathered around a laptop in an office/work session | UNVERIFIED | Could imply actual Unique Holding staff, clients or operating team | REMOVE from rendered Technology route |
+          | `images.unsplash.com/photo-1782330299430-9aa9e8f3bc39` | Evidence Axis card | Glowing hardware / machine-like technology composition | UNVERIFIED | Could imply proprietary AI, hardware or technical infrastructure | REMOVE |
+          | `images.unsplash.com/photo-1771923082503-0a3381c46cef` | Digital Products card | Laptop displaying a software task/interface screen | UNVERIFIED | Could be mistaken for an actual live Unique/YEKI HAST product interface | REMOVE |
+          | `images.unsplash.com/photo-1758876202980-0a28b744fb24` | Business & Venture Advisory card | Two people in a meeting with planning material behind them | UNVERIFIED | Could imply real advisors, clients, staff scale or a photographed engagement | REMOVE |
+          | `images.unsplash.com/photo-1627244714766-94dab62ed964` | Content & Distribution card | Person at a video-editing workstation | UNVERIFIED | Could imply an owned studio, actual production team or demonstrated workflow | REMOVE |
+
+          Exact photographer/license metadata for those remote image URLs was not recorded in the repository, so none is retained as evidence.
+
+          ## Approved Phase 13 system
+
+          | Asset path | Source | Class | Section | Reasonable public implication | Approved use | Restrictions |
+          | --- | --- | --- | --- | --- | --- | --- |
+          | `assets/phase13/technology-hero-system.svg` | Created in-repo from geometric SVG primitives during Phase 13 | ILLUSTRATIVE | Hero | Technology/intelligence involves connected evidence, products and decisions | Editorial hero only | Not evidence of software, infrastructure, staff or customers |
+          | `assets/phase13/evidence-axis-system.svg` | Created in-repo from geometric SVG primitives during Phase 13 | ILLUSTRATIVE | Evidence Axis operating-area card | Evidence is organized through records, verification and decisions | Editorial explanation only | Not an Evidence Axis screenshot or client deliverable |
+          | `assets/phase13/digital-product-development.svg` | Created in-repo from geometric SVG primitives during Phase 13 | ILLUSTRATIVE | Digital Products card | Product work moves through staged development | Development-stage editorial visual | Not a product UI; must not be presented as launched software |
+          | `assets/phase13/venture-systems.svg` | Created in-repo from geometric SVG primitives during Phase 13 | ILLUSTRATIVE | Business & Venture Advisory card | Business questions are framed through structured decision logic | Editorial capability visual | No investment, financial-advice or client-engagement implication |
+          | `assets/phase13/content-distribution-system.svg` | Created in-repo from geometric SVG primitives during Phase 13 | ILLUSTRATIVE | Content & Distribution card | Content moves through structured editorial/distribution paths | Editorial capability visual | No KPI, audience-scale, publisher, ownership or performance implication |
+
+          ## Design restrictions
+
+          - No third-party logos or brand marks.
+          - No fake dashboards, analytics, customer portals, code editors, API consoles or KPI charts.
+          - No people, offices, servers or hardware presented as owned operating evidence.
+          - No visual is captioned as proof.
+          - SVGs contain no remote resources or scripts.
+          - Phase 12 content remains the authority for operating status.
+          MD
+
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('scripts/qa-site.mjs'); s=p.read_text()
+          marker="\nif(errors.length){console.error('\\nTECHNICAL QA FAILED');"
+          assert marker in s
+          block=r'''
+
+          // Phase 13 — provenance-safe Technology visual-system guards.
+          {
+            const technology=read('technology.html');const technologyMain=technology.match(/<main\b[\s\S]*?<\/main>/i)?.[0]||'';const visualCss=read('assets/technology-visuals.css');
+            const visualAssets=[
+              ['hero','assets/phase13/technology-hero-system.svg',2400,1350],
+              ['evidence-axis','assets/phase13/evidence-axis-system.svg',1600,900],
+              ['digital-products','assets/phase13/digital-product-development.svg',1600,900],
+              ['venture-advisory','assets/phase13/venture-systems.svg',1600,900],
+              ['content-distribution','assets/phase13/content-distribution-system.svg',1600,900]
+            ];
+            if(/images\.unsplash\.com|https?:\/\//i.test(visualCss))errors.push('Phase 13: Technology visual stylesheet must contain no remote media URLs');
+            if(!visualCss.includes('.subsite-hero.tech:before{background-image:none!important'))errors.push('Phase 13: inherited unverified Technology hero must be explicitly disabled');
+            const tags=[...technologyMain.matchAll(/<img\b[^>]*data-tech-visual=["']([^"']+)["'][^>]*>/gi)].map(m=>m[0]);
+            if(tags.length!==5)errors.push('Phase 13: expected exactly five Technology visual image records, found '+tags.length);
+            const altBan=/best|leading|trusted|customer|client|live platform|production-ready|market leader|award-winning/i;
+            for(const [key,asset,w,h] of visualAssets){
+              if(!files.includes(asset)){errors.push('Phase 13 asset missing -> '+asset);continue}
+              const svg=read(asset);
+              if(!new RegExp('<svg[^>]*width=["\']'+w+'["\'][^>]*height=["\']'+h+'["\'][^>]*viewBox=["\']0 0 '+w+' '+h+'["\']','i').test(svg))errors.push('Phase 13 SVG intrinsic dimensions/viewBox invalid -> '+asset);
+              if(/https?:\/\/|<script\b|<image\b[^>]*(?:href|xlink:href)=/i.test(svg))errors.push('Phase 13 SVG must not load remote/scripted content -> '+asset);
+              if(fs.statSync(path.join(root,asset)).size>80000)errors.push('Phase 13 SVG unexpectedly large -> '+asset);
+              const tag=tags.find(t=>attr(t,'data-tech-visual')===key)||'';
+              if(!tag){errors.push('technology.html: Phase 13 visual tag missing -> '+key);continue}
+              if(attr(tag,'src')!==asset)errors.push('technology.html: Phase 13 visual src mismatch -> '+key);
+              if(Number(attr(tag,'width'))!==w||Number(attr(tag,'height'))!==h)errors.push('technology.html: Phase 13 width/height attributes mismatch -> '+key);
+              const alt=attr(tag,'alt');if(!alt||altBan.test(alt))errors.push('technology.html: Phase 13 alt text missing or claim-bearing -> '+key);
+              if(key!=='hero'&&attr(tag,'loading')!=='lazy')errors.push('technology.html: below-fold Phase 13 visual must lazy-load -> '+key);
+              if(attr(tag,'decoding')!=='async')errors.push('technology.html: Phase 13 visual must decode async -> '+key);
+            }
+            for(const token of ['01 / Technology &amp; Intelligence','02 / Evidence-Driven Intelligence','03 / Digital Product Development','04 / Business / Venture Systems','05 / Content &amp; Distribution Systems','06 / How Technology Fits the Group','07 / Portfolio / Next Step','a specialist venture within the Unique Holding portfolio','YEKI HAST is a development-stage digital product','Industrial activity continues. Technology expands the operating range.'])if(!technologyMain.includes(token))errors.push('Phase 13: Phase 12 content lock regression -> '+token);
+            if(!fs.existsSync(path.join(root,'docs/qa/phase13-technology-visual-provenance.md')))errors.push('Phase 13 provenance record missing');
+            const provenance=read('docs/qa/phase13-technology-visual-provenance.md');
+            for(const token of ['UNVERIFIED','REMOVE','ILLUSTRATIVE','technology-hero-system.svg','evidence-axis-system.svg','digital-product-development.svg','venture-systems.svg','content-distribution-system.svg'])if(!provenance.includes(token))errors.push('Phase 13 provenance record incomplete -> '+token);
+            const sales=read('sales.html');for(const token of ['01 / Product','02 / Grade / Specification','03 / Quantity','04 / Destination','05 / Timing','06 / Specification / Technical Requirement','07 / Contact','sales@uniqueholding.com.tr','mailto:sales@uniqueholding.com.tr?subject='])if(!sales.includes(token))errors.push('Phase 13: Phase 11 RFQ lock regression -> '+token);
+            const p09=read('products.html');const refs=(p09.match(/data-destination="reference-detail"/g)||[]).length;const inquiries=(p09.match(/data-destination="inquiry-detail"/g)||[]).length;if(refs!==3||inquiries!==62)errors.push('Phase 13: Phase 09 3/62 classification regression');
+            const releaseBlocker={id:'RELEASE-BLOCKER-HTTPS-001',status:'OPEN'};if(releaseBlocker.status!=='OPEN')errors.push('Phase 13: RELEASE-BLOCKER-HTTPS-001 must remain OPEN');
+          }
+          '''
+          s=s.replace(marker,block+marker)
+          s=s.replace('Phase 09/10/11/12 guards passed; protected film hashes verified.','Phase 09/10/11/12/13 guards passed; protected film hashes verified.')
+          p.write_text(s)
+          PY
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import re,html,subprocess
+          base='1ecb43028b3b50b3a44e0b86f0cdef7b671f164f'
+          old=subprocess.check_output(['git','show',f'{base}:technology.html'],text=True)
+          new=Path('technology.html').read_text()
+          def visible(x):
+              m=re.search(r'<main\b[\s\S]*?</main>',x,re.I); x=m.group(0)
+              x=re.sub(r'<[^>]+>',' ',x); x=html.unescape(x); return re.sub(r'\s+',' ',x).strip()
+          assert visible(old)==visible(new), 'Phase 12 visible Technology content changed in Phase 13'
+          print('PHASE 12 VISIBLE CONTENT LOCK: PASS')
+          PY
+
+          node scripts/qa-site.mjs
+          git add technology.html assets/technology-visuals.css assets/phase13 docs/qa/phase13-technology-visual-provenance.md scripts/qa-site.mjs
+          EXPECTED=$'assets/phase13/content-distribution-system.svg\nassets/phase13/digital-product-development.svg\nassets/phase13/evidence-axis-system.svg\nassets/phase13/technology-hero-system.svg\nassets/phase13/venture-systems.svg\nassets/technology-visuals.css\ndocs/qa/phase13-technology-visual-provenance.md\nscripts/qa-site.mjs\ntechnology.html'
+          test "$(git diff --cached --name-only | sort)" = "$EXPECTED"
+          git diff --exit-code "$BASE" -- sales.html product.html products.html energy.html urea-46.html caustic-soda-solid.html sodium-sulphate-anhydrous.html index.html assets/site.css assets/internal.css assets/technology-content.css assets/media/unique-holding-film-720p.mp4 assets/media/unique-holding-caption.vtt evidence-axis.html ventures.html
+          git commit -m "PHASE 13 — Establish provenance-safe technology visual proof"
+          PRODUCT=$(git rev-parse HEAD)
+          test "$(git rev-parse HEAD^)" = "$BASE"
+          test "$(git diff-tree --no-commit-id --name-only -r "$PRODUCT" | sort)" = "$EXPECTED"
+          echo "PRODUCT_SHA=$PRODUCT"
+          git push origin HEAD:refs/heads/phase13-tech-candidate --force
