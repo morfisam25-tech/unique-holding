@@ -1,24 +1,51 @@
-name: Phase 17 policy visual diagnostic
+name: Phase 17 semantic policy diagnostic
 on:
   push:
     branches: [phase17-privacy-qa-runner]
-    paths: ['.github/workflows/phase17-policy-debug.yml']
+    paths:
+      - '.github/workflows/phase17-policy-debug.yml'
+      - '.github/phase17/phase17-policy-debug.cjs'
 permissions:
   contents: read
 jobs:
   debug:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - name: Prepare immutable diagnostic
+      - name: Checkout QA harness
+        uses: actions/checkout@v4
+        with:
+          ref: phase17-privacy-qa-runner
+          path: qa-harness
+          fetch-depth: 1
+      - name: Checkout exact immutable Phase 17 product
+        uses: actions/checkout@v4
+        with:
+          ref: db2e8b9134f7bac4b825bc5ac07301f19499237e
+          path: product
+          fetch-depth: 1
+      - name: Verify exact product SHA and prepare browser
+        working-directory: product
         run: |
-          cp .github/phase17/phase17-policy-debug.cjs /tmp/phase17-policy-debug.cjs
-          git checkout --force db2e8b9134f7bac4b825bc5ac07301f19499237e
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "db2e8b9134f7bac4b825bc5ac07301f19499237e"
+          printf 'DIAGNOSTIC_PRODUCT_SHA=%s\n' "$(git rev-parse HEAD)"
+          cp ../qa-harness/.github/phase17/phase17-policy-debug.cjs /tmp/phase17-policy-debug.cjs
           CHROME="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium)"
           echo "CHROME=$CHROME" >> "$GITHUB_ENV"
           npm install --no-save --ignore-scripts puppeteer-core@24.16.0
-      - name: Run targeted 10-case policy diagnostic
+      - name: Run targeted semantic 10-case policy diagnostic
+        working-directory: product
         run: |
-          python3 -m http.server 8000 --bind 127.0.0.1 >/tmp/server.log 2>&1 &
+          set -euo pipefail
+          python3 -m http.server 8000 --bind 127.0.0.1 >/tmp/phase17-policy-server.log 2>&1 &
           PID=$!; trap 'kill $PID || true' EXIT; sleep 1
-          NODE_PATH="$PWD/node_modules" CHROME="$CHROME" node /tmp/phase17-policy-debug.cjs
+          OUT_DIR=phase17-policy-diagnostic NODE_PATH="$PWD/node_modules" CHROME="$CHROME" node /tmp/phase17-policy-debug.cjs | tee phase17-policy-diagnostic-console.log
+      - name: Upload targeted policy diagnostic
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase17-semantic-policy-diagnostic
+          path: |
+            product/phase17-policy-diagnostic
+            product/phase17-policy-diagnostic-console.log
+          if-no-files-found: error
