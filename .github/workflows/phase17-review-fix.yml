@@ -1,4 +1,4 @@
-name: Phase 17 privacy legal final review
+name: Phase 17 privacy legal corrected final review
 on:
   push:
     branches: [phase17-privacy-qa-runner]
@@ -12,23 +12,65 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Verify immutable Phase 17 product snapshot
+      - name: Verify immutable corrected Phase 17 product snapshot
         run: |
           set -euo pipefail
           cp .github/phase17/phase17-browser-qa.cjs /tmp/phase17-browser-qa.cjs
-          PRODUCT=db2e8b9134f7bac4b825bc5ac07301f19499237e
+          PRODUCT=1b788f558154db77f5d9ad73d97a470cac3ef07f
+          INITIAL=db2e8b9134f7bac4b825bc5ac07301f19499237e
           BASE=b4cc37d001164dca6fc034caf997507b64f2eefe
-          test "$(git rev-parse ${PRODUCT}^)" = "$BASE"
-          test "$(git rev-list --count ${BASE}..${PRODUCT})" = "1"
+          test "$(git rev-parse ${PRODUCT}^)" = "$INITIAL"
+          test "$(git rev-parse ${INITIAL}^)" = "$BASE"
+          test "$(git rev-list --count ${BASE}..${PRODUCT})" = "2"
           EXPECTED=$'assets/legal.css\ndocs/qa/phase17-privacy-legal-audit.md\ndocs/qa/phase17-site-data-flow-inventory.md\nlegal.html\nprivacy.html\nscripts/qa-site.mjs'
-          test "$(git diff-tree --no-commit-id --name-only -r "$PRODUCT" | sort)" = "$EXPECTED"
+          test "$(git diff --name-only "$BASE" "$PRODUCT" | sort)" = "$EXPECTED"
+          test "$(git diff-tree --no-commit-id --name-only -r "$PRODUCT" | sort)" = "assets/legal.css"
           git diff --exit-code "$BASE" "$PRODUCT" -- contact.html assets/contact.css ventures.html assets/ventures.css evidence-axis.html assets/evidence-axis-bridge.css technology.html assets/technology-content.css assets/technology-visuals.css sales.html product.html products.html energy.html urea-46.html caustic-soda-solid.html sodium-sulphate-anhydrous.html index.html assets/site.css assets/internal.css assets/media/unique-holding-film-720p.mp4 assets/media/unique-holding-caption.vtt
           git checkout --force "$PRODUCT"
+          test "$(git rev-parse HEAD)" = "$PRODUCT"
           mkdir -p phase17-review/reports
           node scripts/qa-site.mjs | tee phase17-review/reports/qa-site.log
           cp docs/qa/phase17-privacy-legal-audit.md phase17-review/reports/privacy-legal-audit.md
           cp docs/qa/phase17-site-data-flow-inventory.md phase17-review/reports/site-data-flow-inventory.md
           printf '%s\n' '{"id":"RELEASE-BLOCKER-HTTPS-001","status":"OPEN","note":"CUSTOM DOMAIN HTTPS / Not Secure remains open. Phase 17 did not change deployment, DNS or certificate infrastructure and does not describe transmission as secure or encrypted."}' > phase17-review/reports/release-blocker.json
+          cat > phase17-review/reports/product-correction.md <<'EOF'
+          # Phase 17 product correction record
+
+          Initial candidate: `db2e8b9134f7bac4b825bc5ac07301f19499237e`
+
+          Corrected candidate: `1b788f558154db77f5d9ad73d97a470cac3ef07f`
+
+          The reviewer-predicted original 20 failures were QA false positives caused by classifying hero metadata paragraphs as body copy. After that harness defect was corrected, semantic browser measurement independently demonstrated two genuine mobile accessibility defects: substantive Privacy/Legal prose rendered at 15px instead of the required 16px, and standalone contact-panel actions rendered at 24px height instead of the required 40px. The product correction is one CSS-only follow-up commit touching only `assets/legal.css`. No wording, HTML, routing, privacy fact, legal-review boundary, RFQ behavior, deployment, film, or other product route changed.
+          EOF
+      - name: Correct full-suite policy semantics in QA copy only
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          p=Path('/tmp/phase17-browser-qa.cjs')
+          s=p.read_text()
+          new_metrics=r'''async function policyMetrics(page){return page.evaluate(()=>{const rect=e=>{if(!e)return null;const r=e.getBoundingClientRect();return{x:r.x,right:r.right,width:r.width,height:r.height,bottom:r.bottom}};const styleMetric=e=>{const cs=getComputedStyle(e),r=e.getBoundingClientRect();return{text:e.textContent.trim().replace(/\s+/g,' ').slice(0,120),cls:e.className||'',size:parseFloat(cs.fontSize),line:cs.lineHeight==='normal'?0:parseFloat(cs.lineHeight)||0,width:r.width,...rect(e)}};const bodySel='.legal-hero .intro,.legal-policy-section .section-cap > p,.legal-card p,.legal-split p,.legal-callout p,.legal-review-grid p,.legal-contact-panel p';const metaSel='.subsite-label,.legal-kicker,.legal-label,.section-cap .num,.legal-card > span,.legal-review-grid strong,.legal-callout > strong';const body=[...document.querySelectorAll(bodySel)].filter(e=>e.textContent.trim()).map(styleMetric);const metadata=[...document.querySelectorAll(metaSel)].filter(e=>e.textContent.trim()).map(styleMetric);const emails=[...document.querySelectorAll('main a[href^="mailto:"]')].map(a=>({text:a.textContent.trim(),...rect(a)}));const phones=[...document.querySelectorAll('main a[href^="tel:"]')].map(a=>({text:a.textContent.trim(),...rect(a)}));const actions=[...new Set([...document.querySelectorAll('main .button-link'),...document.querySelectorAll('main .legal-link-row a'),...document.querySelectorAll('main .legal-contact-panel a')])].map(a=>({text:a.textContent.trim(),href:a.getAttribute('href')||'',...rect(a)}));const sectionCaps=[...document.querySelectorAll('main .legal-policy-section .section-cap')].map(rect);const company=[...document.querySelectorAll('main strong')].find(e=>e.textContent.includes('UNIQE OTOMOTİV'))||null;const address=document.querySelector('main address');return{body,metadata,emails,phones,actions,sectionCaps,company:rect(company),address:rect(address),lastUpdated:document.querySelector('main')?.innerText.includes('1 September 2026')||false,heroBefore:getComputedStyle(document.querySelector('.legal-hero'),'::before').backgroundImage}})}'''
+          s,n=re.subn(r"async function policyMetrics\(page\)\{.*?\}\n\(async\(\)=>",new_metrics+'\n(async()=>',s,count=1,flags=re.S)
+          assert n==1, f'policyMetrics replacement count {n}'
+          new_loop=r'''// 1) Primary five-viewport semantic visual/readability QA: privacy + legal = 10 cases.
+          for(const route of ['privacy.html','legal.html'])for(const [w,h] of policyViewports){const scope=`${route}-${w}x${h}`;const{ctx,page,e}=await newPage(browser,w,h);const nav=await go(page,route);ok([200,304].includes(nav.status),scope,'policy route status',{nav});await shell(page,scope,w);const m=await policyMetrics(page);const bodyMin=Math.min(...m.body.map(p=>p.size));const metadataMin=Math.min(...m.metadata.map(p=>p.size));const lineMin=Math.min(...m.body.map(p=>p.line).filter(Number.isFinite));const contentTextMeasureMax=Math.max(...m.body.map(p=>p.width));const sectionContainerWidthMax=Math.max(...m.sectionCaps.map(c=>c.width));const required=w<=390?16:15;ok(m.lastUpdated,scope,'last-updated date missing');ok(!/url\(/i.test(m.heroBefore),scope,'remote/inherited hero image still rendered',{heroBefore:m.heroBefore});for(const p of m.body)ok(p.size+0.01>=required,scope,'legal semantic body text below required rendered size',{required,p});for(const p of m.body)ok(p.width<=Math.min(w,1000)+2,scope,'legal prose text measure too wide',{p});for(const a of [...m.emails,...m.phones])ok(a.x>=-1&&a.right<=w+1,scope,'contact text clipped',{a});if(m.company)ok(m.company.x>=-1&&m.company.right<=w+1,scope,'company name clipped',{company:m.company});if(m.address)ok(m.address.x>=-1&&m.address.right<=w+1,scope,'address clipped',{address:m.address});if(w<=390){for(const a of m.actions)ok(a.x>=-1&&a.right<=w+1&&a.height>=40,scope,'mobile standalone action clipped/not touch-safe',{a});report.mobileCases.push({route,w,h,bodyCopyMinFont:bodyMin,metadataLabelMinFont:metadataMin,bodyMinLineHeight:lineMin,contentTextMeasureMax,sectionContainerWidthMax,emails:m.emails,phones:m.phones,actions:m.actions})}ok(e.console.length===0&&e.page.length===0&&e.failed.length===0,scope,'policy browser errors',{e});await page.screenshot({path:path.join(OUT,`screenshots/${route.replace('.html','')}/${route.replace('.html','')}-${w}x${h}.png`),fullPage:true});report.policyCases.push({route,w,h,status:nav.status,bodyCopyMinFont:bodyMin,metadataLabelMinFont:metadataMin,bodyMinLineHeight:lineMin,contentTextMeasureMax,sectionContainerWidthMax,browserErrors:{console:e.console.length,page:e.page.length,failed:e.failed.length}});await ctx.close()}
+          // 2)'''
+          s,n=re.subn(r"// 1\) Primary five-viewport visual/readability QA: privacy \+ legal = 10 cases\..*?// 2\)",new_loop,s,count=1,flags=re.S)
+          assert n==1, f'policy loop replacement count {n}'
+          p.write_text(s)
+          Path('phase17-review/reports/phase17-browser-qa-semantic.cjs').write_text(s)
+          PY
+          grep -q "bodyCopyMinFont" /tmp/phase17-browser-qa.cjs
+          grep -q "metadataLabelMinFont" /tmp/phase17-browser-qa.cjs
+          ! grep -q "document.querySelectorAll('main p')" /tmp/phase17-browser-qa.cjs
+          cat > phase17-review/reports/qa-harness-correction.md <<'EOF'
+          # QA harness correction
+
+          The original Phase 17 full-suite policy metric classified every `main p` as legal body copy. That was semantically wrong because `.subsite-label` / `.legal-kicker` metadata is intentionally small and does not carry substantive legal disclosure.
+
+          The corrected acceptance copy applies rendered-font thresholds only to semantic policy prose: hero `.intro`, section-cap direct prose, legal-card prose, split prose, callout prose, review-grid prose and contact-panel prose. Metadata is measured and reported separately. Mobile standalone controls include button links, legal link-row actions and contact-panel actions; ordinary inline prose links are not promoted to button-target requirements. Prose text measure and section-container width are reported separately.
+          EOF
       - name: Independent compliance and boilerplate sweeps
         run: |
           set -euo pipefail
@@ -49,11 +91,11 @@ jobs:
       - name: Write review summary
         run: |
           node <<'NODE'
-          const fs=require('fs');const r=JSON.parse(fs.readFileSync('phase17-review/reports/phase17-browser-report.json'));const summary={phase:'17',status:r.failures.length?'FAILED':'READY FOR EXTERNAL REVIEW',baseline:'b4cc37d001164dca6fc034caf997507b64f2eefe',newSha:'db2e8b9134f7bac4b825bc5ac07301f19499237e',browser:r.summary,routing:{reference:3,inquiry:62,invalid:0},legalReview:['LEGAL-PRIVACY-001 — FORMAL DATA-CONTROLLER IDENTITY / ARTICLE 10 NOTICE — LEGAL REVIEW REQUIRED','LEGAL-PRIVACY-002 — TURKISH FORMAL NOTICE — LEGAL REVIEW REQUIRED','Legal basis / recipient-transfer / retention / formal rights procedure — LEGAL REVIEW REQUIRED'],phase18:'NOT STARTED',httpsBlocker:'RELEASE-BLOCKER-HTTPS-001 — OPEN'};fs.writeFileSync('phase17-review/reports/summary.json',JSON.stringify(summary,null,2));console.log(JSON.stringify(summary,null,2));if(summary.status==='FAILED')process.exit(2)
+          const fs=require('fs');const r=JSON.parse(fs.readFileSync('phase17-review/reports/phase17-browser-report.json'));const summary={phase:'17',status:r.failures.length?'FAILED':'READY FOR EXTERNAL REVIEW',baseline:'b4cc37d001164dca6fc034caf997507b64f2eefe',initialCandidate:'db2e8b9134f7bac4b825bc5ac07301f19499237e',newSha:'1b788f558154db77f5d9ad73d97a470cac3ef07f',productCommitsInPhase:2,productCorrection:'One CSS-only mobile accessibility correction after semantic QA proved two real defects',browser:r.summary,routing:{reference:3,inquiry:62,invalid:0},legalReview:['LEGAL-PRIVACY-001 — FORMAL DATA-CONTROLLER IDENTITY / ARTICLE 10 NOTICE — LEGAL REVIEW REQUIRED','LEGAL-PRIVACY-002 — TURKISH FORMAL NOTICE — LEGAL REVIEW REQUIRED','Legal basis / recipient-transfer / retention / formal rights procedure — LEGAL REVIEW REQUIRED'],phase18:'NOT STARTED',httpsBlocker:'RELEASE-BLOCKER-HTTPS-001 — OPEN'};fs.writeFileSync('phase17-review/reports/summary.json',JSON.stringify(summary,null,2));console.log(JSON.stringify(summary,null,2));if(summary.status==='FAILED')process.exit(2)
           NODE
       - uses: actions/upload-artifact@v4
         with:
-          name: phase17-privacy-legal-review-final
+          name: phase17-privacy-legal-review-corrected-final
           path: phase17-review/
           if-no-files-found: error
           compression-level: 6
