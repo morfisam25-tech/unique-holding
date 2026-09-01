@@ -1,0 +1,29 @@
+name: Phase 14 proof-audit guard correction
+on:
+  push:
+    branches: [phase14-axis-build-runner]
+    paths:
+      - '.github/workflows/phase14-axis-build-fix.yml'
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Re-run Phase 14 builder with explicit PRIVATE classification
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          src=Path('.github/workflows/phase14-axis-build.yml').read_text().splitlines()
+          start=next(i for i,l in enumerate(src) if l.strip()=='run: |')+1
+          body='\n'.join((l[10:] if l.startswith('          ') else l) for l in src[start:])+'\n'
+          old='## Private material exclusion'
+          new='## PRIVATE material exclusion'
+          assert old in body
+          Path('/tmp/phase14-build.sh').write_text(body.replace(old,new))
+          PY
+          bash /tmp/phase14-build.sh
