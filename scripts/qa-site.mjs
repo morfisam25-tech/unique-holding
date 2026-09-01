@@ -442,5 +442,44 @@ if(!products.includes('aria-live="polite"'))errors.push('products.html: Phase 09
   const releaseBlocker={id:'RELEASE-BLOCKER-HTTPS-001',status:'OPEN'};if(releaseBlocker.status!=='OPEN')errors.push('Phase 12: RELEASE-BLOCKER-HTTPS-001 must remain OPEN');
 }
 
+
+// Phase 13 — provenance-safe Technology visual-system guards.
+{
+  const technology=read('technology.html');const technologyMain=technology.match(/<main\b[\s\S]*?<\/main>/i)?.[0]||'';const visualCss=read('assets/technology-visuals.css');
+  const visualAssets=[
+    ['hero','assets/phase13/technology-hero-system.svg',2400,1350],
+    ['evidence-axis','assets/phase13/evidence-axis-system.svg',1600,900],
+    ['digital-products','assets/phase13/digital-product-development.svg',1600,900],
+    ['venture-advisory','assets/phase13/venture-systems.svg',1600,900],
+    ['content-distribution','assets/phase13/content-distribution-system.svg',1600,900]
+  ];
+  if(/images\.unsplash\.com|https?:\/\//i.test(visualCss))errors.push('Phase 13: Technology visual stylesheet must contain no remote media URLs');
+  if(!visualCss.includes('.subsite-hero.tech:before{background-image:none!important'))errors.push('Phase 13: inherited unverified Technology hero must be explicitly disabled');
+  const tags=[...technologyMain.matchAll(/<img\b[^>]*data-tech-visual=["']([^"']+)["'][^>]*>/gi)].map(m=>m[0]);
+  if(tags.length!==5)errors.push('Phase 13: expected exactly five Technology visual image records, found '+tags.length);
+  const altBan=/best|leading|trusted|customer|client|live platform|production-ready|market leader|award-winning/i;
+  for(const [key,asset,w,h] of visualAssets){
+    if(!files.includes(asset)){errors.push('Phase 13 asset missing -> '+asset);continue}
+    const svg=read(asset);
+    if(!new RegExp('<svg[^>]*width=["\']'+w+'["\'][^>]*height=["\']'+h+'["\'][^>]*viewBox=["\']0 0 '+w+' '+h+'["\']','i').test(svg))errors.push('Phase 13 SVG intrinsic dimensions/viewBox invalid -> '+asset);
+    if(/<script\b|(?:href|xlink:href)=[\"']https?:\/\//i.test(svg))errors.push('Phase 13 SVG must not load remote/scripted content -> '+asset);
+    if(fs.statSync(path.join(root,asset)).size>80000)errors.push('Phase 13 SVG unexpectedly large -> '+asset);
+    const tag=tags.find(t=>attr(t,'data-tech-visual')===key)||'';
+    if(!tag){errors.push('technology.html: Phase 13 visual tag missing -> '+key);continue}
+    if(attr(tag,'src')!==asset)errors.push('technology.html: Phase 13 visual src mismatch -> '+key);
+    if(Number(attr(tag,'width'))!==w||Number(attr(tag,'height'))!==h)errors.push('technology.html: Phase 13 width/height attributes mismatch -> '+key);
+    const alt=attr(tag,'alt');if(!alt||altBan.test(alt))errors.push('technology.html: Phase 13 alt text missing or claim-bearing -> '+key);
+    if(key!=='hero'&&attr(tag,'loading')!=='lazy')errors.push('technology.html: below-fold Phase 13 visual must lazy-load -> '+key);
+    if(attr(tag,'decoding')!=='async')errors.push('technology.html: Phase 13 visual must decode async -> '+key);
+  }
+  for(const token of ['01 / Technology &amp; Intelligence','02 / Evidence-Driven Intelligence','03 / Digital Product Development','04 / Business / Venture Systems','05 / Content &amp; Distribution Systems','06 / How Technology Fits the Group','07 / Portfolio / Next Step','a specialist venture within the Unique Holding portfolio','YEKI HAST is a development-stage digital product','Industrial activity continues. Technology expands the operating range.'])if(!technologyMain.includes(token))errors.push('Phase 13: Phase 12 content lock regression -> '+token);
+  if(!fs.existsSync(path.join(root,'docs/qa/phase13-technology-visual-provenance.md')))errors.push('Phase 13 provenance record missing');
+  const provenance=read('docs/qa/phase13-technology-visual-provenance.md');
+  for(const token of ['UNVERIFIED','REMOVE','ILLUSTRATIVE','technology-hero-system.svg','evidence-axis-system.svg','digital-product-development.svg','venture-systems.svg','content-distribution-system.svg'])if(!provenance.includes(token))errors.push('Phase 13 provenance record incomplete -> '+token);
+  const sales=read('sales.html');for(const token of ['01 / Product','02 / Grade / Specification','03 / Quantity','04 / Destination','05 / Timing','06 / Specification / Technical Requirement','07 / Contact','sales@uniqueholding.com.tr','mailto:sales@uniqueholding.com.tr?subject='])if(!sales.includes(token))errors.push('Phase 13: Phase 11 RFQ lock regression -> '+token);
+  const p09=read('products.html');const refs=(p09.match(/data-destination="reference-detail"/g)||[]).length;const inquiries=(p09.match(/data-destination="inquiry-detail"/g)||[]).length;if(refs!==3||inquiries!==62)errors.push('Phase 13: Phase 09 3/62 classification regression');
+  const releaseBlocker={id:'RELEASE-BLOCKER-HTTPS-001',status:'OPEN'};if(releaseBlocker.status!=='OPEN')errors.push('Phase 13: RELEASE-BLOCKER-HTTPS-001 must remain OPEN');
+}
+
 if(errors.length){console.error('\nTECHNICAL QA FAILED');for(const e of errors)console.error(' - '+e);process.exit(1)}
-console.log('TECHNICAL QA PASS — '+htmlFiles.length+' HTML, '+jsFiles.length+' JS, '+cssFiles.length+' CSS files checked; '+urls.length+' sitemap URLs verified; Phase 09/10/11/12 guards passed; protected film hashes verified.');
+console.log('TECHNICAL QA PASS — '+htmlFiles.length+' HTML, '+jsFiles.length+' JS, '+cssFiles.length+' CSS files checked; '+urls.length+' sitemap URLs verified; Phase 09/10/11/12/13 guards passed; protected film hashes verified.');

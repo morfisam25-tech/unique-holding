@@ -1,29 +1,34 @@
 @layer page{
-/* Technology card photography and hierarchy. Existing four image sources retained. */
-.tech-overview-card{position:relative;isolation:isolate;overflow:hidden;min-height:340px;background-color:#0b0e0f;background-repeat:no-repeat;background-size:cover;background-position:center;}
-.tech-overview-card::before{content:"";position:absolute;inset:0;z-index:0;background:linear-gradient(180deg,rgba(3,5,6,.24) 0%,rgba(3,5,6,.52) 43%,rgba(3,5,6,.94) 100%),linear-gradient(90deg,rgba(3,5,6,.38),transparent 68%);pointer-events:none;}
-.tech-overview-card>*{position:relative;z-index:1;}
-.tech-overview-card .k{color:#ff7a32;text-shadow:0 1px 12px rgba(0,0,0,.55);}
-.tech-overview-card h3{color:#f4f0e8;text-shadow:0 2px 18px rgba(0,0,0,.72);margin-top:auto;padding-top:84px;}
-.tech-overview-card p{color:#d0d4d5;text-shadow:0 1px 12px rgba(0,0,0,.7);}
-.tech-overview-card b{color:#ff7a32;}
-.route-card.tech-overview-card:hover{filter:brightness(1.06);}
+/* Phase 13 — provenance-safe Technology visuals. No remote imagery. */
+.subsite-hero.tech:before{background-image:none!important;background:#080a0b!important}
+.tech-phase13-hero-visual{position:absolute;inset:0;z-index:0;overflow:hidden;background:#080a0b}
+.tech-phase13-hero-visual:after{content:"";position:absolute;inset:0;background:radial-gradient(circle at 73% 42%,rgba(255,122,50,.08),transparent 28%),linear-gradient(90deg,rgba(3,5,6,.22),rgba(3,5,6,.08) 60%,rgba(3,5,6,.2));pointer-events:none}
+.tech-phase13-hero-visual img{display:block;width:100%;height:100%;object-fit:cover;object-position:50% 50%;filter:saturate(.92) contrast(1.04)}
+.subsite-hero.tech:after{z-index:1;background:linear-gradient(90deg,rgba(3,5,6,.88),rgba(3,5,6,.45) 57%,rgba(3,5,6,.22)),linear-gradient(0deg,rgba(3,5,6,.9),transparent 58%)}
+.subsite-hero.tech .inner{z-index:2}
 
-.route-card.tech-card--evidence-axis,
-.route-card.tech-card--evidence-axis:hover{background-image:url('https://images.unsplash.com/photo-1782330299430-9aa9e8f3bc39?auto=format&fit=crop&fm=jpg&ixlib=rb-4.1.0&q=82&w=1800');background-position:center 48%;}
-.tech-card--evidence-axis::after{content:"EVIDENCE AXIS  /  SPECIALIST INTELLIGENCE";position:absolute;z-index:1;right:22px;top:24px;max-width:180px;color:rgba(244,240,232,.72);font-size:7px;line-height:1.45;letter-spacing:.22em;text-align:right;text-transform:uppercase;padding-right:12px;border-right:1px solid rgba(255,122,50,.75);pointer-events:none;}
+.tech-overview-card{position:relative;isolation:isolate;overflow:hidden;min-height:340px;background:#0b0e0f!important;background-image:none!important}
+.tech-overview-card>.tech-card-media{position:absolute;inset:0;z-index:0;display:block;overflow:hidden;background:#0a0d0e}
+.tech-card-media img{display:block;width:100%;height:100%;object-fit:cover;object-position:50% 50%;opacity:.9;filter:saturate(.92) contrast(1.06)}
+.tech-overview-card::before{content:"";position:absolute;inset:0;z-index:1;background:linear-gradient(180deg,rgba(3,5,6,.18) 0%,rgba(3,5,6,.5) 42%,rgba(3,5,6,.96) 100%),linear-gradient(90deg,rgba(3,5,6,.38),transparent 72%);pointer-events:none}
+.tech-overview-card>*:not(.tech-card-media){position:relative;z-index:2}
+.tech-overview-card .k{color:#ff7a32;text-shadow:0 1px 12px rgba(0,0,0,.55)}
+.tech-overview-card h3{color:#f4f0e8;text-shadow:0 2px 18px rgba(0,0,0,.72);margin-top:auto;padding-top:84px}
+.tech-overview-card p{color:#d0d4d5;text-shadow:0 1px 12px rgba(0,0,0,.7)}
+.tech-overview-card b{color:#ff7a32}
+.route-card.tech-overview-card:hover{filter:brightness(1.04)}
+.tech-card--evidence-axis .tech-card-media img{object-position:50% 48%;opacity:.96}
+.tech-card--digital-products .tech-card-media img{object-position:50% 50%;opacity:.88}
+.tech-card--advisory .tech-card-media img{object-position:50% 50%;opacity:.86}
+.tech-card--content .tech-card-media img{object-position:50% 52%;opacity:.88}
+.tech-card--evidence-axis::after{content:"EVIDENCE AXIS  /  SPECIALIST INTELLIGENCE";position:absolute;z-index:2;right:22px;top:24px;max-width:180px;color:rgba(244,240,232,.72);font-size:7px;line-height:1.45;letter-spacing:.22em;text-align:right;text-transform:uppercase;padding-right:12px;border-right:1px solid rgba(255,122,50,.75);pointer-events:none}
 
-.tech-card--digital-products{background-image:url('https://images.unsplash.com/photo-1771923082503-0a3381c46cef?auto=format&fit=crop&fm=jpg&ixlib=rb-4.1.0&q=82&w=1800');background-position:center 50%;}
-.tech-card--advisory{background-image:url('https://images.unsplash.com/photo-1758876202980-0a28b744fb24?auto=format&fit=crop&fm=jpg&ixlib=rb-4.1.0&q=82&w=1800');background-position:center 44%;}
-.tech-card--content{background-image:url('https://images.unsplash.com/photo-1627244714766-94dab62ed964?auto=format&fit=crop&fm=jpg&ixlib=rb-4.1.0&q=82&w=1800');background-position:center 52%;}
-
-.tech-primary-grid .tech-overview-card{min-height:390px;}
-.tech-capability-grid .tech-overview-card{min-height:280px;}
-.tech-capability-grid .tech-overview-card h3{padding-top:48px;font-size:30px;}
-.tech-capability-grid .tech-overview-card::before{background:linear-gradient(180deg,rgba(3,5,6,.38) 0%,rgba(3,5,6,.64) 45%,rgba(3,5,6,.96) 100%);}
-.tech-product-visual{min-height:520px;border-left:1px solid rgba(255,255,255,.14);}
-.tech-product-visual::after{content:"VENTURE DEVELOPMENT  /  SELECTIVE PRODUCT BUILDING";position:absolute;z-index:1;right:22px;top:24px;max-width:190px;color:rgba(244,240,232,.72);font-size:7px;line-height:1.45;letter-spacing:.22em;text-align:right;text-transform:uppercase;padding-right:12px;border-right:1px solid rgba(255,122,50,.75);}
-
-@media(max-width:1100px){.tech-overview-card{min-height:320px}.tech-overview-card h3{padding-top:70px}.tech-primary-grid .tech-overview-card{min-height:350px}.tech-product-visual{min-height:420px}}
-@media(max-width:760px){.tech-overview-card,.tech-primary-grid .tech-overview-card,.tech-capability-grid .tech-overview-card{min-height:300px;background-position:center}.tech-overview-card h3,.tech-capability-grid .tech-overview-card h3{padding-top:64px}.tech-card--evidence-axis::after{right:18px;top:20px;max-width:150px;font-size:6px}.tech-product-visual{min-height:320px;border-left:0;border-top:1px solid rgba(255,255,255,.14)}}
+@media(max-width:1100px){.tech-overview-card{min-height:320px}.tech-overview-card h3{padding-top:70px}}
+@media(max-width:760px){
+  .tech-phase13-hero-visual img{object-position:50% 50%}
+  .tech-overview-card{min-height:300px}
+  .tech-overview-card h3{padding-top:64px}
+  .tech-card-media img{object-position:50% 50%}
+  .tech-card--evidence-axis::after{right:18px;top:20px;max-width:150px;font-size:6px}
+}
 }
