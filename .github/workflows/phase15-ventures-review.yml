@@ -1,0 +1,60 @@
+name: Phase 15 venture portfolio review
+on:
+  push:
+    branches: [phase15-ventures-qa-runner]
+    paths:
+      - '.github/phase15/phase15-browser-qa.cjs'
+      - '.github/workflows/phase15-ventures-review.yml'
+permissions:
+  contents: read
+jobs:
+  review:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify immutable Phase 15 product snapshot
+        run: |
+          set -euo pipefail
+          PRODUCT=3888c84a73cffa15c0ed955e4bdeef9d0a4cd029
+          BASE=def3696a6d69b0762c9c72a765c729c481de3d57
+          cp .github/phase15/phase15-browser-qa.cjs /tmp/phase15-browser-qa.cjs
+          git show origin/phase12-tech-qa-runner:.github/phase12/phase12-browser-qa.cjs > /tmp/phase12-regression.cjs
+          sed -i 's/8ebffede8e6219d1a3a89d8ab9e215a121188556/3888c84a73cffa15c0ed955e4bdeef9d0a4cd029/g; s/af0ede75005c121f7eff2dc60ee3d69170cdef5c/def3696a6d69b0762c9c72a765c729c481de3d57/g' /tmp/phase12-regression.cjs
+          test "$(git rev-parse ${PRODUCT}^)" = "$BASE"
+          EXPECTED=$'assets/ventures.css\ndocs/qa/phase15-yeki-hast-public-evidence.md\nscripts/qa-site.mjs\nventures.html'
+          test "$(git diff-tree --no-commit-id --name-only -r "$PRODUCT" | sort)" = "$EXPECTED"
+          git diff --exit-code "$BASE" "$PRODUCT" -- evidence-axis.html assets/evidence-axis-bridge.css technology.html assets/technology-content.css assets/technology-visuals.css assets/phase13/technology-hero-system.svg assets/phase13/evidence-axis-system.svg assets/phase13/digital-product-development.svg assets/phase13/venture-systems.svg assets/phase13/content-distribution-system.svg sales.html product.html products.html energy.html urea-46.html caustic-soda-solid.html sodium-sulphate-anhydrous.html index.html assets/site.css assets/internal.css assets/media/unique-holding-film-720p.mp4 assets/media/unique-holding-caption.vtt
+          git checkout --force "$PRODUCT"
+          mkdir -p phase15-review/reports phase15-review/regression
+          node scripts/qa-site.mjs | tee phase15-review/reports/qa-site.log
+          printf '%s\n' '{"id":"RELEASE-BLOCKER-HTTPS-001","status":"OPEN","note":"CUSTOM DOMAIN HTTPS / Not Secure remains open. Deployment, DNS and certificate work were not investigated or modified in Phase 15."}' > phase15-review/reports/release-blocker.json
+          cp docs/qa/phase15-yeki-hast-public-evidence.md phase15-review/reports/yeki-hast-public-evidence.md
+      - name: Prepare browser QA
+        run: |
+          set -euo pipefail
+          node --check /tmp/phase15-browser-qa.cjs
+          node --check /tmp/phase12-regression.cjs
+          CHROME="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium)"
+          echo "CHROME=$CHROME" >> "$GITHUB_ENV"
+          npm install --no-save --ignore-scripts puppeteer-core@24.16.0
+      - name: Run Phase 15 acceptance and regressions
+        run: |
+          set -euo pipefail
+          python3 -m http.server 8000 --bind 127.0.0.1 >phase15-review/reports/server.log 2>&1 &
+          PID=$!; trap 'kill $PID || true' EXIT; sleep 1
+          OUT_DIR=phase15-review NODE_PATH="$PWD/node_modules" CHROME="$CHROME" node /tmp/phase15-browser-qa.cjs | tee phase15-review/reports/browser-console.log
+          OUT_DIR=phase15-review/regression NODE_PATH="$PWD/node_modules" CHROME="$CHROME" node /tmp/phase12-regression.cjs | tee phase15-review/reports/regression-console.log
+      - name: Write review summary
+        run: |
+          node <<'NODE'
+          const fs=require('fs');const a=JSON.parse(fs.readFileSync('phase15-review/reports/phase15-browser-report.json'));const r=JSON.parse(fs.readFileSync('phase15-review/regression/reports/browser-report.json'));
+          const summary={phase:'15',status:(a.failures.length||r.failures.length)?'FAILED':'READY FOR EXTERNAL REVIEW',baseline:'def3696a6d69b0762c9c72a765c729c481de3d57',newSha:'3888c84a73cffa15c0ed955e4bdeef9d0a4cd029',ventures:a.summary,regression:r.summary,routing:{reference:3,inquiry:62,invalid:0},phase14:'LOCKED / REGRESSION CHECKED',phase13:'LOCKED / REGRESSION CHECKED',film:'UNCHANGED',phase16:'NOT STARTED',httpsBlocker:'RELEASE-BLOCKER-HTTPS-001 — OPEN'};fs.writeFileSync('phase15-review/reports/summary.json',JSON.stringify(summary,null,2));console.log(JSON.stringify(summary,null,2));if(summary.status==='FAILED')process.exit(2);
+          NODE
+      - name: Upload Phase 15 review packet
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase15-venture-portfolio-yeki-hast-review
+          path: phase15-review/
+          if-no-files-found: error
