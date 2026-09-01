@@ -25,7 +25,8 @@ a=a.replace('- Phase 18 changes only HTML head metadata on the 16 routes. Source
 a=a.replace('- No `meta keywords`, hreflang, SearchAction, Twitter/X account metadata, unverified LinkedIn/Instagram URLs, or social `sameAs` entries were added.', '- No `meta keywords`, hreflang, SearchAction, Twitter/X account metadata, unverified LinkedIn/Instagram URLs, or social `sameAs` entries were added. Legacy JS injection of social metadata and Organization JSON-LD was removed so the final SEO layer is static in source HTML.')
 audit.write_text(a,encoding='utf-8')
 
-# Strengthen the generated Phase 18 QA with a static-source/runtime-injection guard.
+# Strengthen the generated Phase 18 QA with static-source/runtime-injection
+# guards and source-accurate Phase 17 legal-boundary checks.
 qa=root/'scripts/qa-seo.mjs'
 q=qa.read_text(encoding='utf-8')
 needle="for(const file of ['assets/site.js','assets/products-data.js']){const s=read(file);if(/meta\\s*\\[?name\\s*=\\s*[\"']robots|querySelector\\([^)]*robots|setAttribute\\([^)]*robots/i.test(s))fail(`${file}: runtime robots mutation detected`)}"
@@ -33,5 +34,11 @@ replacement_js=needle+"\nconst runtimeSite=read('assets/site.js');for(const rx o
 if needle not in q:
     raise SystemExit('qa-seo runtime guard insertion point missing')
 q=q.replace(needle,replacement_js,1)
+
+old="const phase17Files=['privacy.html','legal.html'];for(const route of phase17Files){const body=read(route).slice(read(route).search(/<body\\b/i));if(!/LEGAL REVIEW REQUIRED/i.test(body))fail(`${route}: Phase 17 legal-review status missing`)}"
+new="const privacyBody=read('privacy.html').slice(read('privacy.html').search(/<body\\b/i));const legalBody=read('legal.html').slice(read('legal.html').search(/<body\\b/i));if(!/Legal review required/i.test(privacyBody))fail('privacy.html: Phase 17 legal-review boundary missing');if(!/does not add an unreviewed governing-law, jurisdiction, warranty, liability, arbitration or browsing-acceptance clause/i.test(legalBody))fail('legal.html: Phase 17 legal boundary missing');if(!/does not create a separate legal entity named [“\"]Unique Holding[”\"]/i.test(legalBody))fail('legal.html: Phase 17 group-entity boundary missing');"
+if old not in q:
+    raise SystemExit('qa-seo Phase 17 legal guard replacement point missing')
+q=q.replace(old,new,1)
 qa.write_text(q,encoding='utf-8')
-print('Runtime SEO injection removed; static-source QA guard installed.')
+print('Runtime SEO injection removed; static-source and Phase 17 boundary QA guards installed.')
