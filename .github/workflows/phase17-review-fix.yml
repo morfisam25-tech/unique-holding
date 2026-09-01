@@ -1,0 +1,59 @@
+name: Phase 17 privacy legal final review
+on:
+  push:
+    branches: [phase17-privacy-qa-runner]
+    paths: ['.github/workflows/phase17-review-fix.yml']
+permissions:
+  contents: read
+jobs:
+  review:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify immutable Phase 17 product snapshot
+        run: |
+          set -euo pipefail
+          cp .github/phase17/phase17-browser-qa.cjs /tmp/phase17-browser-qa.cjs
+          PRODUCT=db2e8b9134f7bac4b825bc5ac07301f19499237e
+          BASE=b4cc37d001164dca6fc034caf997507b64f2eefe
+          test "$(git rev-parse ${PRODUCT}^)" = "$BASE"
+          test "$(git rev-list --count ${BASE}..${PRODUCT})" = "1"
+          EXPECTED=$'assets/legal.css\ndocs/qa/phase17-privacy-legal-audit.md\ndocs/qa/phase17-site-data-flow-inventory.md\nlegal.html\nprivacy.html\nscripts/qa-site.mjs'
+          test "$(git diff-tree --no-commit-id --name-only -r "$PRODUCT" | sort)" = "$EXPECTED"
+          git diff --exit-code "$BASE" "$PRODUCT" -- contact.html assets/contact.css ventures.html assets/ventures.css evidence-axis.html assets/evidence-axis-bridge.css technology.html assets/technology-content.css assets/technology-visuals.css sales.html product.html products.html energy.html urea-46.html caustic-soda-solid.html sodium-sulphate-anhydrous.html index.html assets/site.css assets/internal.css assets/media/unique-holding-film-720p.mp4 assets/media/unique-holding-caption.vtt
+          git checkout --force "$PRODUCT"
+          mkdir -p phase17-review/reports
+          node scripts/qa-site.mjs | tee phase17-review/reports/qa-site.log
+          cp docs/qa/phase17-privacy-legal-audit.md phase17-review/reports/privacy-legal-audit.md
+          cp docs/qa/phase17-site-data-flow-inventory.md phase17-review/reports/site-data-flow-inventory.md
+          printf '%s\n' '{"id":"RELEASE-BLOCKER-HTTPS-001","status":"OPEN","note":"CUSTOM DOMAIN HTTPS / Not Secure remains open. Phase 17 did not change deployment, DNS or certificate infrastructure and does not describe transmission as secure or encrypted."}' > phase17-review/reports/release-blocker.json
+      - name: Independent compliance and boilerplate sweeps
+        run: |
+          set -euo pipefail
+          node <<'NODE' | tee phase17-review/reports/language-sweeps.txt
+          const fs=require('fs');const files=fs.readdirSync('.').filter(x=>x.endsWith('.html'));const compliance=[/KVKK compliant/i,/GDPR compliant/i,/fully compliant/i,/privacy compliant/i,/secure transmission/i,/secure website/i,/encrypted inquiry/i,/we never share/i,/we never transfer/i,/we never retain/i,/data is never stored/i,/all data deleted/i,/\banonymized\b/i,/no personal data processed/i,/no cookies ever/i,/no tracking ever/i];const boiler=[/use at your own risk/i,/no warranties whatsoever/i,/all liability excluded/i,/exclusive jurisdiction/i,/binding arbitration/i,/indemnification/i,/force majeure/i,/terms acceptance by browsing/i];let c=[],b=[];for(const f of files){const s=fs.readFileSync(f,'utf8');for(const rx of compliance)if(rx.test(s))c.push([f,String(rx)]);for(const rx of boiler)if(rx.test(s))b.push([f,String(rx)])}console.log('COMPLIANCE-LANGUAGE HITS='+c.length);console.log('LEGAL-BOILERPLATE HITS='+b.length);if(c.length||b.length){console.log(JSON.stringify({compliance:c,boiler:b},null,2));process.exit(1)}
+          NODE
+      - name: Prepare browser acceptance
+        run: |
+          CHROME="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium)"
+          echo "CHROME=$CHROME" >> "$GITHUB_ENV"
+          npm install --no-save --ignore-scripts puppeteer-core@24.16.0
+      - name: Run Phase 17 acceptance, instrumentation, smoke and crawl
+        run: |
+          set -euo pipefail
+          python3 -m http.server 8000 --bind 127.0.0.1 >phase17-review/reports/server.log 2>&1 &
+          PID=$!; trap 'kill $PID || true' EXIT; sleep 1
+          OUT_DIR=phase17-review NODE_PATH="$PWD/node_modules" CHROME="$CHROME" node /tmp/phase17-browser-qa.cjs | tee phase17-review/reports/browser-console.log
+      - name: Write review summary
+        run: |
+          node <<'NODE'
+          const fs=require('fs');const r=JSON.parse(fs.readFileSync('phase17-review/reports/phase17-browser-report.json'));const summary={phase:'17',status:r.failures.length?'FAILED':'READY FOR EXTERNAL REVIEW',baseline:'b4cc37d001164dca6fc034caf997507b64f2eefe',newSha:'db2e8b9134f7bac4b825bc5ac07301f19499237e',browser:r.summary,routing:{reference:3,inquiry:62,invalid:0},legalReview:['LEGAL-PRIVACY-001 — FORMAL DATA-CONTROLLER IDENTITY / ARTICLE 10 NOTICE — LEGAL REVIEW REQUIRED','LEGAL-PRIVACY-002 — TURKISH FORMAL NOTICE — LEGAL REVIEW REQUIRED','Legal basis / recipient-transfer / retention / formal rights procedure — LEGAL REVIEW REQUIRED'],phase18:'NOT STARTED',httpsBlocker:'RELEASE-BLOCKER-HTTPS-001 — OPEN'};fs.writeFileSync('phase17-review/reports/summary.json',JSON.stringify(summary,null,2));console.log(JSON.stringify(summary,null,2));if(summary.status==='FAILED')process.exit(2)
+          NODE
+      - uses: actions/upload-artifact@v4
+        with:
+          name: phase17-privacy-legal-review-final
+          path: phase17-review/
+          if-no-files-found: error
+          compression-level: 6
