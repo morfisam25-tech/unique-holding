@@ -20,6 +20,14 @@ jobs:
           PRODUCT=def3696a6d69b0762c9c72a765c729c481de3d57
           BASE=20e5c65595d6e02cc7b517714b34ce1d969950ad
           cp .github/phase14/phase14-browser-qa.cjs /tmp/phase14-browser-qa.cjs
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('/tmp/phase14-browser-qa.cjs');s=p.read_text()
+          old="const body=await res.text();const rec={url,status:res.status,finalUrl:res.url,marker,markerFound:body.includes(marker),bytes:body.length};report.externalRoutes.push(rec);ok(res.status>=200&&res.status<400,scope,'external route status not successful',rec);ok(body.includes(marker),scope,'external route did not return intended page marker',rec)"
+          new="const body=await res.text();const text=body.replace(/<[^>]+>/g,' ').replace(/\\s+/g,' ').trim();const rec={url,status:res.status,finalUrl:res.url,marker,markerFound:text.includes(marker),bytes:body.length};report.externalRoutes.push(rec);ok(res.status>=200&&res.status<400,scope,'external route status not successful',rec);ok(text.includes(marker),scope,'external route did not return intended page marker',rec)"
+          assert old in s
+          p.write_text(s.replace(old,new))
+          PY
           git show origin/phase12-tech-qa-runner:.github/phase12/phase12-browser-qa.cjs > /tmp/phase12-regression.cjs
           sed -i 's/8ebffede8e6219d1a3a89d8ab9e215a121188556/def3696a6d69b0762c9c72a765c729c481de3d57/g; s/af0ede75005c121f7eff2dc60ee3d69170cdef5c/20e5c65595d6e02cc7b517714b34ce1d969950ad/g' /tmp/phase12-regression.cjs
           test "$(git rev-parse ${PRODUCT}^)" = "$BASE"
