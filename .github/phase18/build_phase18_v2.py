@@ -21,6 +21,10 @@ mod.ROUTES["ventures.html"]["description"] = "Venture development at Unique Hold
 mod.ROUTES["contact.html"]["title"] = "Contact & Business Routing | Unique Holding"
 mod.ROUTES["contact.html"]["description"] = "Contact Unique Holding through the correct business route for industrial sales, corporate communication, Evidence Axis specialist inquiries, technology or venture context, and the Istanbul office."
 
+# Same meaning as the first-pass wording, without an apostrophe HTML entity so
+# the intentionally small source parser can compare it without ambiguity.
+mod.ROUTES["energy.html"]["description"] = "Energy & Global Trade at Unique Holding covers industrial trading in petrochemicals and chemicals, including import, domestic supply, export and re-export."
+
 
 def main():
     if set(mod.ROUTES) != {p.name for p in mod.ROOT.glob("*.html")}:
