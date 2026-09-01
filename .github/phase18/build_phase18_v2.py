@@ -11,6 +11,16 @@ mod = importlib.util.module_from_spec(SPEC)
 assert SPEC and SPEC.loader
 SPEC.loader.exec_module(mod)
 
+# Preserve approved Phase 12/14/15/16 title/description locks where the
+# existing wording is already unique, accurate and Phase 18 compliant.
+mod.ROUTES["technology.html"]["description"] = "Technology and intelligence at Unique Holding: Evidence Axis, development-stage digital products, venture systems and content/distribution capabilities alongside active industrial operations."
+mod.ROUTES["evidence-axis.html"]["title"] = "Evidence Axis | Competitive Intelligence Venture | Unique Holding"
+mod.ROUTES["evidence-axis.html"]["description"] = "Evidence Axis is a specialist venture within the Unique Holding portfolio. Explore its competitive-intelligence focus, public research sample and specialist website."
+mod.ROUTES["ventures.html"]["title"] = "Venture Development | Unique Holding"
+mod.ROUTES["ventures.html"]["description"] = "Venture development at Unique Holding: Evidence Axis as a specialist operating venture and YEKI HAST as a development-stage digital product under active build."
+mod.ROUTES["contact.html"]["title"] = "Contact & Business Routing | Unique Holding"
+mod.ROUTES["contact.html"]["description"] = "Contact Unique Holding through the correct business route for industrial sales, corporate communication, Evidence Axis specialist inquiries, technology or venture context, and the Istanbul office."
+
 
 def main():
     if set(mod.ROUTES) != {p.name for p in mod.ROOT.glob("*.html")}:
