@@ -1,0 +1,31 @@
+name: Phase 16 contact routing candidate build fix
+on:
+  push:
+    branches: [phase16-contact-build-runner]
+    paths: ['.github/workflows/phase16-contact-build-fix.yml']
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Execute corrected Phase 16 build script
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          src=Path('.github/workflows/phase16-contact-build.yml').read_text().splitlines()
+          start=next(i for i,l in enumerate(src) if l=='        run: |')+1
+          block=[]
+          for l in src[start:]:
+              if l.startswith('          '): block.append(l[10:])
+              elif not l.strip(): block.append('')
+              else: break
+          script='\n'.join(block)+'\n'
+          script=script.replace("'Who do you need to reach?'", "'Who do you<br>need to reach?'")
+          Path('/tmp/phase16-build.sh').write_text(script)
+          PY
+          bash /tmp/phase16-build.sh
