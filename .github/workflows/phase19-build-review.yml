@@ -39,4 +39,4 @@ jobs:
           path: /tmp/phase19-review/
           if-no-files-found: error
           compression-level: 6
-# final full-gate rerun v4: source-vs-runtime classifier fixture integration marker corrected; 8/8 fixtures required before full acceptance
+# final full-gate rerun v5: full acceptance now wired to the fixture-tested source-graph-vs-runtime-graph adjudicator; no legacy v2 classifier
