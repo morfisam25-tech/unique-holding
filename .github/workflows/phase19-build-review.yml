@@ -39,4 +39,4 @@ jobs:
           path: /tmp/phase19-review/
           if-no-files-found: error
           compression-level: 6
-# final full-gate rerun v3: source graph vs runtime graph classifier; 8/8 semantic+actual source fixtures required; no route-specific bypass or stochastic whitelist
+# final full-gate rerun v4: source-vs-runtime classifier fixture integration marker corrected; 8/8 fixtures required before full acceptance
