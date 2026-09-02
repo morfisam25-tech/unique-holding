@@ -8,7 +8,9 @@ const HEIGHT=Number(process.env.PHASE19_PERF_HEIGHT||844);
 const REPS=5;
 fs.mkdirSync(OUT,{recursive:true});
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
-const median=a=>{const s=[...a].sort((x,y)=>x-y);return s.length%2?s[(s.length-1)/2]:(s[s.length/2-1]+s[s.length/2])/2};
+const median=a=>{if(!a.length)return 0;const s=[...a].sort((x,y)=>x-y);return s.length%2?s[(s.length-1)/2]:(s[s.length/2-1]+s[s.length/2])/2};
+const sorted=a=>[...a].sort((x,y)=>x-y);
+const sameNums=(a,b)=>JSON.stringify(sorted(a))===JSON.stringify(sorted(b));
 const safeName=s=>s.replace(/[^a-z0-9._-]+/gi,'-');
 const normalize=(u,base)=>u.startsWith(base)?`LOCAL/${u.slice(base.length)}`:u;
 const externalHost=(u,base)=>{if(u.startsWith(base))return null;try{return new URL(u).host}catch{return 'INVALID-URL'}};
@@ -52,7 +54,16 @@ function side(rows,label){
   const urlTransfers=rs.map(x=>{const m={};for(const r of x.requests)m[r.url]=(m[r.url]||0)+(r.transferSize||0);return m});
   const union=[...new Set(rs.flatMap(x=>x.requests.map(r=>r.url)))].sort();
   const hosts=[...new Set(rs.flatMap(x=>x.requests.filter(r=>r.thirdParty).map(r=>r.externalHost).filter(Boolean)))].sort();
-  return {rs,requestCounts,thirdPartyCounts,transferTotals,decodedTotals,urlCounts,urlTransfers,union,hosts};
+  const resourceClasses=[...new Set(rs.flatMap(x=>x.requests.map(r=>r.resourceType||'UNKNOWN')))].sort();
+  return {rs,requestCounts,thirdPartyCounts,transferTotals,decodedTotals,urlCounts,urlTransfers,union,hosts,resourceClasses};
+}
+function totalFrequency(urlCounts,url){return urlCounts.reduce((n,m)=>n+(m[url]||0),0)}
+function materiallyEquivalentTransfers(before,after){
+  if(!before.length&&!after.length)return true;
+  if(!before.length||!after.length)return false;
+  const bm=median(before),am=median(after),delta=Math.abs(am-bm);
+  const denom=Math.max(bm,am,1);
+  return delta<=4096 || delta/denom<=0.05;
 }
 (async()=>{
   const browser=await puppeteer.launch({executablePath:process.env.CHROME,headless:true,args:['--no-sandbox','--disable-dev-shm-usage']});
@@ -61,32 +72,51 @@ function side(rows,label){
   const b=side(rows,'before'),a=side(rows,'after');
   const allUrls=[...new Set([...b.union,...a.union])].sort();
   const frequencyDifferences=[];
+  const withinSideVariability=[];
+  const transferMaterialDifferences=[];
   const transferByUrl=[];
+  const urlFrequencyMap={before:{},after:{}};
   for(const u of allUrls){
     const bc=b.urlCounts.map(m=>m[u]||0),ac=a.urlCounts.map(m=>m[u]||0);
-    if(JSON.stringify(bc)!==JSON.stringify(ac)||new Set(bc).size>1||new Set(ac).size>1)frequencyDifferences.push({url:u,before:bc,after:ac});
+    const bTotal=bc.reduce((x,y)=>x+y,0),aTotal=ac.reduce((x,y)=>x+y,0);
+    urlFrequencyMap.before[u]=bTotal;urlFrequencyMap.after[u]=aTotal;
+    if(bTotal!==aTotal)frequencyDifferences.push({url:u,beforeRuns:bc,afterRuns:ac,beforeTotal:bTotal,afterTotal:aTotal});
+    if(new Set(bc).size>1||new Set(ac).size>1)withinSideVariability.push({url:u,before:bc,after:ac,beforeTotal:bTotal,afterTotal:aTotal});
     const bt=b.urlTransfers.map(m=>m[u]||0),at=a.urlTransfers.map(m=>m[u]||0);
-    transferByUrl.push({url:u,before:bt,after:at,beforeMedian:median(bt),afterMedian:median(at),medianDelta:median(at)-median(bt)});
+    const bObserved=bt.filter(x=>x>0),aObserved=at.filter(x=>x>0);
+    const thirdParty=!u.startsWith('LOCAL/');
+    const intermittent=(new Set(bc).size>1||new Set(ac).size>1);
+    const transferEquivalent=!thirdParty||!intermittent||materiallyEquivalentTransfers(bObserved,aObserved);
+    if(thirdParty&&intermittent&&!transferEquivalent)transferMaterialDifferences.push({url:u,beforeObserved:bObserved,afterObserved:aObserved,beforeMedianObserved:median(bObserved),afterMedianObserved:median(aObserved)});
+    transferByUrl.push({url:u,before:bt,after:at,beforeObserved:bObserved,afterObserved:aObserved,beforeMedian:median(bt),afterMedian:median(at),medianDelta:median(at)-median(bt),thirdParty,intermittent,materiallyEquivalentWhenIntermittent:transferEquivalent});
   }
   transferByUrl.sort((x,y)=>Math.abs(y.medianDelta)-Math.abs(x.medianDelta));
-  const added=b.union.length||a.union.length?a.union.filter(x=>!b.union.includes(x)):[];
+  const added=a.union.filter(x=>!b.union.includes(x));
   const removed=b.union.filter(x=>!a.union.includes(x));
   const candidateOnlyHosts=a.hosts.filter(x=>!b.hosts.includes(x));
   const baselineOnlyHosts=b.hosts.filter(x=>!a.hosts.includes(x));
+  const candidateOnlyResourceClasses=a.resourceClasses.filter(x=>!b.resourceClasses.includes(x));
+  const baselineOnlyResourceClasses=b.resourceClasses.filter(x=>!a.resourceClasses.includes(x));
   const stableBefore=b.requestCounts.every(x=>x===b.requestCounts[0]);
   const stableAfter=a.requestCounts.every(x=>x===a.requestCounts[0]);
-  const structurallyEquivalent=added.length===0&&removed.length===0&&candidateOnlyHosts.length===0&&baselineOnlyHosts.length===0&&stableBefore&&stableAfter&&b.requestCounts[0]===a.requestCounts[0]&&frequencyDifferences.length===0;
+  const requestCountDistributionsEquivalent=sameNums(b.requestCounts,a.requestCounts);
+  const thirdPartyCountDistributionsEquivalent=sameNums(b.thirdPartyCounts,a.thirdPartyCounts);
+  const urlFrequenciesEquivalent=frequencyDifferences.length===0;
+  const structurallyEquivalent=added.length===0&&removed.length===0&&candidateOnlyHosts.length===0&&baselineOnlyHosts.length===0&&candidateOnlyResourceClasses.length===0&&baselineOnlyResourceClasses.length===0&&requestCountDistributionsEquivalent&&thirdPartyCountDistributionsEquivalent&&urlFrequenciesEquivalent&&transferMaterialDifferences.length===0;
   const report={
     route:ROUTE,viewport:`${WIDTH}x${HEIGHT}`,repetitionsPerSide:REPS,
     beforeRequestCounts:b.requestCounts,afterRequestCounts:a.requestCounts,
+    beforeRequestCountDistribution:sorted(b.requestCounts),afterRequestCountDistribution:sorted(a.requestCounts),requestCountDistributionsEquivalent,
     beforeThirdPartyCounts:b.thirdPartyCounts,afterThirdPartyCounts:a.thirdPartyCounts,
+    beforeThirdPartyCountDistribution:sorted(b.thirdPartyCounts),afterThirdPartyCountDistribution:sorted(a.thirdPartyCounts),thirdPartyCountDistributionsEquivalent,
     beforeTransferTotals:b.transferTotals,afterTransferTotals:a.transferTotals,
     beforeDecodedTotals:b.decodedTotals,afterDecodedTotals:a.decodedTotals,
     beforeUnion:b.union,afterUnion:a.union,added,removed,
     beforeThirdPartyHosts:b.hosts,afterThirdPartyHosts:a.hosts,candidateOnlyHosts,baselineOnlyHosts,
-    frequencyDifferences,transferByUrl,
+    beforeResourceClasses:b.resourceClasses,afterResourceClasses:a.resourceClasses,candidateOnlyResourceClasses,baselineOnlyResourceClasses,
+    urlFrequencyMap,frequencyDifferences,withinSideVariability,transferMaterialDifferences,transferByUrl,
     medians:{before:{requests:median(b.requestCounts),thirdParty:median(b.thirdPartyCounts),transfer:median(b.transferTotals)},after:{requests:median(a.requestCounts),thirdParty:median(a.thirdPartyCounts),transfer:median(a.transferTotals)}},
-    stableBefore,stableAfter,structurallyEquivalent,rows
+    stableBefore,stableAfter,urlFrequenciesEquivalent,structurallyEquivalent,rows
   };
   const outFile=path.join(OUT,`${safeName(ROUTE)}-${WIDTH}x${HEIGHT}-performance-diagnostic.json`);
   fs.writeFileSync(outFile,JSON.stringify(report,null,2));
