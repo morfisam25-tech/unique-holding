@@ -26,7 +26,6 @@ fixes=r'''
 .route-card>.k{color:#984218}
 .sales-boundary>strong{color:#81370f}
 #evidence-driven-intelligence>.section-cap>.num,#content-distribution>.section-cap>.num,#what-it-does>.section-cap>.num,#public-proof>.section-cap>.num,#portfolio-status>.section-cap>.num,#development-discipline>.section-cap>.num,#choose-route>.section-cap>.num,#istanbul-office>.section-cap>.num,#current-flows>.section-cap>.num,#cookies-storage>.section-cap>.num,#external-destinations>.section-cap>.num,#corporate-identity>.section-cap>.num,#offered-lot>.section-cap>.num,#portfolio-boundary>.section-cap>.num{color:#984218}
-.axis-proof-boundary{color:#555b5d}
 .venture-path-step[data-stage-state="explanatory"]>small,.venture-path-step[data-stage-state="future"]>small,.venture-path-note{color:#55585a}
 .venture-path-step[data-stage-state="future"]>span{color:#743819}
 .contact-route-meta>span{color:#555b5d}
@@ -38,16 +37,16 @@ fixes=r'''
 /* Phase 19 fix-only continuation — exact nodes from targeted diagnostic run 33644495235. */
 .tech-next-grid .route-card>.k,
 .ventures-context .route-card>.k{color:#ee6a24}
-.axis-proof-card .axis-proof-boundary{color:#555b5d!important}
 .legal-company-panel .legal-label{color:#984218}
 .legal-policy-body #correspondence .legal-split>div{min-width:0}
 .legal-policy-body #correspondence .legal-split p{overflow-wrap:anywhere}
 }
-/* The homepage sample paragraph is declared !important in the page layer.
+/* These two measured nodes already carry !important declarations in @layer page.
    Important layer precedence is reversed, so the earliest named layer is used
-   narrowly for this one measured node rather than broadening the palette. */
+   narrowly rather than broadening the palette. */
 @layer tokens{
 .home-operating-world--tech .ea-public-sample>p{color:#4f5962!important}
+.axis-proof-card .axis-proof-boundary{color:#555b5d!important}
 }
 '''
 if 'Phase 19 — targeted WCAG contrast corrections' in s: raise SystemExit('Phase 19 contrast block already present unexpectedly')
