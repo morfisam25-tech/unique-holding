@@ -15,7 +15,6 @@ fixes=r'''
 @layer performance{
 .global-footer-company-name>span,.global-footer-bottom{color:#858d8f}
 .home-operating-world--trade .home-kicker,.home-proof .home-kicker,.home-routes .home-kicker{color:#4f5759}
-.ea-public-sample>p{color:#4f5962!important}
 .home-proof__row>span{color:#555d5f}
 .home-route-list>a>span:first-child{color:#5b6365}
 .corp-identity .corp-kicker,.corp-history-grid .corp-kicker,.corp-proof__head .corp-kicker{color:#51595b}
@@ -35,6 +34,20 @@ fixes=r'''
 .contact-office-direct a>small{color:#5f6263}
 .legal-contact-panel .legal-label{color:#ff9a63}
 #external-links .legal-split a[href="privacy.html"]{color:#3f4749}
+
+/* Phase 19 fix-only continuation — exact nodes from targeted diagnostic run 33644495235. */
+.tech-next-grid .route-card>.k,
+.ventures-context .route-card>.k{color:#ee6a24}
+.axis-proof-card .axis-proof-boundary{color:#555b5d!important}
+.legal-company-panel .legal-label{color:#984218}
+.legal-policy-body #correspondence .legal-split>div{min-width:0}
+.legal-policy-body #correspondence .legal-split p{overflow-wrap:anywhere}
+}
+/* The homepage sample paragraph is declared !important in the page layer.
+   Important layer precedence is reversed, so the earliest named layer is used
+   narrowly for this one measured node rather than broadening the palette. */
+@layer tokens{
+.home-operating-world--tech .ea-public-sample>p{color:#4f5962!important}
 }
 '''
 if 'Phase 19 — targeted WCAG contrast corrections' in s: raise SystemExit('Phase 19 contrast block already present unexpectedly')
@@ -72,4 +85,4 @@ const index=fs.readFileSync('index.html','utf8');if(/<aside class="ea-public-sam
 const css=fs.readFileSync('assets/site.css','utf8');if(!css.includes('Phase 19 — targeted WCAG contrast corrections'))fail('contrast correction block missing');
 console.log('PHASE 19 ACCESSIBILITY STATIC QA PASS');
 ''',encoding='utf-8')
-print('Phase 19 candidate built: Phase 02 CSS architecture preserved; duplicate hero-poster preload removed; semantic landmark and contrast defects corrected.')
+print('Phase 19 candidate built: Phase 02 CSS architecture preserved; duplicate hero-poster preload removed; semantic landmark, measured contrast defects and privacy text-spacing overflow corrected.')
