@@ -39,4 +39,4 @@ jobs:
           path: /tmp/phase19-review/
           if-no-files-found: error
           compression-level: 6
-# final full-gate rerun with symmetric Contact/390 and Sales/1440 structural equivalence
+# final full-gate rerun: Contact/390 structural record + documented one-sided Sales/1440 stochastic-resource acceptance; no standalone Sales 5x5
