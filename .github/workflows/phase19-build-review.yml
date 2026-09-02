@@ -1,0 +1,40 @@
+name: Phase 19 build and review
+on:
+  push:
+    branches: ["phase19-build-runner"]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  phase19:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout Phase 19 build harness
+        uses: actions/checkout@v4
+        with:
+          ref: phase19-build-runner
+          path: qa-harness
+          fetch-depth: 1
+      - name: Checkout Phase 19 baseline harness
+        uses: actions/checkout@v4
+        with:
+          ref: phase19-audit-runner
+          path: baseline-harness
+          fetch-depth: 1
+      - name: Checkout exact approved Phase 18 baseline
+        uses: actions/checkout@v4
+        with:
+          ref: 8d2811298c668865f5438f86337c9d8f9d959c80
+          path: product
+          fetch-depth: 0
+      - name: Run gated Phase 19 baseline, build, QA and single commit
+        working-directory: product
+        shell: bash
+        run: bash ../qa-harness/.github/phase19/run_phase19.sh
+      - name: Upload Phase 19 review packet
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase19-review-packet
+          path: /tmp/phase19-review/
+          if-no-files-found: error
+          compression-level: 6
