@@ -32,7 +32,7 @@ jobs:
       - name: Build uncommitted Phase 19 candidate
         working-directory: after-product
         run: python3 ../qa-harness/.github/phase19/build_phase19.py
-      - name: Compare contact request graph across five cold runs
+      - name: Compare Sales desktop request graph across five cold runs
         shell: bash
         run: |
           set -euo pipefail
@@ -47,7 +47,13 @@ jobs:
           trap 'kill "$P1" "$P2" 2>/dev/null || true' EXIT
           sleep 1
           CHROME="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium)"
-          PHASE19_PERF_OUT=/tmp/phase19-perf-diag NODE_PATH=/tmp/phase19-node/node_modules CHROME="$CHROME" node "$GITHUB_WORKSPACE/qa-harness/.github/phase19/targeted_performance.cjs" | tee /tmp/phase19-perf-diag/console.log
+          PHASE19_PERF_OUT=/tmp/phase19-perf-diag \
+          PHASE19_PERF_ROUTE=sales.html \
+          PHASE19_PERF_WIDTH=1440 \
+          PHASE19_PERF_HEIGHT=900 \
+          NODE_PATH=/tmp/phase19-node/node_modules \
+          CHROME="$CHROME" \
+          node "$GITHUB_WORKSPACE/qa-harness/.github/phase19/targeted_performance.cjs" | tee /tmp/phase19-perf-diag/console.log
           kill "$P1" "$P2" 2>/dev/null || true
           trap - EXIT
       - name: Upload diagnostic
