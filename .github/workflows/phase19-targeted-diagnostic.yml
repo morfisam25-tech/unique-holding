@@ -3,7 +3,7 @@ on:
   push:
     branches: ["phase19-build-runner"]
     paths:
-      - '.github/phase19/targeted_diagnostic.cjs'
+      - '.github/phase19/targeted_verify.cjs'
       - '.github/workflows/phase19-targeted-diagnostic.yml'
 permissions:
   contents: read
@@ -26,27 +26,28 @@ jobs:
       - name: Build current uncommitted Phase 19 candidate
         working-directory: product
         run: python3 ../qa-harness/.github/phase19/build_phase19.py
-      - name: Run targeted contrast and text-spacing diagnostics
+      - name: Verify zero serious axe and seven text-spacing routes
         working-directory: product
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p /tmp/phase19-node /tmp/phase19-targeted
+          mkdir -p /tmp/phase19-node /tmp/phase19-targeted-verify
           cd /tmp/phase19-node
           npm init -y >/dev/null 2>&1
           npm install --no-save --ignore-scripts puppeteer-core@24.16.0 axe-core@4.10.3 >/dev/null
           cd "$GITHUB_WORKSPACE/product"
-          python3 -m http.server 8000 --bind 127.0.0.1 >/tmp/phase19-targeted/server.log 2>&1 &
+          python3 -m http.server 8000 --bind 127.0.0.1 >/tmp/phase19-targeted-verify/server.log 2>&1 &
           PID=$!
           trap 'kill "$PID" 2>/dev/null || true' EXIT
           sleep 1
           CHROME="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium)"
-          PHASE19_DIAG_OUT=/tmp/phase19-targeted NODE_PATH=/tmp/phase19-node/node_modules CHROME="$CHROME" node ../qa-harness/.github/phase19/targeted_diagnostic.cjs | tee /tmp/phase19-targeted/console.log
+          PHASE19_VERIFY_OUT=/tmp/phase19-targeted-verify NODE_PATH=/tmp/phase19-node/node_modules CHROME="$CHROME" node ../qa-harness/.github/phase19/targeted_verify.cjs | tee /tmp/phase19-targeted-verify/console.log
           kill "$PID" 2>/dev/null || true
           trap - EXIT
-      - name: Upload targeted diagnostic
+      - name: Upload targeted verification
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: phase19-targeted-diagnostic
-          path: /tmp/phase19-targeted/
+          name: phase19-targeted-verification
+          path: /tmp/phase19-targeted-verify/
           if-no-files-found: error
