@@ -1,0 +1,52 @@
+name: Phase 19 targeted diagnostic
+on:
+  push:
+    branches: ["phase19-build-runner"]
+    paths:
+      - '.github/phase19/targeted_diagnostic.cjs'
+      - '.github/workflows/phase19-targeted-diagnostic.yml'
+permissions:
+  contents: read
+jobs:
+  diagnostic:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout Phase 19 harness
+        uses: actions/checkout@v4
+        with:
+          ref: phase19-build-runner
+          path: qa-harness
+          fetch-depth: 1
+      - name: Checkout exact Phase 18 baseline
+        uses: actions/checkout@v4
+        with:
+          ref: 8d2811298c668865f5438f86337c9d8f9d959c80
+          path: product
+          fetch-depth: 1
+      - name: Build current uncommitted Phase 19 candidate
+        working-directory: product
+        run: python3 ../qa-harness/.github/phase19/build_phase19.py
+      - name: Run targeted contrast and text-spacing diagnostics
+        working-directory: product
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/phase19-node /tmp/phase19-targeted
+          cd /tmp/phase19-node
+          npm init -y >/dev/null 2>&1
+          npm install --no-save --ignore-scripts puppeteer-core@24.16.0 axe-core@4.10.3 >/dev/null
+          cd "$GITHUB_WORKSPACE/product"
+          python3 -m http.server 8000 --bind 127.0.0.1 >/tmp/phase19-targeted/server.log 2>&1 &
+          PID=$!
+          trap 'kill "$PID" 2>/dev/null || true' EXIT
+          sleep 1
+          CHROME="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium)"
+          PHASE19_DIAG_OUT=/tmp/phase19-targeted NODE_PATH=/tmp/phase19-node/node_modules CHROME="$CHROME" node ../qa-harness/.github/phase19/targeted_diagnostic.cjs | tee /tmp/phase19-targeted/console.log
+          kill "$PID" 2>/dev/null || true
+          trap - EXIT
+      - name: Upload targeted diagnostic
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase19-targeted-diagnostic
+          path: /tmp/phase19-targeted/
+          if-no-files-found: error
