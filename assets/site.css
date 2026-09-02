@@ -118,3 +118,42 @@ body.nav-open{overflow:hidden}
   html:not(.js) .site-header .primary-nav .nav-cta{width:max-content;margin-top:8px}
 }
 }
+
+
+/* Phase 19 — targeted WCAG contrast corrections from 32-context axe baseline. */
+@layer performance{
+.global-footer-company-name>span,.global-footer-bottom{color:#858d8f}
+.home-operating-world--trade .home-kicker,.home-proof .home-kicker,.home-routes .home-kicker{color:#4f5759}
+.home-proof__row>span{color:#555d5f}
+.home-route-list>a>span:first-child{color:#5b6365}
+.corp-identity .corp-kicker,.corp-history-grid .corp-kicker,.corp-proof__head .corp-kicker{color:#51595b}
+.corp-proof__row>span{color:#555d5f}
+#overview .subsite-label,#trading .subsite-label,.energy-context-grid>.subsite-label,.energy-context-grid>div>.subsite-label{color:#984218}
+.energy-position dt,.energy-context__facts>div>span{color:#555d5f}
+#operations .subsite-label{color:#101213}
+.paper>.section-cap>.num,.subsite-section.paper>.section-cap>.num{color:#984218}
+.route-card>.k{color:#984218}
+.sales-boundary>strong{color:#81370f}
+#evidence-driven-intelligence>.section-cap>.num,#content-distribution>.section-cap>.num,#what-it-does>.section-cap>.num,#public-proof>.section-cap>.num,#portfolio-status>.section-cap>.num,#development-discipline>.section-cap>.num,#choose-route>.section-cap>.num,#istanbul-office>.section-cap>.num,#current-flows>.section-cap>.num,#cookies-storage>.section-cap>.num,#external-destinations>.section-cap>.num,#corporate-identity>.section-cap>.num,#offered-lot>.section-cap>.num,#portfolio-boundary>.section-cap>.num{color:#984218}
+.venture-path-step[data-stage-state="explanatory"]>small,.venture-path-step[data-stage-state="future"]>small,.venture-path-note{color:#55585a}
+.venture-path-step[data-stage-state="future"]>span{color:#743819}
+.contact-route-meta>span{color:#555b5d}
+.contact-office-address>span,.contact-office-direct>span{color:#984218}
+.contact-office-direct a>small{color:#5f6263}
+.legal-contact-panel .legal-label{color:#ff9a63}
+#external-links .legal-split a[href="privacy.html"]{color:#3f4749}
+
+/* Phase 19 fix-only continuation — exact nodes from targeted diagnostic run 33644495235. */
+.tech-next-grid .route-card>.k,
+.ventures-context .route-card>.k{color:#ee6a24}
+.legal-company-panel .legal-label{color:#984218}
+.legal-policy-body #correspondence .legal-split>div{min-width:0}
+.legal-policy-body #correspondence .legal-split p{overflow-wrap:anywhere}
+}
+/* These two measured nodes already carry !important declarations in @layer page.
+   Important layer precedence is reversed, so the earliest named layer is used
+   narrowly rather than broadening the palette. */
+@layer tokens{
+.home-operating-world--tech .ea-public-sample>p{color:#4f5962!important}
+.axis-proof-card .axis-proof-boundary{color:#555b5d!important}
+}

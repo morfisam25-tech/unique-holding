@@ -1,0 +1,7 @@
+import fs from 'node:fs';
+const routes=['index.html','corporate.html','energy.html','products.html','product.html','urea-46.html','caustic-soda-solid.html','sodium-sulphate-anhydrous.html','sales.html','technology.html','evidence-axis.html','ventures.html','contact.html','privacy.html','legal.html','404.html'];
+const fail=m=>{console.error('PHASE 19 ACCESSIBILITY QA FAIL — '+m);process.exitCode=1};
+for(const route of routes){const h=fs.readFileSync(route,'utf8');if((h.match(/<main\b/gi)||[]).length!==1)fail(route+': expected one main');if((h.match(/<h1\b/gi)||[]).length!==1)fail(route+': expected one H1');if(!/<a class="skip-link" href="#main">/.test(h))fail(route+': skip link missing');for(const m of h.matchAll(/<img\b[^>]*>/gi)){if(!/\balt="[^"]*"/.test(m[0]))fail(route+': img missing alt');if(!/\bwidth="\d+"/.test(m[0])||!/\bheight="\d+"/.test(m[0]))fail(route+': img missing intrinsic dimensions')}}
+const index=fs.readFileSync('index.html','utf8');if(/<aside class="ea-public-sample"/.test(index))fail('nested complementary landmark remains in Evidence Axis sample');if(!/<div class="ea-public-sample" role="group"/.test(index))fail('Evidence Axis sample group semantic fix missing');
+const css=fs.readFileSync('assets/site.css','utf8');if(!css.includes('Phase 19 — targeted WCAG contrast corrections'))fail('contrast correction block missing');
+console.log('PHASE 19 ACCESSIBILITY STATIC QA PASS');
