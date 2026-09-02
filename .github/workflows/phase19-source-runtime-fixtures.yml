@@ -1,0 +1,42 @@
+name: Phase 19 source-runtime classifier fixtures
+on:
+  push:
+    branches: ["phase19-build-runner"]
+    paths:
+      - '.github/workflows/phase19-source-runtime-fixtures.yml'
+permissions:
+  contents: read
+jobs:
+  fixtures:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout QA harness
+        uses: actions/checkout@v4
+        with:
+          ref: phase19-build-runner
+          path: qa-harness
+          fetch-depth: 1
+      - name: Checkout exact approved baseline
+        uses: actions/checkout@v4
+        with:
+          ref: 8d2811298c668865f5438f86337c9d8f9d959c80
+          path: candidate
+          fetch-depth: 0
+      - name: Build exact current Phase 19 candidate in runner only
+        working-directory: candidate
+        run: python3 ../qa-harness/.github/phase19/build_phase19.py
+      - name: Run deterministic classifier fixtures
+        working-directory: candidate
+        env:
+          PHASE19_BASE: 8d2811298c668865f5438f86337c9d8f9d959c80
+          PYTHONPATH: ../qa-harness/.github/phase19
+        run: |
+          mkdir -p /tmp/phase19-source-runtime-fixtures
+          python3 ../qa-harness/.github/phase19/test_performance_classifier.py | tee /tmp/phase19-source-runtime-fixtures/classifier-fixtures.json
+          python3 ../qa-harness/.github/phase19/test_source_graph_fixtures.py | tee /tmp/phase19-source-runtime-fixtures/source-graph-fixtures.json
+      - name: Upload fixture evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase19-source-runtime-fixtures
+          path: /tmp/phase19-source-runtime-fixtures/
+          if-no-files-found: error
