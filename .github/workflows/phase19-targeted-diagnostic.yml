@@ -3,6 +3,7 @@ on:
   push:
     branches: ["phase19-build-runner"]
     paths:
+      - '.github/phase19/build_phase19.py'
       - '.github/phase19/targeted_verify.cjs'
       - '.github/workflows/phase19-targeted-diagnostic.yml'
 permissions:
