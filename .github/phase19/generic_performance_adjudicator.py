@@ -1,6 +1,7 @@
 from pathlib import Path
 from urllib.parse import urlparse
 import json, os, re, statistics, sys
+from collections import Counter
 from performance_source_classifier import extract_source_graph, logical_asset, changed_responsible_files
 
 PACK=Path(os.environ.get('PHASE19_PACKET','/tmp/phase19-review'))
@@ -82,9 +83,12 @@ for key,brows in B.items():
     if route not in source_graph_cache:
         source_graph_cache[route]=(extract_source_graph('baseline',BASE,route),extract_source_graph('candidate',BASE,route))
     bsg,asg=source_graph_cache[route]
-    bsigs={ref_signature(r):r for r in bsg['references']}; asigs={ref_signature(r):r for r in asg['references']}
-    source_added_refs=[asigs[s] for s in sorted(set(asigs)-set(bsigs))]
-    source_removed_refs=[bsigs[s] for s in sorted(set(bsigs)-set(asigs))]
+    bsig_counts=Counter(ref_signature(r) for r in bsg['references']); asig_counts=Counter(ref_signature(r) for r in asg['references'])
+    source_added_refs=[]; source_removed_refs=[]
+    for sig,n in (asig_counts-bsig_counts).items():
+        source_added_refs += [next(r for r in asg['references'] if ref_signature(r)==sig)]*n
+    for sig,n in (bsig_counts-asig_counts).items():
+        source_removed_refs += [next(r for r in bsg['references'] if ref_signature(r)==sig)]*n
     source_added_hosts=sorted(set(asg['hosts'])-set(bsg['hosts']))
     source_added_classes=sorted(set(asg['resourceClasses'])-set(bsg['resourceClasses']))
     source_added_logical=sorted(set(asg['logicalAssets'])-set(bsg['logicalAssets']))
@@ -108,9 +112,10 @@ for key,brows in B.items():
     for aid,g in sorted(logical_runtime.items()):
         brefs=[r for r in bsg['references'] if r.get('logicalAsset')==aid]
         arefs=[r for r in asg['references'] if r.get('logicalAsset')==aid]
-        b_ref_sigs={ref_signature(r) for r in brefs}; a_ref_sigs={ref_signature(r) for r in arefs}
-        asset_added_refs=[r for r in arefs if ref_signature(r) not in b_ref_sigs]
-        asset_removed_refs=[r for r in brefs if ref_signature(r) not in a_ref_sigs]
+        b_ref_counts=Counter(ref_signature(r) for r in brefs); a_ref_counts=Counter(ref_signature(r) for r in arefs)
+        asset_added_refs=[]; asset_removed_refs=[]
+        for sig,n in (a_ref_counts-b_ref_counts).items(): asset_added_refs += [next(r for r in arefs if ref_signature(r)==sig)]*n
+        for sig,n in (b_ref_counts-a_ref_counts).items(): asset_removed_refs += [next(r for r in brefs if ref_signature(r)==sig)]*n
         changed_files=changed_responsible_files(BASE,bsg,asg,aid)
         baseline_logical_source=bool(brefs); candidate_logical_source=bool(arefs)
         baseline_total=sum(g['before'].values()); candidate_total=sum(g['after'].values())
@@ -123,8 +128,10 @@ for key,brows in B.items():
         for u in sorted(set(g['before'])|set(g['after'])):
             bv=occurrence_vector(bruns,u); av=occurrence_vector(aruns,u)
             exact_brefs=[r for r in brefs if r['exactUrl']==u]; exact_arefs=[r for r in arefs if r['exactUrl']==u]
-            exact_added=[r for r in exact_arefs if ref_signature(r) not in b_ref_sigs]
-            exact_removed=[r for r in exact_brefs if ref_signature(r) not in a_ref_sigs]
+            exact_b_counts=Counter(ref_signature(r) for r in exact_brefs); exact_a_counts=Counter(ref_signature(r) for r in exact_arefs)
+            exact_added=[]; exact_removed=[]
+            for sig,n in (exact_a_counts-exact_b_counts).items(): exact_added += [next(r for r in exact_arefs if ref_signature(r)==sig)]*n
+            for sig,n in (exact_b_counts-exact_a_counts).items(): exact_removed += [next(r for r in exact_brefs if ref_signature(r)==sig)]*n
             runtime_only_candidate=(sum(bv)==0 and sum(av)>0 and not exact_added)
             source_removed_optimization=(bool(exact_removed) and not exact_added and sum(av)<=sum(bv))
             stochastic_eligible=(baseline_logical_source and candidate_logical_source and not asset_added_refs and not source_added_hosts and not source_added_classes)
