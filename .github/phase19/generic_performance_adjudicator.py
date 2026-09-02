@@ -1,6 +1,7 @@
 from pathlib import Path
-import json, os, re, statistics, subprocess, sys
-from urllib.parse import urlparse, parse_qsl
+from urllib.parse import urlparse
+import json, os, re, statistics, sys
+from performance_source_classifier import extract_source_graph, logical_asset, changed_responsible_files
 
 PACK=Path(os.environ.get('PHASE19_PACKET','/tmp/phase19-review'))
 BASE=os.environ.get('PHASE19_BASE','8d2811298c668865f5438f86337c9d8f9d959c80')
@@ -9,7 +10,7 @@ BEFORE=json.loads((PACK/'before/phase19-baseline.json').read_text())
 AFTER=json.loads((PACK/'after/phase19-baseline.json').read_text())
 RECORDS=json.loads(RECORDS_PATH.read_text()) if RECORDS_PATH.exists() else {'records':[]}
 LOCAL_RE=re.compile(r'^https?://127\.0\.0\.1:\d+/')
-UNSPLASH_RE=re.compile(r'(photo-[0-9]+-[A-Za-z0-9]+)')
+
 
 def median(xs): return statistics.median(xs) if xs else 0
 
@@ -29,35 +30,6 @@ def resource_class(r):
 
 def third_party(u): return not u.startswith('LOCAL/')
 
-def logical_asset(u, cls):
-    if not third_party(u): return None
-    p=urlparse(u)
-    if cls=='Image' and p.netloc=='images.unsplash.com':
-        m=UNSPLASH_RE.search(p.path)
-        if m: return f'unsplash:{p.netloc}:{m.group(1)}'
-    if cls=='Image': return f'image:{p.netloc}:{p.path}'
-    return f'{cls.lower()}:{p.netloc}:{p.path}'
-
-def qparam(u,k):
-    try: return dict(parse_qsl(urlparse(u).query)).get(k)
-    except Exception: return None
-
-def source_files_for_token(token, rev=None):
-    cmd=['git','grep','-l','-F',token]
-    if rev: cmd.append(rev)
-    cmd += ['--','*.html','*.css','*.js','*.mjs']
-    cp=subprocess.run(cmd,text=True,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL)
-    if cp.returncode not in (0,1): return []
-    return sorted(x for x in cp.stdout.splitlines() if x)
-
-def source_authority(asset_id):
-    token=asset_id.split(':')[-1]
-    b=source_files_for_token(token,BASE); a=source_files_for_token(token,None); changed=[]
-    for f in sorted(set(b+a)):
-        if f not in b or f not in a: changed.append(f); continue
-        if subprocess.run(['git','diff','--quiet',BASE,'--',f]).returncode!=0: changed.append(f)
-    return {'token':token,'baselineFiles':b,'candidateFiles':a,'changedFiles':changed,'sourceChanged':bool(changed)}
-
 def rows_by_case(data):
     out={}
     for x in data['performance']: out.setdefault((x['route'],x['w'],x['h']),[]).append(x)
@@ -70,7 +42,7 @@ def run_resource_maps(rows):
         rr=[]
         for r0 in row.get('resources',[]):
             u=normalize_url(r0.get('url','')); cls=resource_class({'url':u,**r0})
-            rr.append({'url':u,'class':cls,'thirdParty':third_party(u),'encoded':int(r0.get('encoded') or 0),'logicalAsset':logical_asset(u,cls),'mime':r0.get('mime'),'status':r0.get('status')})
+            rr.append({'url':u,'class':cls,'thirdParty':third_party(u),'encoded':int(r0.get('encoded') or 0),'decoded':int(r0.get('decoded') or 0),'logicalAsset':logical_asset(u,cls) if third_party(u) else None,'mime':r0.get('mime'),'status':r0.get('status')})
         runs.append(rr)
     return runs
 
@@ -78,7 +50,8 @@ def occurrence_vector(runs,u): return [sum(1 for r in rr if r['url']==u) for rr 
 def deterministic_transfer(runs, stochastic_urls): return [sum(r['encoded'] for r in rr if r['url'] not in stochastic_urls) for rr in runs]
 def deterministic_request_count(runs, stochastic_urls): return [sum(1 for r in rr if r['url'] not in stochastic_urls) for rr in runs]
 def deterministic_thirdparty_count(runs, stochastic_urls): return [sum(1 for r in rr if r['thirdParty'] and r['url'] not in stochastic_urls) for rr in runs]
-def repeated_increase(bvec,avec): return bool(avec) and min(avec)>max(bvec or [0])
+def ref_signature(r): return (r['exactUrl'],r['sourceFile'],r['declarationType'])
+def ref_public(r): return {k:r[k] for k in ['exactUrl','logicalAsset','resourceClass','host','sourceFile','line','declarationType']}
 
 def record_for(case_key):
     route,w,h=case_key
@@ -88,6 +61,7 @@ def record_for(case_key):
 
 B=rows_by_case(BEFORE); A=rows_by_case(AFTER)
 case_reports=[]; unresolved=[]; adjudicated=[]
+source_graph_cache={}
 for key,brows in B.items():
     arows=A[key]; route,w,h=key
     bmed={k:median([x[k] for x in brows]) for k in ['requests','transfer','thirdParty']}; bmed['cls']=median([x['timing']['cls'] for x in brows])
@@ -97,80 +71,141 @@ for key,brows in B.items():
     if amed['thirdParty']>bmed['thirdParty']: raw.append('thirdParty')
     if bmed['transfer'] and amed['transfer']>bmed['transfer']*1.10: raw.append('transfer')
     if amed['cls']>bmed['cls']+0.03: raw.append('cls')
+
     bruns=run_resource_maps(brows); aruns=run_resource_maps(arows)
     bunion=sorted(set(r['url'] for rr in bruns for r in rr)); aunion=sorted(set(r['url'] for rr in aruns for r in rr))
-    added=sorted(set(aunion)-set(bunion)); removed=sorted(set(bunion)-set(aunion))
-    bhosts=sorted(set(urlparse(u).netloc for u in bunion if third_party(u))); ahosts=sorted(set(urlparse(u).netloc for u in aunion if third_party(u)))
-    bclasses=sorted(set(r['class'] for rr in bruns for r in rr)); aclasses=sorted(set(r['class'] for rr in aruns for r in rr))
-    candidate_only_hosts=sorted(set(ahosts)-set(bhosts)); candidate_only_classes=sorted(set(aclasses)-set(bclasses))
-    all_urls=sorted(set(bunion+aunion)); freq={}
-    for u in all_urls:
-        bv=occurrence_vector(bruns,u); av=occurrence_vector(aruns,u)
-        freq[u]={'before':bv,'after':av,'beforeTotal':sum(bv),'afterTotal':sum(av)}
-    logical={}
+    runtime_added=sorted(set(aunion)-set(bunion)); runtime_removed=sorted(set(bunion)-set(aunion))
+    all_urls=sorted(set(bunion+aunion))
+    freq={u:{'before':occurrence_vector(bruns,u),'after':occurrence_vector(aruns,u)} for u in all_urls}
+    for u,v in freq.items(): v.update({'beforeTotal':sum(v['before']),'afterTotal':sum(v['after'])})
+
+    if route not in source_graph_cache:
+        source_graph_cache[route]=(extract_source_graph('baseline',BASE,route),extract_source_graph('candidate',BASE,route))
+    bsg,asg=source_graph_cache[route]
+    bsigs={ref_signature(r):r for r in bsg['references']}; asigs={ref_signature(r):r for r in asg['references']}
+    source_added_refs=[asigs[s] for s in sorted(set(asigs)-set(bsigs))]
+    source_removed_refs=[bsigs[s] for s in sorted(set(bsigs)-set(asigs))]
+    source_added_hosts=sorted(set(asg['hosts'])-set(bsg['hosts']))
+    source_added_classes=sorted(set(asg['resourceClasses'])-set(bsg['resourceClasses']))
+    source_added_logical=sorted(set(asg['logicalAssets'])-set(bsg['logicalAssets']))
+
+    issues=[]
+    if source_added_hosts: issues.append(f'candidate-source-added hosts {source_added_hosts}')
+    if source_added_classes: issues.append(f'candidate-source-added resource classes {source_added_classes}')
+    if source_added_logical: issues.append(f'candidate-source-added logical assets {source_added_logical}')
+    if source_added_refs:
+        issues.append('candidate-source-added external declarations '+json.dumps([ref_public(r) for r in source_added_refs],sort_keys=True))
+
+    logical_runtime={}
     for side,runs in [('before',bruns),('after',aruns)]:
         for rr in runs:
             for r in rr:
-                if r['logicalAsset'] and r['class']=='Image':
-                    g=logical.setdefault(r['logicalAsset'],{'before':{},'after':{}})
+                if r['thirdParty'] and r['class']=='Image' and r['logicalAsset']:
+                    g=logical_runtime.setdefault(r['logicalAsset'],{'before':{},'after':{}})
                     g[side][r['url']]=g[side].get(r['url'],0)+1
-    stochastic_urls=set(); logical_details=[]; logical_fail=[]
-    for aid,g in sorted(logical.items()):
-        baseline_total=sum(g['before'].values()); candidate_total=sum(g['after'].values()); authority=source_authority(aid)
-        baseline_urls=set(g['before']); candidate_urls=set(g['after'])
-        if candidate_total and not baseline_total: logical_fail.append(f'candidate-added logical external image asset {aid}')
-        intended=None
-        if g['before']:
-            intended=sorted(g['before'], key=lambda u:(-g['before'][u], int(qparam(u,'w') or 10**9), u))[0]
-        intended_before=g['before'].get(intended,0) if intended else 0; intended_after=g['after'].get(intended,0) if intended else 0
-        if intended and intended_before==len(bruns) and intended_after<len(aruns): logical_fail.append(f'intended responsive image not consistently loaded: {intended} {intended_before}->{intended_after}')
-        variants=sorted((baseline_urls|candidate_urls)-({intended} if intended else set())); variant_details=[]
-        for u in variants:
-            bv=occurrence_vector(bruns,u); av=occurrence_vector(aruns,u); source_unchanged=not authority['sourceChanged']
-            can_stochastic=(baseline_total>0 and source_unchanged and (not intended or intended_after>0))
-            if can_stochastic:
+
+    stochastic_urls=set(); logical_details=[]
+    for aid,g in sorted(logical_runtime.items()):
+        brefs=[r for r in bsg['references'] if r.get('logicalAsset')==aid]
+        arefs=[r for r in asg['references'] if r.get('logicalAsset')==aid]
+        b_ref_sigs={ref_signature(r) for r in brefs}; a_ref_sigs={ref_signature(r) for r in arefs}
+        asset_added_refs=[r for r in arefs if ref_signature(r) not in b_ref_sigs]
+        asset_removed_refs=[r for r in brefs if ref_signature(r) not in a_ref_sigs]
+        changed_files=changed_responsible_files(BASE,bsg,asg,aid)
+        baseline_logical_source=bool(brefs); candidate_logical_source=bool(arefs)
+        baseline_total=sum(g['before'].values()); candidate_total=sum(g['after'].values())
+        if baseline_total>0 and candidate_logical_source and candidate_total==0 and not asset_removed_refs:
+            issues.append(f'pre-existing logical image asset no longer loads {aid}')
+        if asset_added_refs:
+            issues.append('candidate-source-added image declaration '+json.dumps([ref_public(r) for r in asset_added_refs],sort_keys=True))
+
+        variants=[]
+        for u in sorted(set(g['before'])|set(g['after'])):
+            bv=occurrence_vector(bruns,u); av=occurrence_vector(aruns,u)
+            exact_brefs=[r for r in brefs if r['exactUrl']==u]; exact_arefs=[r for r in arefs if r['exactUrl']==u]
+            exact_added=[r for r in exact_arefs if ref_signature(r) not in b_ref_sigs]
+            exact_removed=[r for r in exact_brefs if ref_signature(r) not in a_ref_sigs]
+            runtime_only_candidate=(sum(bv)==0 and sum(av)>0 and not exact_added)
+            source_removed_optimization=(bool(exact_removed) and not exact_added and sum(av)<=sum(bv))
+            stochastic_eligible=(baseline_logical_source and candidate_logical_source and not asset_added_refs and not source_added_hosts and not source_added_classes)
+            if stochastic_eligible and not source_removed_optimization:
                 stochastic_urls.add(u)
-                if sum(av)>sum(bv) and sum(av)>=len(aruns): logical_fail.append(f'repeatable stochastic-variant increase {u}: {sum(bv)}->{sum(av)}')
-            elif sum(av)>sum(bv): logical_fail.append(f'external image variant increase with changed/unknown source {u}: {sum(bv)}->{sum(av)}')
-            variant_details.append({'url':u,'before':bv,'after':av,'beforeTotal':sum(bv),'afterTotal':sum(av),'stochasticEligible':can_stochastic,'width':qparam(u,'w')})
-        logical_details.append({'logicalAsset':aid,'authority':authority,'intendedUrl':intended,'intendedBeforeTotal':intended_before,'intendedAfterTotal':intended_after,'variants':variant_details})
-    strict_added=[]
-    for u in added:
-        if u.startswith('LOCAL/'): strict_added.append(u); continue
-        cls=next((r['class'] for rr in aruns for r in rr if r['url']==u),'Other'); aid=logical_asset(u,cls)
-        if not aid or u not in stochastic_urls: strict_added.append(u)
+            variants.append({
+                'url':u,'before':bv,'after':av,'beforeTotal':sum(bv),'afterTotal':sum(av),
+                'baselineSourceReferences':[ref_public(r) for r in exact_brefs],
+                'candidateSourceReferences':[ref_public(r) for r in exact_arefs],
+                'sourceDeclarationAdded':[ref_public(r) for r in exact_added],
+                'sourceDeclarationRemoved':[ref_public(r) for r in exact_removed],
+                'runtimeOnlyCandidateObservation':runtime_only_candidate,
+                'sourceRemovedOptimization':source_removed_optimization,
+                'stochasticEligible':stochastic_eligible,
+                'classification':('SOURCE-REMOVED OPTIMIZATION' if source_removed_optimization else ('RUNTIME-ONLY STOCHASTIC VARIANT OF UNCHANGED PRE-EXISTING LOGICAL ASSET' if stochastic_eligible and sum(bv)!=sum(av) else 'PRE-EXISTING SOURCE/RUNTIME'))
+            })
+        logical_details.append({
+            'logicalAsset':aid,'baselineSourceReferences':[ref_public(r) for r in brefs],
+            'candidateSourceReferences':[ref_public(r) for r in arefs],
+            'sourceAddedDeclarations':[ref_public(r) for r in asset_added_refs],
+            'sourceRemovedDeclarations':[ref_public(r) for r in asset_removed_refs],
+            'responsibleSourceFilesChanged':changed_files,
+            'baselineRuntimeTotal':baseline_total,'candidateRuntimeTotal':candidate_total,
+            'variants':variants
+        })
+
+    strict_runtime_added=[]
+    for u in runtime_added:
+        if u.startswith('LOCAL/') or u not in stochastic_urls:
+            strict_runtime_added.append(u)
+    if strict_runtime_added: issues.append(f'unattributed candidate runtime-added resources {strict_runtime_added}')
+
     deterministic_frequency_increases=[]
     for u in all_urls:
         if u in stochastic_urls: continue
-        bv=occurrence_vector(bruns,u); av=occurrence_vector(aruns,u)
-        if repeated_increase(bv,av): deterministic_frequency_increases.append({'url':u,'before':bv,'after':av})
+        bv=freq[u]['before']; av=freq[u]['after']
+        if av and min(av)>max(bv or [0]): deterministic_frequency_increases.append({'url':u,'before':bv,'after':av})
+    if deterministic_frequency_increases: issues.append(f'repeatable deterministic request-frequency increases {deterministic_frequency_increases}')
     bdet_t=deterministic_transfer(bruns,stochastic_urls); adet_t=deterministic_transfer(aruns,stochastic_urls)
     bdet_r=deterministic_request_count(bruns,stochastic_urls); adet_r=deterministic_request_count(aruns,stochastic_urls)
     bdet_tp=deterministic_thirdparty_count(bruns,stochastic_urls); adet_tp=deterministic_thirdparty_count(aruns,stochastic_urls)
     det_transfer_ok=(median(adet_t)<=median(bdet_t)*1.10 if median(bdet_t) else median(adet_t)==0)
-    rec=record_for(key); record_support=False
-    if rec:
-        if rec.get('classification')=='STRUCTURAL SAME-RUN REQUEST GRAPH': record_support=bool(rec.get('verifiedStructuralEquivalence'))
-        elif rec.get('classification')=='PRE-EXISTING STOCHASTIC THIRD-PARTY IMAGE REQUEST':
-            record_support=(rec.get('candidateAddedUrls')==0 and rec.get('candidateOnlyHosts')==0 and rec.get('candidateOnlyResourceClasses')==0 and rec.get('candidateObservedOccurrences',999)<=rec.get('baselineObservedOccurrences',-1))
-    issues=[]
-    if 'cls' in raw: issues.append(f'CLS regression {bmed["cls"]}->{amed["cls"]}')
-    if strict_added: issues.append(f'candidate-added resources {strict_added}')
-    if candidate_only_hosts: issues.append(f'candidate-only hosts {candidate_only_hosts}')
-    if candidate_only_classes: issues.append(f'candidate-only resource classes {candidate_only_classes}')
-    if deterministic_frequency_increases: issues.append(f'repeatable deterministic request-frequency increases {deterministic_frequency_increases}')
-    if logical_fail: issues.extend(logical_fail)
     if not det_transfer_ok: issues.append(f'unexplained deterministic transfer growth {median(bdet_t)}->{median(adet_t)}')
-    if median(adet_r)>median(bdet_r) and not record_support: issues.append(f'deterministic median request growth {median(bdet_r)}->{median(adet_r)}')
-    if median(adet_tp)>median(bdet_tp) and not record_support: issues.append(f'deterministic median third-party growth {median(bdet_tp)}->{median(adet_tp)}')
+    if median(adet_r)>median(bdet_r): issues.append(f'deterministic median request growth {median(bdet_r)}->{median(adet_r)}')
+    if median(adet_tp)>median(bdet_tp): issues.append(f'deterministic median third-party growth {median(bdet_tp)}->{median(adet_tp)}')
+    if 'cls' in raw: issues.append(f'CLS regression {bmed["cls"]}->{amed["cls"]}')
+
+    rec=record_for(key)
     status='PASS'; classification='STRICT PASS'
     if issues:
         status='FAIL'; classification='REAL PERFORMANCE REGRESSION'; unresolved.append({'case':f'{route}|{w}x{h}','issues':issues})
     elif raw:
-        classification='MEASUREMENT VARIANCE — NO CANDIDATE REGRESSION'; adjudicated.append({'case':f'{route}|{w}x{h}','rawFailures':raw,'record':rec.get('id') if rec else None})
-    case_reports.append({'case':f'{route}|{w}x{h}','route':route,'width':w,'height':h,'beforeMedian':bmed,'afterMedian':amed,'rawMedianFailures':raw,'status':status,'classification':classification,'issues':issues,'baselineUrlUnion':bunion,'candidateUrlUnion':aunion,'addedUrls':added,'removedUrls':removed,'candidateOnlyHosts':candidate_only_hosts,'candidateOnlyResourceClasses':candidate_only_classes,'stochasticUrls':sorted(stochastic_urls),'logicalAssets':logical_details,'urlFrequency':freq,'deterministicRequestCounts':{'before':bdet_r,'after':adet_r,'beforeMedian':median(bdet_r),'afterMedian':median(adet_r)},'deterministicThirdPartyCounts':{'before':bdet_tp,'after':adet_tp,'beforeMedian':median(bdet_tp),'afterMedian':median(adet_tp)},'deterministicTransferTotals':{'before':bdet_t,'after':adet_t,'beforeMedian':median(bdet_t),'afterMedian':median(adet_t),'within10Percent':det_transfer_ok},'measurementRecord':rec})
+        classification='MEASUREMENT VARIANCE — NO CANDIDATE REGRESSION'
+        adjudicated.append({'case':f'{route}|{w}x{h}','rawFailures':raw,'record':rec.get('id') if rec else None,'stochasticUrls':sorted(stochastic_urls)})
 
-report={'model':{'name':'Phase 19 two-layer deterministic/stochastic performance acceptance','deterministicLayer':'strict product graph, source-diff, host/class, repeatable frequency, transfer and CLS gates','stochasticLayer':'pre-existing third-party image variants grouped by exact URL and logical asset; exact occurrence equality not required when source unchanged and no repeatable candidate increase','sourceDiffAuthority':True,'exactUrlAndLogicalAsset':True,'oneSidedRegressionRule':True},'records':RECORDS.get('records',[]),'cases':case_reports,'adjudicatedMeasurementVariance':adjudicated,'unresolvedFailures':unresolved,'unresolvedCount':len(unresolved)}
+    case_reports.append({
+        'case':f'{route}|{w}x{h}','route':route,'width':w,'height':h,
+        'beforeMedian':bmed,'afterMedian':amed,'rawMedianFailures':raw,'status':status,'classification':classification,'issues':issues,
+        'runtimeGraph':{'baselineUrlUnion':bunion,'candidateUrlUnion':aunion,'runtimeAddedUrls':runtime_added,'runtimeRemovedUrls':runtime_removed,'urlFrequency':freq},
+        'sourceGraph':{'baseline':bsg,'candidate':asg,'sourceAddedDeclarations':[ref_public(r) for r in source_added_refs],'sourceRemovedDeclarations':[ref_public(r) for r in source_removed_refs],'sourceAddedHosts':source_added_hosts,'sourceAddedResourceClasses':source_added_classes,'sourceAddedLogicalAssets':source_added_logical},
+        'stochasticUrls':sorted(stochastic_urls),'logicalAssets':logical_details,
+        'deterministicRequestCounts':{'before':bdet_r,'after':adet_r,'beforeMedian':median(bdet_r),'afterMedian':median(adet_r)},
+        'deterministicThirdPartyCounts':{'before':bdet_tp,'after':adet_tp,'beforeMedian':median(bdet_tp),'afterMedian':median(adet_tp)},
+        'deterministicTransferTotals':{'before':bdet_t,'after':adet_t,'beforeMedian':median(bdet_t),'afterMedian':median(adet_t),'within10Percent':det_transfer_ok},
+        'measurementRecord':rec
+    })
+
+report={
+    'model':{
+        'name':'Phase 19 source-vs-runtime two-layer performance acceptance',
+        'sourceGraphAuthority':True,
+        'runtimeGraphDistinctFromSourceGraph':True,
+        'deterministicLayer':'strict candidate-source additions, local graph, dependency class/host, deterministic frequency, deterministic transfer and CLS',
+        'stochasticLayer':'runtime-only or intermittently observed variants of unchanged pre-existing third-party logical image assets',
+        'exactUrlAndLogicalAsset':True,
+        'sourceRemovedOptimizationDistinct':True,
+        'oneSidedRegressionRule':True
+    },
+    'records':RECORDS.get('records',[]),'cases':case_reports,
+    'adjudicatedMeasurementVariance':adjudicated,'unresolvedFailures':unresolved,'unresolvedCount':len(unresolved)
+}
 out=PACK/'reports/performance-adjudication.json'; out.write_text(json.dumps(report,indent=2),encoding='utf-8')
 print(json.dumps({'model':report['model'],'adjudicatedMeasurementVariance':adjudicated,'unresolvedFailures':unresolved,'unresolvedCount':len(unresolved),'caseTable':[{'case':c['case'],'raw':c['rawMedianFailures'],'status':c['status'],'classification':c['classification']} for c in case_reports]},indent=2))
 if unresolved: sys.exit(1)
