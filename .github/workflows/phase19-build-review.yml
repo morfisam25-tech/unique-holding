@@ -39,4 +39,4 @@ jobs:
           path: /tmp/phase19-review/
           if-no-files-found: error
           compression-level: 6
-# final full-gate rerun trigger only
+# final full-gate rerun with Sales/1440 structural diagnostic
