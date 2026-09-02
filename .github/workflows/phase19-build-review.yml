@@ -1,6 +1,9 @@
 name: Phase 19 build and review
 on:
-  workflow_dispatch:
+  push:
+    branches: ["phase19-build-runner"]
+    paths:
+      - '.github/workflows/phase19-build-review.yml'
 permissions:
   contents: write
 jobs:
@@ -28,7 +31,7 @@ jobs:
       - name: Run gated Phase 19 baseline, build, QA and single commit
         working-directory: product
         shell: bash
-        run: bash ../qa-harness/.github/phase19/run_phase19.sh
+        run: bash ../qa-harness/.github/phase19/run_phase19_fixonly.sh
       - name: Upload Phase 19 review packet
         uses: actions/upload-artifact@v4
         with:
