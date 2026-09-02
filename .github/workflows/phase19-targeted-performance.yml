@@ -1,0 +1,59 @@
+name: Phase 19 targeted performance diagnostic
+on:
+  push:
+    branches: ["phase19-build-runner"]
+    paths:
+      - '.github/phase19/targeted_performance.cjs'
+      - '.github/workflows/phase19-targeted-performance.yml'
+permissions:
+  contents: read
+jobs:
+  diagnostic:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout Phase 19 harness
+        uses: actions/checkout@v4
+        with:
+          ref: phase19-build-runner
+          path: qa-harness
+          fetch-depth: 1
+      - name: Checkout baseline copy
+        uses: actions/checkout@v4
+        with:
+          ref: 8d2811298c668865f5438f86337c9d8f9d959c80
+          path: before-product
+          fetch-depth: 1
+      - name: Checkout candidate source copy
+        uses: actions/checkout@v4
+        with:
+          ref: 8d2811298c668865f5438f86337c9d8f9d959c80
+          path: after-product
+          fetch-depth: 1
+      - name: Build uncommitted Phase 19 candidate
+        working-directory: after-product
+        run: python3 ../qa-harness/.github/phase19/build_phase19.py
+      - name: Compare contact request graph across five cold runs
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/phase19-node /tmp/phase19-perf-diag
+          cd /tmp/phase19-node
+          npm init -y >/dev/null 2>&1
+          npm install --no-save --ignore-scripts puppeteer-core@24.16.0 >/dev/null
+          cd "$GITHUB_WORKSPACE/before-product"
+          python3 -m http.server 8000 --bind 127.0.0.1 >/tmp/phase19-perf-diag/before-server.log 2>&1 & P1=$!
+          cd "$GITHUB_WORKSPACE/after-product"
+          python3 -m http.server 8001 --bind 127.0.0.1 >/tmp/phase19-perf-diag/after-server.log 2>&1 & P2=$!
+          trap 'kill "$P1" "$P2" 2>/dev/null || true' EXIT
+          sleep 1
+          CHROME="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium)"
+          PHASE19_PERF_OUT=/tmp/phase19-perf-diag NODE_PATH=/tmp/phase19-node/node_modules CHROME="$CHROME" node "$GITHUB_WORKSPACE/qa-harness/.github/phase19/targeted_performance.cjs" | tee /tmp/phase19-perf-diag/console.log
+          kill "$P1" "$P2" 2>/dev/null || true
+          trap - EXIT
+      - name: Upload diagnostic
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase19-targeted-performance
+          path: /tmp/phase19-perf-diag/
+          if-no-files-found: error
