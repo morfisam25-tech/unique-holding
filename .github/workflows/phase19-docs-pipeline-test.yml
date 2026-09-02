@@ -1,0 +1,103 @@
+name: Phase 19 documentation pipeline test
+on:
+  push:
+    branches: ["phase19-docs-test-runner"]
+    paths:
+      - '.github/workflows/phase19-docs-pipeline-test.yml'
+permissions:
+  contents: read
+jobs:
+  docs:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout QA harness
+        uses: actions/checkout@v4
+        with:
+          ref: phase19-build-runner
+          path: qa-harness
+          fetch-depth: 1
+      - name: Checkout exact approved baseline as disposable product tree
+        uses: actions/checkout@v4
+        with:
+          ref: 8d2811298c668865f5438f86337c9d8f9d959c80
+          path: product
+          fetch-depth: 1
+      - name: Build representative final-architecture packet
+        working-directory: product
+        shell: bash
+        run: |
+          set -euo pipefail
+          P=/tmp/phase19-docs-test
+          rm -rf "$P"
+          mkdir -p "$P/before" "$P/after" "$P/regression" "$P/reports" docs/qa
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          P=Path('/tmp/phase19-docs-test')
+          def baseline(serious):
+              perf={
+                'route':'index.html','w':1440,'h':900,'rep':1,
+                'requests':10,'transfer':100000,'image':50000,'css':20000,'js':5000,'video':0,'thirdParty':1,
+                'timing':{'cls':0.0,'fcp':100,'lcp':{'startTime':500}},
+                'resources':[{'url':'https://images.unsplash.com/photo-1784911542546-7891c4d7abba?auto=format&fit=crop&ixlib=rb-4.1.0&q=72&w=1800','encoded':50000}]
+              }
+              acc={
+                'route':'index.html','w':1440,'h':900,
+                'counts':{'critical':0,'serious':serious,'moderate':0,'minor':0},
+                'violations':([] if serious==0 else [{'impact':'serious','id':'color-contrast','nodes':[{}]}]),
+                'landmarks':{'main':1,'h1':1,'imgs':[]}
+              }
+              return {
+                'performance':[perf],
+                'accessibility':[acc],
+                'keyboard':[{'route':'index.html','w':1440,'h':900,'hiddenFocus':0,'tinyFocus':0}],
+                'media':[{'route':'index.html','items':[]}]
+              }
+          (P/'before/phase19-baseline.json').write_text(json.dumps(baseline(1)))
+          a=baseline(0); a['performance'][0]['requests']=9; a['performance'][0]['transfer']=90000; a['performance'][0]['thirdParty']=1
+          (P/'after/phase19-baseline.json').write_text(json.dumps(a))
+          reg={'summary':{'smokeCases':32,'smokeFailures':0,'representativeCases':30,'representativeFailures':0,'coreCases':3,'coreFailures':0,'evidenceVenturesCases':2,'evidenceVenturesFailures':0,'legalCases':2,'legalFailures':0,'zoomCases':9,'zoomFailures':0,'textSpacingCases':7,'textSpacingFailures':0,'forcedColorsCases':5,'forcedColorsFailures':0,'keyboardMenuCases':16,'keyboardMenuFailures':0,'totalFailures':0},'film':{'lockedTouchTargets':[]},'rfq':{'pass':True},'reducedMotion':[{'pass':True},{'pass':True}]}
+          (P/'regression/phase19-regression.json').write_text(json.dumps(reg))
+          acceptance={'axe':{'critical':0,'serious':0,'moderate':0,'minor':0},'performanceCases':18,'regression':reg['summary'],'rfqPass':True,'reducedMotionPass':True,'errors':[]}
+          (P/'reports/acceptance.json').write_text(json.dumps(acceptance))
+          adjud={'model':{'name':'Phase 19 source-vs-runtime two-layer performance acceptance'},'unresolvedFailures':[],'unresolvedCount':0,'cases':[]}
+          (P/'reports/performance-adjudication.json').write_text(json.dumps(adjud))
+          (P/'reports/classifier-fixtures.json').write_text(json.dumps({'fixtureCount':6,'passed':6,'failed':0,'fixtures':[]}))
+          (P/'reports/source-graph-fixtures.json').write_text(json.dumps({'fixtureCount':2,'passed':2,'failed':0,'fixtures':[]}))
+          PY
+      - name: Test generate_docs + corrected postprocess_docs
+        working-directory: product
+        shell: bash
+        env:
+          PHASE19_PACKET: /tmp/phase19-docs-test
+          PHASE19_RECORDS: ../qa-harness/.github/phase19/performance_measurement_records.json
+        run: |
+          set -euo pipefail
+          test ! -e /tmp/phase19-docs-test/performance-diagnostic/contact.html-390x844-performance-diagnostic.json
+          python3 ../qa-harness/.github/phase19/generate_docs.py
+          python3 ../qa-harness/.github/phase19/postprocess_docs.py
+          grep -q 'FINAL GENERIC PERFORMANCE EVIDENCE' docs/qa/phase19-performance-audit.md
+          grep -q 'no longer executes or requires `contact.html-390x844-performance-diagnostic.json`' docs/qa/phase19-performance-audit.md
+      - name: Test generate_packet
+        working-directory: product
+        shell: bash
+        env:
+          PHASE19_PACKET: /tmp/phase19-docs-test
+          NEW_SHA: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+          REBUILD_SHA: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+          MAIN_SHA: 6d106520dd82bf4448312b5f45b54ae15981b1db
+        run: |
+          set -euo pipefail
+          cat > /tmp/phase19-docs-test/reports/exact-files-changed.txt <<'EOF'
+          assets/site.css
+          docs/qa/phase19-accessibility-audit.md
+          docs/qa/phase19-media-inventory.md
+          docs/qa/phase19-performance-audit.md
+          index.html
+          scripts/qa-accessibility.mjs
+          scripts/qa-performance.mjs
+          EOF
+          python3 ../qa-harness/.github/phase19/generate_packet.py
+          test -s /tmp/phase19-docs-test/PHASE_19_REVIEW_PACKET.md
+          grep -q 'STATUS: READY FOR EXTERNAL REVIEW' /tmp/phase19-docs-test/PHASE_19_REVIEW_PACKET.md
+          echo 'DOCS PIPELINE QA PASS — generate_docs.py PASS; postprocess_docs.py PASS; generate_packet.py PASS; no legacy diagnostic dependency.'
