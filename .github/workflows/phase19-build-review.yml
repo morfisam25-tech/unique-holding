@@ -1,7 +1,5 @@
 name: Phase 19 build and review
 on:
-  push:
-    branches: ["phase19-build-runner"]
   workflow_dispatch:
 permissions:
   contents: write
