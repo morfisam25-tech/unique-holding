@@ -1,0 +1,80 @@
+name: Phase 19 Products mobile performance diagnostic
+on:
+  push:
+    branches: ["phase19-build-runner"]
+    paths:
+      - '.github/workflows/phase19-products-mobile-diagnostic.yml'
+permissions:
+  contents: read
+jobs:
+  diagnostic:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout QA harness
+        uses: actions/checkout@v4
+        with:
+          ref: phase19-build-runner
+          path: qa-harness
+          fetch-depth: 1
+
+      - name: Checkout exact approved Phase 18 baseline
+        uses: actions/checkout@v4
+        with:
+          ref: 8d2811298c668865f5438f86337c9d8f9d959c80
+          path: before
+          fetch-depth: 1
+
+      - name: Checkout exact approved Phase 18 candidate base
+        uses: actions/checkout@v4
+        with:
+          ref: 8d2811298c668865f5438f86337c9d8f9d959c80
+          path: candidate
+          fetch-depth: 1
+
+      - name: Build exact current uncommitted Phase 19 candidate in runner only
+        working-directory: candidate
+        shell: bash
+        run: |
+          python3 ../qa-harness/.github/phase19/build_phase19.py
+
+      - name: Install targeted diagnostic dependency
+        shell: bash
+        run: |
+          mkdir -p /tmp/phase19-node
+          npm install --prefix /tmp/phase19-node puppeteer-core@24.16.0
+
+      - name: Run Products mobile 5x5 cold diagnostic only
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/phase19-products-diagnostic
+          (cd before && python3 -m http.server 8001 --bind 127.0.0.1 >/tmp/phase19-products-diagnostic/server-before.log 2>&1) &
+          BEFORE_PID=$!
+          (cd candidate && python3 -m http.server 8000 --bind 127.0.0.1 >/tmp/phase19-products-diagnostic/server-after.log 2>&1) &
+          AFTER_PID=$!
+          trap 'kill "$BEFORE_PID" "$AFTER_PID" 2>/dev/null || true' EXIT
+          sleep 1
+          CHROME="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium)"
+          test -n "$CHROME"
+          set +e
+          PHASE19_PERF_OUT=/tmp/phase19-products-diagnostic \
+          PHASE19_BEFORE_BASE='http://127.0.0.1:8001/' \
+          PHASE19_AFTER_BASE='http://127.0.0.1:8000/' \
+          PHASE19_PERF_ROUTE='products.html' \
+          PHASE19_PERF_WIDTH=390 \
+          PHASE19_PERF_HEIGHT=844 \
+          NODE_PATH='/tmp/phase19-node/node_modules' \
+          CHROME="$CHROME" \
+          node qa-harness/.github/phase19/targeted_performance.cjs | tee /tmp/phase19-products-diagnostic/console.log
+          CODE=${PIPESTATUS[0]}
+          set -e
+          echo "diagnostic_exit_code=$CODE" | tee /tmp/phase19-products-diagnostic/status.txt
+          exit 0
+
+      - name: Upload Products mobile diagnostic
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase19-products-mobile-performance-diagnostic
+          path: /tmp/phase19-products-diagnostic/
+          if-no-files-found: error
+          compression-level: 6
