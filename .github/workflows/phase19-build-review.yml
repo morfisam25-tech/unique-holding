@@ -39,4 +39,4 @@ jobs:
           path: /tmp/phase19-review/
           if-no-files-found: error
           compression-level: 6
-# final full-gate rerun: generic deterministic/stochastic third-party adjudication with source-diff authority; PERF-QA records 001-003 are evidence data, not route-specific bypasses
+# final full-gate rerun v2: generic exact-source adjudication distinguishes deliberate source-removed optimizations from persistent intended media; no route-specific diagnostic reruns
