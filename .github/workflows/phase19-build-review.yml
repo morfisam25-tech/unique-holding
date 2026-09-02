@@ -39,4 +39,4 @@ jobs:
           path: /tmp/phase19-review/
           if-no-files-found: error
           compression-level: 6
-# final full-gate rerun v2: generic exact-source adjudication distinguishes deliberate source-removed optimizations from persistent intended media; no route-specific diagnostic reruns
+# final full-gate rerun v3: source graph vs runtime graph classifier; 8/8 semantic+actual source fixtures required; no route-specific bypass or stochastic whitelist
