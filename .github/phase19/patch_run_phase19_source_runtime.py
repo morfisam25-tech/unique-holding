@@ -5,5 +5,9 @@ needle='mkdir -p "$PACK/reports" "$PACK/regression"\n'
 replace=needle+'if [ -f /tmp/phase19-classifier-fixtures.json ]; then cp /tmp/phase19-classifier-fixtures.json "$PACK/reports/classifier-fixtures.json"; fi\n'
 if needle not in s: raise SystemExit('PACK mkdir marker missing')
 s=s.replace(needle,replace,1)
+needle='python3 "$QA/build_phase19.py" | tee "$PACK/reports/build.log"\n'
+replace=needle+'PYTHONPATH="$QA" PHASE19_BASE="$BASE" python3 "$QA/test_source_graph_fixtures.py" | tee "$PACK/reports/source-graph-fixtures.json"\n'
+if needle not in s: raise SystemExit('build marker missing')
+s=s.replace(needle,replace,1)
 dst.write_text(s,encoding='utf-8')
-print('Phase 19 source-vs-runtime fixture evidence wired into final packet.')
+print('Phase 19 source-vs-runtime fixture evidence wired into final packet and post-build source graph gate.')
