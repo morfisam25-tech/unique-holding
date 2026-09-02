@@ -1,0 +1,40 @@
+name: Phase 18 social-card correction
+
+on:
+  push:
+    branches: ["phase18-social-fix-runner"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  correct:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout correction runner
+        uses: actions/checkout@v4
+        with:
+          ref: phase18-social-fix-runner
+          path: qa-harness
+          fetch-depth: 1
+
+      - name: Checkout exact approved Phase 17 baseline
+        uses: actions/checkout@v4
+        with:
+          ref: 6f9d49cb96b4599f4518a07a5927090c6daea563
+          path: product
+          fetch-depth: 0
+
+      - name: Rebuild, revalidate and replace unreviewed Phase 18 candidate
+        working-directory: product
+        shell: bash
+        run: bash ../qa-harness/.github/phase18/run_phase18_social_fix.sh
+
+      - name: Upload final Phase 18 review packet
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase18-review-packet-final
+          path: /tmp/phase18-review-packet-final/
+          if-no-files-found: error
+          compression-level: 6
