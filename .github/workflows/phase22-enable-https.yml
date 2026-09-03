@@ -1,0 +1,68 @@
+name: Phase 22 safe Pages HTTPS enforcement
+
+on:
+  push:
+    branches: ["phase22-release-qa-runner"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+
+jobs:
+  https:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Attempt HTTPS enforcement only
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -u
+          mkdir -p /tmp/phase22-https
+          OUT=/tmp/phase22-https
+          api="https://api.github.com/repos/${GITHUB_REPOSITORY}/pages"
+          curl -sS -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" "$api" -o "$OUT/before.json"
+          code=$(curl -sS -o "$OUT/put-body.txt" -w '%{http_code}' -X PUT \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "$api" \
+            -d '{"https_enforced":true}')
+          echo "PUT_HTTP_STATUS=$code" | tee "$OUT/put-status.txt"
+          cat "$OUT/put-body.txt" || true
+          sleep 2
+          curl -sS -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" "$api" -o "$OUT/after.json"
+          python3 - <<'PY'
+          import json, pathlib
+          for n in ('before','after'):
+              d=json.loads(pathlib.Path(f'/tmp/phase22-https/{n}.json').read_text())
+              keep={k:d.get(k) for k in ['cname','html_url','build_type','source','https_enforced','https_certificate','protected_domain_state','pending_domain_unverified_at'] if k in d}
+              pathlib.Path(f'/tmp/phase22-https/{n}-summary.json').write_text(json.dumps(keep,indent=2))
+              print(n, json.dumps(keep,indent=2))
+          PY
+          for u in http://www.uniqueholding.com.tr/ https://www.uniqueholding.com.tr/; do
+            echo "===== $u =====" >> "$OUT/http-after.txt"
+            curl -sS -I -L --max-time 20 --connect-timeout 8 "$u" >> "$OUT/http-after.txt" 2>&1 || echo "CURL_EXIT=$?" >> "$OUT/http-after.txt"
+          done
+          curl -skI https://www.uniqueholding.com.tr/ > "$OUT/https-insecure-headers.txt" 2>&1 || true
+          echo | timeout 20 openssl s_client -connect www.uniqueholding.com.tr:443 -servername www.uniqueholding.com.tr -showcerts > "$OUT/openssl-full.txt" 2>&1 || true
+          python3 - <<'PY'
+          import re, pathlib, subprocess, tempfile
+          text=pathlib.Path('/tmp/phase22-https/openssl-full.txt').read_text(errors='ignore')
+          m=re.search(r'-----BEGIN CERTIFICATE-----.*?-----END CERTIFICATE-----', text, re.S)
+          out=pathlib.Path('/tmp/phase22-https/tls-cert-summary.txt')
+          if not m:
+              out.write_text('NO_CERTIFICATE_CAPTURED\n')
+          else:
+              with tempfile.NamedTemporaryFile('w', delete=False) as f:
+                  f.write(m.group(0)); p=f.name
+              r=subprocess.run(['openssl','x509','-in',p,'-noout','-subject','-issuer','-dates','-ext','subjectAltName'],text=True,capture_output=True)
+              out.write_text(r.stdout+r.stderr)
+          PY
+
+      - name: Upload HTTPS evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase22-https-enforcement-attempt
+          path: /tmp/phase22-https/
+          if-no-files-found: error
