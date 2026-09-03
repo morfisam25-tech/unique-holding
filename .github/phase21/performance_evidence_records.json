@@ -1,0 +1,76 @@
+{
+  "records": [
+    {
+      "id": "PHASE21-PERFORMANCE-EVIDENCE-001",
+      "route": "evidence-axis.html",
+      "width": 390,
+      "height": 844,
+      "logicalAsset": "unsplash:images.unsplash.com:photo-1779896411954-9129882c996d",
+      "classification": "SOURCE-INERT PRE-EXISTING THIRD-PARTY ASSET",
+      "disposition": "NO PRODUCT REGRESSION",
+      "evidenceRun": 33783918490,
+      "artifact": "phase21-evidence-axis-final-performance-evidence",
+      "artifactId": 9904711458,
+      "artifactDigest": "sha256:69dd1c72f07e2aea5e5a1041d0a35109fac306fe98510d105e39349fe7426c27",
+      "controlledOccurrence": {
+        "baseline": "0/10",
+        "candidate": "0/10",
+        "aaLeft": "0/10",
+        "aaRight": "0/10",
+        "total": "0/40"
+      },
+      "priorRuntimeOccurrence": {
+        "run": 33706442110,
+        "disposition": "PRIOR RUNTIME/MEASUREMENT OCCURRENCE NOT REPRODUCED AND NOT ATTRIBUTABLE TO A CANDIDATE SOURCE CHANGE"
+      },
+      "sourceInertMedia": {
+        "baselineLogicalSource": true,
+        "candidateLogicalSource": true,
+        "responsibleSourceChanged": false,
+        "candidateAddedMediaDeclaration": false,
+        "candidateOnlyHost": false,
+        "candidateOnlyResourceClass": false,
+        "baselineEffectiveSuppressed": true,
+        "candidateEffectiveSuppressed": true,
+        "baselineSuppressionStable": true,
+        "candidateSuppressionStable": true,
+        "affectedRegionVisualRegression": false,
+        "geometryRegression": false,
+        "intendedMediaDisappears": false,
+        "clsRegression": false,
+        "deterministicGraphRegression": false,
+        "fullPageVisualCoveredSeparately": true,
+        "unrelatedOutsideRegionRasterDelta": true,
+        "wholeViewportDiffPercent": 0.0452667,
+        "affectedRegionPixelDelta": 0,
+        "heroBackgroundDelta": false,
+        "heroGeometryDelta": false,
+        "clsAllRuns": 0,
+        "assetTransferBytes": 0,
+        "thirdPartyRequestsAttributableToLogicalAsset": 0,
+        "candidateAddedDeclarations": [],
+        "candidateRemovedRelevantDeclarations": [],
+        "responsibleSourceFilesChanged": [],
+        "computedBackgroundImage": {
+          "baseline": {
+            "DOMContentLoaded": "none",
+            "stylesheets loaded": "none",
+            "network idle": "none",
+            "pre-screenshot": "none"
+          },
+          "candidate": {
+            "DOMContentLoaded": "none",
+            "stylesheets loaded": "none",
+            "network idle": "none",
+            "pre-screenshot": "none"
+          }
+        },
+        "responsibleFiles": {
+          "assets/internal.css": "18e798aee7da4fee65d72ff941ba3de9eb0a8a40",
+          "assets/evidence-axis-bridge.css": "d6e1ce5a75d9654f16706e75e6a01c6f5f3d5df0",
+          "assets/performance.css": "1e31794d7b03498be6d2458261ac0f1c1b8fca57"
+        }
+      }
+    }
+  ]
+}
