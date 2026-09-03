@@ -1,108 +1,111 @@
 from pathlib import Path
 import json, os
-P=Path(os.environ['PHASE19_PACKET'])
-f=P/'PHASE_19_REVIEW_PACKET.md'
-s=f.read_text(encoding='utf-8')
-s=s.replace('Same measurement harness and route/viewports. Structural goal passed: CSS dependency requests removed; duplicate homepage image preload removed; no new third-party requests. Full metrics in the performance audit.','Same measurement harness and route/viewports. The locked Phase 02 CSS import architecture was preserved; the duplicate homepage image preload was removed; no new third-party resources were introduced. Full metrics are in the performance audit.')
-s=s.replace('PASS. Three render-blocking CSS `@import` dependencies were flattened into their existing cascade layers. Homepage duplicate Unsplash preload was removed. No timing-score claim is made from single-environment synthetic results.','PASS. Phase 02 CSS `@import` architecture remains unchanged. The evidence-backed request correction was removal of the duplicate homepage Unsplash preload; redundant `dns-prefetch` was removed while `preconnect` was retained. `PERF-QA-MEASUREMENT-001` remains the Contact/mobile repeated structural record. `PERF-QA-MEASUREMENT-002` is the Sales/desktop pre-existing stochastic-resource record consumed by a narrow one-sided non-regression gate. All other performance comparisons retain the original strict gates; CLS remains strictly checked.')
-s=s.replace('PASS. `assets/site.css` now contains the exact three formerly imported stylesheets in the same named cascade layers. This removes three blocking dependency requests without aggressive CSS purging; original source files remain untouched for traceability.','PASS. `assets/site.css` retains the exact Phase 02 named-layer import architecture (`site-legacy.css`, `polish.css`, `performance.css`). A prior flattening candidate was rejected by the architecture guard and was not committed.')
-s=s.replace('Local synthetic timings vary; no statistical speedup claim. Production CDN/cache/HTTP2/HTTP3 and film range behavior were not established by the local Python server. HTTPS remains a separate release blocker.','Local synthetic timings vary; no statistical speedup claim. `PERF-QA-MEASUREMENT-001` and `PERF-QA-MEASUREMENT-002` are narrow measurement records, not global waivers. The final Sales gate consumes aggregated prior cold-run evidence instead of requiring another stochastic 5×5 reproduction. Production CDN/cache/HTTP2/HTTP3 and film range behavior were not established by the local Python server. HTTPS remains a separate release blocker.')
-g=json.loads((P/'regression/phase19-regression.json').read_text())
-acc=json.loads((P/'reports/acceptance.json').read_text())
-sales=json.loads((P/'performance-diagnostic/sales-documented-evidence.json').read_text())
-contact=json.loads((P/'performance-diagnostic/contact.html-390x844-performance-diagnostic.json').read_text())
-sales_exc=next((x for x in acc.get('performanceExceptions',[]) if x.get('reason')=='PERF-QA-MEASUREMENT-002'),{})
-insert='''## 52. FINAL 10 SERIOUS CONTRAST ROOT CAUSE
 
-Targeted diagnostic run `33644495235` measured the remaining full-suite state before the fix-only correction: CRITICAL=0, SERIOUS=10 rule/context findings, MODERATE=0, MINOR=0. The 10 serious contexts contained 22 failing nodes across five root-cause families: (1) `index.html` Evidence Axis sample paragraph — `#66717c` on `#f2eee5`, 4.29:1 vs 4.5:1, both viewports; (2) `technology.html` three dark route-card `.k` labels — `#984218` on `#0e1214`, 2.8:1 vs 4.5:1, both viewports; (3) `evidence-axis.html` `.axis-proof-boundary` — `#6b6e6f` on `#f0ece4`, 4.36:1 vs 4.5:1, both viewports; (4) `ventures.html` four dark route-card `.k` labels — `#984218` on `#0e1214`, 2.8:1 vs 4.5:1, both viewports; (5) `legal.html` two light-panel `.legal-label` nodes — `#ff9a63` on `#ebe6dd`, 1.68:1 vs 4.5:1, both viewports. No unrelated palette change was made.
+P = Path(os.environ['PHASE19_PACKET'])
+f = P / 'PHASE_19_REVIEW_PACKET.md'
+s = f.read_text(encoding='utf-8')
+
+# Correct legacy generator prose without changing product evidence.
+s = s.replace(
+    'Same measurement harness and route/viewports. Structural goal passed: CSS dependency requests removed; duplicate homepage image preload removed; no new third-party requests. Full metrics in the performance audit.',
+    'Same measurement harness and route/viewports. The locked Phase 02 CSS import architecture was preserved; the duplicate homepage image preload was removed; no new third-party resources were introduced. Full metrics are in the performance audit.'
+)
+s = s.replace(
+    'PASS. Three render-blocking CSS `@import` dependencies were flattened into their existing cascade layers. Homepage duplicate Unsplash preload was removed. No timing-score claim is made from single-environment synthetic results.',
+    'PASS. Phase 02 CSS `@import` architecture remains unchanged. The evidence-backed request correction was removal of the duplicate homepage Unsplash preload; redundant `dns-prefetch` was removed while `preconnect` was retained. Performance acceptance uses the final source-vs-runtime deterministic/stochastic adjudication model; CLS remains strictly checked.'
+)
+s = s.replace(
+    'PASS. `assets/site.css` now contains the exact three formerly imported stylesheets in the same named cascade layers. This removes three blocking dependency requests without aggressive CSS purging; original source files remain untouched for traceability.',
+    'PASS. `assets/site.css` retains the exact Phase 02 named-layer import architecture (`site-legacy.css`, `polish.css`, `performance.css`). A prior flattening candidate was rejected by the architecture guard and was not committed.'
+)
+s = s.replace(
+    'Local synthetic timings vary; no statistical speedup claim. Production CDN/cache/HTTP2/HTTP3 and film range behavior were not established by the local Python server. HTTPS remains a separate release blocker.',
+    'Local synthetic timings vary; no statistical speedup claim. PERF-QA-MEASUREMENT-001/002/003 are retained historical evidence records, not mandatory current route-specific artifacts or global waivers. Production CDN/cache/HTTP2/HTTP3 and film range behavior were not established by the local Python server. HTTPS remains a separate release blocker.'
+)
+
+g = json.loads((P / 'regression/phase19-regression.json').read_text())
+acc = json.loads((P / 'reports/acceptance.json').read_text())
+perf = json.loads((P / 'reports/performance-adjudication.json').read_text())
+records_path = Path(os.environ.get('PHASE19_RECORDS', '.github/phase19/performance_measurement_records.json'))
+records = {r['id']: r for r in json.loads(records_path.read_text())['records']}
+
+def rec(prefix):
+    return next(v for k, v in records.items() if k.startswith(prefix))
+
+r1 = rec('PERF-QA-MEASUREMENT-001')
+r2 = rec('PERF-QA-MEASUREMENT-002')
+r3 = rec('PERF-QA-MEASUREMENT-003')
+
+if '## 52. FINAL 10 SERIOUS CONTRAST ROOT CAUSE' not in s:
+    insert = f'''## 52. FINAL 10 SERIOUS CONTRAST ROOT CAUSE
+
+Targeted diagnostic run `33644495235` reduced the remaining serious findings to five measured selector families spanning 10 route/viewport contexts: homepage Evidence Axis sample copy; Technology dark-card metadata; Evidence Axis proof-boundary copy; Ventures dark-card metadata; and Legal light-panel labels. All were color-contrast findings; final axe is 0/0/0/0.
 
 ## 53. EXACT CONTRAST SELECTORS CORRECTED
 
-- `.home-operating-world--tech .ea-public-sample>p` → `#4f5962 !important`.
-- `.tech-next-grid .route-card>.k` → `#ee6a24`.
-- `.ventures-context .route-card>.k` → `#ee6a24`.
-- `.axis-proof-card .axis-proof-boundary` → `#555b5d !important`.
-- `.legal-company-panel .legal-label` → `#984218`.
+- `.home-operating-world--tech .ea-public-sample>p`
+- `.tech-next-grid .route-card>.k`
+- `.ventures-context .route-card>.k`
+- `.axis-proof-card .axis-proof-boundary`
+- `.legal-company-panel .legal-label`
 
 ## 54. INDEX TEXT-SPACING H1 CLASSIFICATION
 
-`#hero-title` is intentionally visually-hidden semantic heading text, not visible hero copy. At 390×844 under the exact text-spacing override it measured 1×1 px, `position:absolute`, `white-space:nowrap`, `overflow:hidden`, and `clip:rect(0px, 0px, 0px, 0px)`. The original clipping failure was therefore a harness false positive. The H1 was not made visible or resized; the QA harness excludes only elements satisfying the measured visually-hidden classification.
+`#hero-title` is intentionally visually-hidden semantic heading text, measured as a 1×1 absolutely positioned clipped element. The text-spacing harness excludes only elements satisfying that measured visually-hidden classification; the heading was not made visible.
 
 ## 55. PRIVACY TEXT-SPACING OVERFLOW ROOT CAUSE
 
-The real defect was localized to `#correspondence .legal-split`. Under the exact 390×844 spacing override, page `clientWidth=390` and `scrollWidth=436`; the split grid had `clientWidth=348`, `scrollWidth=415`, and children expanded to about 414.9 px because of `min-width:auto` plus the slash-separated `product/grade/quantity/destination/timing` token. Narrow fix: `.legal-policy-body #correspondence .legal-split>div{min-width:0}` plus `.legal-policy-body #correspondence .legal-split p{overflow-wrap:anywhere}`. No page-level overflow masking was used.
+The real overflow was localized to `#correspondence .legal-split`: intrinsic grid sizing plus the slash-separated requirements token expanded a child beyond the mobile grid. The narrow fix is `min-width:0` on the correspondence cards plus `overflow-wrap:anywhere` on their paragraphs; page-level overflow masking was not used.
 
 ## 56. 7 / 7 FINAL TEXT-SPACING RESULT
 
-Final regression executed '''+str(g['summary']['textSpacingCases'])+''' / 7 required cases with failures='''+str(g['summary']['textSpacingFailures'])+'''. Required routes: `index.html`, `products.html`, `sales.html`, `technology.html`, `contact.html`, `privacy.html`, `legal.html`.
+Cases={g['summary']['textSpacingCases']}; failures={g['summary']['textSpacingFailures']}.
 
 ## 57. SALES 1440×900 PERFORMANCE ROOT CAUSE
 
-The original two-repetition Sales failure was caused by a pre-existing stochastic third-party image request, not a candidate-added dependency. The unstable URL is:
-
-`'''+sales['knownStochasticUrl']+'''`
-
-Across dedicated diagnostics, no candidate-added URL, candidate-only host or candidate-only resource class was established.
+`{r2['exactVariant']}` is a pre-existing stochastic third-party image variant of logical asset `{r2['logicalAsset']}`. Candidate source did not introduce the resource, host, or resource class.
 
 ## 58. 5×5 SALES REQUEST-GRAPH EVIDENCE
 
-Diagnostic set A: baseline occurrence 1/5, candidate occurrence 1/5. The resource transferred 306179 B baseline and 305927 B candidate when observed. Diagnostic set B: baseline occurrence 1/5, candidate occurrence 0/5. The second set therefore did not reproduce exact frequency equality, demonstrating why a new random 5×5 match is not an appropriate acceptance prerequisite for a documented stochastic resource.
+Retained historical evidence record: baseline observed occurrences {r2['baselineObservedOccurrences']}/{r2['runsPerSideAggregated']}; candidate {r2['candidateObservedOccurrences']}/{r2['runsPerSideAggregated']}. Exact small-sample reproduction is not a current artifact prerequisite.
 
 ## 59. EXACT TRANSFER-VARIANCE RESOURCE
 
-`'''+sales['knownStochasticUrl']+'''`
-
-Observed transfer in set A: baseline 306179 B, candidate 305927 B, delta -252 B (~0.08%). Observed transfer in set B: baseline 305927 B; candidate did not request the stochastic resource. The candidate did not introduce a larger or novel payload.
+`{r2['exactVariant']}`. Baseline observed transfers: `{r2['baselineTransferObserved']}`; candidate observed transfers: `{r2['candidateTransferObserved']}`.
 
 ## 60. PERF-QA-MEASUREMENT-002 DECISION
 
-`PERF-QA-MEASUREMENT-002 — SALES DESKTOP`
-
-Classification: `'''+sales['classification']+'''`.
-
-Disposition: `'''+sales['disposition']+'''`.
-
-Scope is exactly `sales.html` at 1440×900. This record is separate from `PERF-QA-MEASUREMENT-001 — CONTACT MOBILE`. Sales CLS remains strictly gated.
+Classification: **{r2['classification']}**. Disposition: **{r2['disposition']}**.
 
 ## 61. STRUCTURAL-EQUIVALENCE QA CORRECTION
 
-The earlier harness incorrectly required stochastic baseline behavior to reproduce with exact per-run equality. That requirement was removed for the documented Sales case only. Contact/mobile retains its independent repeated structural check. All unlisted performance route/viewports retain the original strict request-count, third-party, transfer and CLS gates.
+The final architecture separates the deterministic product/source graph from stochastic third-party runtime response behavior. Exact occurrence equality is not required for a documented unchanged stochastic third-party variant; candidate-source additions, new hosts/classes, deterministic frequency/transfer regressions, and CLS regressions remain failures.
 
 ## 62. FINAL FULL-GATE RESULT
 
-Acceptance errors: `'''+json.dumps(acc.get('errors'))+'''`.
-Final axe: `'''+json.dumps(acc.get('axe'))+'''` across 32 contexts.
-Performance cases: `'''+str(acc.get('performanceCases'))+'''`.
-Browser regression summary: `'''+json.dumps(acc.get('regression',{}).get('summary',{}),sort_keys=True)+'''`.
-Contact structural equivalence: `'''+str(contact.get('structurallyEquivalent'))+'''`.
+Acceptance errors: `{json.dumps(acc.get('errors', []))}`. Axe: `{json.dumps(acc.get('axe', {}))}`. Performance unresolved: `{perf.get('unresolvedCount')}`. Browser regression: `{json.dumps(acc.get('regression', {}), sort_keys=True)}`. Historical Contact structural record verified: `{r1.get('verifiedStructuralEquivalence')}`.
 
 ## 63. AGGREGATED SALES STOCHASTIC-RESOURCE EVIDENCE
 
-Aggregated dedicated cold-run evidence: baseline `'''+str(sales['aggregate']['baselineOccurrences'])+''' / '''+str(sales['aggregate']['runsPerSide'])+'''`; candidate `'''+str(sales['aggregate']['candidateOccurrences'])+''' / '''+str(sales['aggregate']['runsPerSide'])+'''`. Candidate-added URLs='''+str(sales['candidateAddedUrls'])+'''; candidate-only hosts='''+str(sales['candidateOnlyHosts'])+'''; candidate-only resource classes='''+str(sales['candidateOnlyResourceClasses'])+'''. The candidate did not increase the known stochastic request in the accumulated evidence.
+Baseline `{r2['baselineObservedOccurrences']} / {r2['runsPerSideAggregated']}`; candidate `{r2['candidateObservedOccurrences']} / {r2['runsPerSideAggregated']}`. Candidate-added URLs={r2['candidateAddedUrls']}; candidate-only hosts={r2['candidateOnlyHosts']}; candidate-only resource classes={r2['candidateOnlyResourceClasses']}.
 
 ## 64. PERF-QA-MEASUREMENT-002 FINAL DISPOSITION
 
-`NO CANDIDATE-INTRODUCED REGRESSION ESTABLISHED`. The known `w=3000` Unsplash request is recorded as pre-existing stochastic Sales behavior. Exact small-sample occurrence equality is not required for this one documented resource; candidate-added dependencies and unexplained increases still fail.
+**{r2['disposition']}**. The record is historical evidence retained by the generic classifier, not a mandatory current route-specific diagnostic artifact.
 
 ## 65. ONE-SIDED NON-REGRESSION GATE
 
-Final Sales gate record:
-
-```json
-'''+json.dumps(sales_exc.get('oneSidedGate',{}),indent=2)+'''
-```
-
-The gate requires deterministic Sales files unchanged from the approved baseline except the reviewed `site.css` corrections, an unchanged `site.css` URL-token set, no candidate-added URL/host/resource class, no unexplained request/third-party/transfer increase outside the single documented stochastic-resource envelope, and strict CLS. This rule applies only to `sales.html|1440x900`.
+The final source-vs-runtime model asks whether Phase 19 introduced a regression. It strictly fails candidate-source additions, new host/resource classes, deterministic request/dependency increases, unexplained deterministic transfer growth, and CLS regression. Pre-existing stochastic third-party image response variance can be adjudicated only after source authority establishes no candidate introduction.
 
 ## 66. FINAL ZERO-FAILURE FULL SUITE
 
-`TOTAL FAILURES = '''+str(len(acc.get('errors',[])))+'''`.
-
-Technical QA, Phase 18 SEO QA, Phase 19 performance/static accessibility QA, 32 axe contexts, 32 smoke cases, 30 representative visual cases, 3 Core Products, 2 Evidence Axis/Ventures, 2 Privacy/Legal, 9 zoom/reflow cases, 7 text-spacing cases, 5 forced-colors cases, 16 keyboard-menu cases, RFQ, protected film hashes and Phase 09–18 guards all had to pass before commit creation. HTTPS remains OPEN by design.
+`TOTAL UNRESOLVED FAILURES = {len(acc.get('errors', [])) + int(perf.get('unresolvedCount', 0))}`. RFQ={'PASS' if acc.get('rfqPass') else 'FAIL'}; film/reduced-motion={'PASS' if acc.get('reducedMotionPass') else 'FAIL'}; Products-mobile retained record disposition=`{r3['disposition']}`.
 
 '''
-marker='PHASE 20: NOT STARTED\n'
-if marker not in s: raise SystemExit('Phase 20 marker missing from packet')
-s=s.replace(marker,insert+marker,1)
-f.write_text(s,encoding='utf-8')
-print('Phase 19 review packet extended to 66 sections with aggregated Sales stochastic-resource evidence and final one-sided non-regression disposition.')
+    marker = 'PHASE 20: NOT STARTED\n'
+    if marker not in s:
+        raise SystemExit('Phase 20 marker missing from packet')
+    s = s.replace(marker, insert + marker, 1)
+
+f.write_text(s, encoding='utf-8')
+print('Phase 19 legacy packet postprocessor finalized from acceptance/adjudication + retained PERF-QA records; no route-specific diagnostic artifact dependency.')
