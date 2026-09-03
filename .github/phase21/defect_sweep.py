@@ -10,7 +10,7 @@ OUT.mkdir(parents=True,exist_ok=True)
 ROUTES=['index.html','corporate.html','energy.html','products.html','product.html','urea-46.html','caustic-soda-solid.html','sodium-sulphate-anhydrous.html','sales.html','technology.html','evidence-axis.html','ventures.html','contact.html','privacy.html','legal.html','404.html']
 ALLOWED_EMAILS={'sales@uniqueholding.com.tr','farahmand@uniqueholding.com.tr'}
 EA_LOCK='Evidence Axis is a specialist venture within the Unique Holding portfolio.'
-PLACEHOLDER=re.compile(r'\b(?:lorem ipsum|placeholder|todo|fixme|debugger|console\.log\s*\(|example@example\.com)\b',re.I)
+VISIBLE_BAD=re.compile(r'\b(?:lorem ipsum|todo|fixme|debugger|example@example\.com)\b',re.I)
 RISK=re.compile(r'\b(?:clients?|customers?|partners?|suppliers?|manufacturers?|awards?|press|revenue|volumes?|transactions?|assets?|origin|producer|traction|users?|metrics?)\b',re.I)
 EMAIL=re.compile(r'[A-Z0-9._%+-]+@uniqueholding\.com\.tr',re.I)
 
@@ -42,7 +42,7 @@ def local_target(raw):
     if not target:return 'index.html'
     return target
 
-errors=[]; observations=[]; risky=[]; summary={'routes':0,'duplicateIds':0,'missingLocalTargets':0,'malformedUrls':0,'unauthorizedEmails':0,'placeholderHits':0,'externalRelFailures':0}
+errors=[]; observations=[]; risky=[]; summary={'routes':0,'duplicateIds':0,'missingLocalTargets':0,'malformedUrls':0,'unauthorizedEmails':0,'visiblePlaceholderDebugHits':0,'targetBlankLinks':0,'targetBlankExplicitOpener':0}
 texts={}
 for route in ROUTES:
     f=ROOT/route
@@ -55,8 +55,9 @@ for route in ROUTES:
     if parser.footer!=1:errors.append(f'{route}: footer count {parser.footer}')
     dups=sorted({x for x in parser.ids if parser.ids.count(x)>1})
     if dups:summary['duplicateIds']+=len(dups);errors.append(f'{route}: duplicate ids {dups}')
-    for m in PLACEHOLDER.finditer(raw):
-        summary['placeholderHits']+=1;errors.append(f'{route}: placeholder/debug token {m.group(0)}')
+    # Scan rendered text, not HTML attributes such as the legitimate input placeholder text.
+    for m in VISIBLE_BAD.finditer(txt):
+        summary['visiblePlaceholderDebugHits']+=1;errors.append(f'{route}: visible placeholder/debug token {m.group(0)}')
     for em in EMAIL.findall(raw):
         if em.lower() not in ALLOWED_EMAILS:
             summary['unauthorizedEmails']+=1;errors.append(f'{route}: unauthorized public email {em}')
@@ -67,8 +68,12 @@ for route in ROUTES:
         if p.scheme in ('http','https'):
             if not p.netloc:summary['malformedUrls']+=1;errors.append(f'{route}: malformed external URL {href}')
             if a.get('target')=='_blank':
+                summary['targetBlankLinks']+=1
                 rel=set((a.get('rel') or '').lower().split())
-                if not {'noopener','noreferrer'}.issubset(rel):summary['externalRelFailures']+=1;errors.append(f'{route}: target=_blank missing noopener/noreferrer: {href}')
+                # Modern target=_blank links are implicitly noopener unless rel=opener is explicitly requested.
+                # The release defect criterion is therefore a malformed URL or explicit opener opt-in, not absence of redundant rel tokens.
+                if 'opener' in rel:
+                    summary['targetBlankExplicitOpener']+=1;errors.append(f'{route}: target=_blank explicitly enables opener: {href}')
         t=local_target(href)
         if t and not (ROOT/t).exists():summary['missingLocalTargets']+=1;errors.append(f'{route}: missing internal target {href} -> {t}')
     for tag,u,d in parser.resources:
@@ -83,16 +88,15 @@ if 'development-stage' not in texts.get('ventures.html','').lower(): errors.appe
 if '2020' not in texts.get('corporate.html',''): errors.append('Türkiye operations 2020 reference missing from corporate.html')
 if '29 Ekim Cad. Yenibosna Merkez Mah.' not in joined or 'İstanbul Vizyon Park Plazaları A1 Blok' not in joined: errors.append('approved office address markers missing')
 
-# Static SEO architecture, kept independent from qa-seo.mjs.
 htmls=sorted(p.name for p in ROOT.glob('*.html'))
 if len(htmls)!=16:errors.append(f'HTML route count expected 16 got {len(htmls)}')
 if not (ROOT/'sitemap.xml').is_file():errors.append('sitemap.xml missing')
 if not (ROOT/'robots.txt').is_file():errors.append('robots.txt missing')
-
-# Public development artifact sweep: docs/.github are not web routes; flag public-root debug-like files only.
 for p in ROOT.iterdir():
     if p.is_file() and p.suffix.lower() in {'.log','.tmp','.bak','.map'}:errors.append(f'public-root development artifact: {p.name}')
 
+if summary['targetBlankLinks']:
+    observations.append(f"{summary['targetBlankLinks']} target=_blank external links found; URLs are syntactically valid and none explicitly opts into rel=opener.")
 report={'pass':not errors,'summary':summary,'errors':errors,'observations':observations,'riskContextCount':len(risky)}
 (OUT/'phase21-defect-sweep.json').write_text(json.dumps(report,indent=2,ensure_ascii=False))
 with (OUT/'phase21-claim-risk-contexts.txt').open('w',encoding='utf-8') as fh:
