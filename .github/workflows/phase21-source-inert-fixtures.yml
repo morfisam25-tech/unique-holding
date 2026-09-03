@@ -1,0 +1,49 @@
+name: Phase 21 source-inert classifier fixtures
+on:
+  push:
+    branches: ["phase21-release-candidate-runner"]
+    paths:
+      - '.github/workflows/phase21-source-inert-fixtures.yml'
+      - '.github/phase21/source_inert_media_model.py'
+      - '.github/phase21/test_performance_classifier_A_J.py'
+permissions:
+  contents: read
+jobs:
+  fixtures:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout Phase 21 QA harness
+        uses: actions/checkout@v4
+        with:
+          ref: phase21-release-candidate-runner
+          path: qa21
+          fetch-depth: 1
+      - name: Checkout approved Phase 19 QA classifier
+        uses: actions/checkout@v4
+        with:
+          ref: phase19-build-runner
+          path: qa19
+          fetch-depth: 1
+      - name: Run classifier fixtures A-J
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/phase21-source-inert-fixtures
+          PYTHONPATH="$GITHUB_WORKSPACE/qa21/.github/phase21:$GITHUB_WORKSPACE/qa19/.github/phase19" \
+            python3 "$GITHUB_WORKSPACE/qa21/.github/phase21/test_performance_classifier_A_J.py" \
+            | tee /tmp/phase21-source-inert-fixtures/classifier-fixtures-A-J.json
+          python3 - <<'PY'
+          import json
+          p='/tmp/phase21-source-inert-fixtures/classifier-fixtures-A-J.json'
+          d=json.load(open(p))
+          assert d['fixtureCount']==10, d
+          assert d['passed']==10, d
+          assert d['failed']==0, d
+          print('CLASSIFIER FIXTURES A-J: 10/10 PASS')
+          PY
+      - name: Upload fixture evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase21-source-inert-classifier-fixtures
+          path: /tmp/phase21-source-inert-fixtures/
+          if-no-files-found: error
