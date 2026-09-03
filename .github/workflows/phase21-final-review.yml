@@ -41,18 +41,17 @@ jobs:
           ref: 8d2811298c668865f5438f86337c9d8f9d959c80
           path: before
           fetch-depth: 0
-      - name: Checkout approved Phase 20 product tree
+      - name: Checkout exact unchanged Phase 21 product candidate
         uses: actions/checkout@v4
         with:
           ref: b247b536eda5b1f48ada5b6a09c657b324d289f1
           path: candidate
           fetch-depth: 0
-      - name: Finalize Phase 21 no-change release candidate
+      - name: Finalize Phase 21 with generic SOURCE-INERT media adjudication
         shell: bash
-        run: |
-          sed -i 's#assets/hero-player.css#assets/site.css#g' qa21/.github/phase21/finalize_nochange.sh
-          bash qa21/.github/phase21/finalize_nochange.sh
+        run: bash qa21/.github/phase21/run_final_with_source_inert.sh
       - name: Upload Phase 21 review artifact
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: phase21-review-packet-final
