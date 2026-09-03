@@ -1,8 +1,6 @@
 name: Phase 22 safe Pages HTTPS enforcement
 
 on:
-  push:
-    branches: ["phase22-release-qa-runner"]
   workflow_dispatch:
 
 permissions:
