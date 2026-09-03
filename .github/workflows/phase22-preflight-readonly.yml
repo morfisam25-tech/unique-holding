@@ -1,0 +1,98 @@
+name: Phase 22 read-only production preflight
+
+on:
+  push:
+    branches: ["phase22-release-qa-runner"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: read
+  actions: read
+
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout QA branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Read Pages, DNS, HTTP and TLS state
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -u
+          mkdir -p /tmp/phase22-preflight
+          OUT=/tmp/phase22-preflight
+          {
+            echo "QA_HEAD=$(git rev-parse HEAD)"
+            echo "QA_PARENT=$(git rev-parse HEAD^)"
+            echo "RC_EXPECTED=b247b536eda5b1f48ada5b6a09c657b324d289f1"
+            echo "RC_TREE_EXPECTED=30a289aaf26cb1944baf76a5d9f53b98cc6e54dd"
+            echo "MAIN_EXPECTED=6d106520dd82bf4448312b5f45b54ae15981b1db"
+          } > "$OUT/identity.txt"
+
+          curl -sS -D "$OUT/pages-api-headers.txt" \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/pages" \
+            -o "$OUT/pages.json" || true
+
+          python3 - <<'PY'
+          import json, pathlib
+          p=pathlib.Path('/tmp/phase22-preflight/pages.json')
+          try:
+              d=json.loads(p.read_text())
+          except Exception as e:
+              print('PAGES_JSON_PARSE_ERROR',e)
+              raise SystemExit(0)
+          keep={k:d.get(k) for k in ['url','status','cname','custom_404','html_url','build_type','source','public','protected_domain_state','pending_domain_unverified_at','https_certificate'] if k in d}
+          # Do not persist token/auth details; this is configuration-only public release evidence.
+          pathlib.Path('/tmp/phase22-preflight/pages-summary.json').write_text(json.dumps(keep,indent=2,ensure_ascii=False))
+          print(json.dumps(keep,indent=2,ensure_ascii=False))
+          PY
+
+          for server in 8.8.8.8 1.1.1.1; do
+            for name in www.uniqueholding.com.tr uniqueholding.com.tr; do
+              for type in A AAAA CNAME CAA; do
+                { echo "### server=$server name=$name type=$type"; dig +time=4 +tries=1 @$server "$name" "$type" +noall +answer +comments; } >> "$OUT/dns-web-records.txt" 2>&1 || true
+              done
+            done
+          done
+          { echo '### authoritative NS'; dig +time=4 +tries=1 uniqueholding.com.tr NS +noall +answer +comments; } >> "$OUT/dns-web-records.txt" 2>&1 || true
+          { echo '### MX PRESENCE ONLY'; dig +short uniqueholding.com.tr MX | sed 's/.*/MX_RECORD_PRESENT/' | sort -u; } > "$OUT/email-dns-preservation-readonly.txt" 2>&1 || true
+          { echo '### TXT PRESENCE COUNT ONLY'; printf 'TXT_RECORD_COUNT='; dig +short uniqueholding.com.tr TXT | wc -l; } >> "$OUT/email-dns-preservation-readonly.txt" 2>&1 || true
+
+          for u in \
+            http://www.uniqueholding.com.tr/ \
+            https://www.uniqueholding.com.tr/ \
+            http://uniqueholding.com.tr/ \
+            https://uniqueholding.com.tr/; do
+            echo "===== $u =====" >> "$OUT/http-probes.txt"
+            curl -sS -I -L --max-time 20 --connect-timeout 8 --max-redirs 10 "$u" >> "$OUT/http-probes.txt" 2>&1 || echo "CURL_EXIT=$?" >> "$OUT/http-probes.txt"
+          done
+
+          {
+            echo | timeout 20 openssl s_client -connect www.uniqueholding.com.tr:443 -servername www.uniqueholding.com.tr -showcerts 2>&1 | tee /tmp/tls-full.txt >/dev/null
+            openssl x509 -in <(sed -n '/BEGIN CERTIFICATE/,/END CERTIFICATE/p' /tmp/tls-full.txt | head -n 28) -noout -subject -issuer -dates -ext subjectAltName 2>&1
+          } > "$OUT/tls-www.txt" 2>&1 || true
+
+          {
+            echo | timeout 20 openssl s_client -connect uniqueholding.com.tr:443 -servername uniqueholding.com.tr -showcerts 2>&1 | tee /tmp/tls-apex-full.txt >/dev/null
+            openssl x509 -in <(sed -n '/BEGIN CERTIFICATE/,/END CERTIFICATE/p' /tmp/tls-apex-full.txt | head -n 28) -noout -subject -issuer -dates -ext subjectAltName 2>&1
+          } > "$OUT/tls-apex.txt" 2>&1 || true
+
+          printf '%s\n' '--- GitHub Pages origin probe ---' > "$OUT/pages-origin.txt"
+          curl -sS -I -L --max-time 20 https://morfisam25-tech.github.io/unique-holding/ >> "$OUT/pages-origin.txt" 2>&1 || echo "ORIGIN_CURL_EXIT=$?" >> "$OUT/pages-origin.txt"
+
+          echo 'PHASE22 READ-ONLY PREFLIGHT COMPLETE'
+
+      - name: Upload preflight evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase22-readonly-preflight
+          path: /tmp/phase22-preflight/
+          if-no-files-found: error
