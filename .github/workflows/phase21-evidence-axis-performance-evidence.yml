@@ -1,0 +1,300 @@
+name: Phase 21 Evidence Axis targeted performance evidence
+on:
+  push:
+    branches: ["phase21-release-candidate-runner"]
+    paths:
+      - '.github/workflows/phase21-evidence-axis-performance-evidence.yml'
+permissions:
+  contents: read
+jobs:
+  evidence-axis-mobile:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout diagnostic harness branch
+        uses: actions/checkout@v4
+        with:
+          ref: phase21-release-candidate-runner
+          path: qa21
+          fetch-depth: 1
+      - name: Checkout Phase 18 baseline
+        uses: actions/checkout@v4
+        with:
+          ref: 8d2811298c668865f5438f86337c9d8f9d959c80
+          path: baseline
+          fetch-depth: 1
+      - name: Checkout current candidate
+        uses: actions/checkout@v4
+        with:
+          ref: b247b536eda5b1f48ada5b6a09c657b324d289f1
+          path: candidate
+          fetch-depth: 1
+      - name: Checkout same-tree A/A left
+        uses: actions/checkout@v4
+        with:
+          ref: b247b536eda5b1f48ada5b6a09c657b324d289f1
+          path: aa-left
+          fetch-depth: 1
+      - name: Checkout same-tree A/A right
+        uses: actions/checkout@v4
+        with:
+          ref: b247b536eda5b1f48ada5b6a09c657b324d289f1
+          path: aa-right
+          fetch-depth: 1
+      - name: Run only targeted Evidence Axis 390x844 diagnostic
+        shell: bash
+        run: |
+          set -euo pipefail
+          OUT=/tmp/phase21-evidence-axis
+          NODE=/tmp/phase21-evidence-axis-node
+          mkdir -p "$OUT/screenshots" "$NODE"
+          cd "$NODE"
+          npm init -y >/dev/null 2>&1
+          npm install --no-save --ignore-scripts puppeteer-core@24.16.0 pngjs@7.0.0 pixelmatch@6.0.0 >/dev/null
+          cd "$GITHUB_WORKSPACE"
+          python3 -m http.server 8101 --bind 127.0.0.1 --directory baseline >"$OUT/server-baseline.log" 2>&1 & P1=$!
+          python3 -m http.server 8102 --bind 127.0.0.1 --directory candidate >"$OUT/server-candidate.log" 2>&1 & P2=$!
+          python3 -m http.server 8103 --bind 127.0.0.1 --directory aa-left >"$OUT/server-aa-left.log" 2>&1 & P3=$!
+          python3 -m http.server 8104 --bind 127.0.0.1 --directory aa-right >"$OUT/server-aa-right.log" 2>&1 & P4=$!
+          trap 'kill $P1 $P2 $P3 $P4 2>/dev/null || true' EXIT
+          sleep 1
+          CHROME="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium)"
+          cat > "$OUT/diagnostic.cjs" <<'NODE'
+          const fs = require('fs');
+          const path = require('path');
+          const crypto = require('crypto');
+          const {execFileSync} = require('child_process');
+          const puppeteer = require('puppeteer-core');
+          const {PNG} = require('pngjs');
+          const pixelmatch = require('pixelmatch').default || require('pixelmatch');
+
+          const OUT = '/tmp/phase21-evidence-axis';
+          const ASSET_ID = 'photo-1779896411954-9129882c996d';
+          const VIEW = {width:390,height:844,deviceScaleFactor:1,isMobile:true,hasTouch:true};
+          const GROUPS = [
+            {key:'baseline', sha:'8d2811298c668865f5438f86337c9d8f9d959c80', root:path.join(process.env.GITHUB_WORKSPACE,'baseline'), port:8101, runs:10},
+            {key:'candidate', sha:'b247b536eda5b1f48ada5b6a09c657b324d289f1', root:path.join(process.env.GITHUB_WORKSPACE,'candidate'), port:8102, runs:10},
+            {key:'aaLeft', sha:'b247b536eda5b1f48ada5b6a09c657b324d289f1', root:path.join(process.env.GITHUB_WORKSPACE,'aa-left'), port:8103, runs:10},
+            {key:'aaRight', sha:'b247b536eda5b1f48ada5b6a09c657b324d289f1', root:path.join(process.env.GITHUB_WORKSPACE,'aa-right'), port:8104, runs:10}
+          ];
+
+          function gitBlob(root, rel){
+            try { return execFileSync('git',['-C',root,'hash-object',rel],{encoding:'utf8'}).trim(); }
+            catch { return null; }
+          }
+          function sha256File(p){ return crypto.createHash('sha256').update(fs.readFileSync(p)).digest('hex'); }
+          function walk(root, out=[]){
+            for(const ent of fs.readdirSync(root,{withFileTypes:true})){
+              if(ent.name==='.git') continue;
+              const p=path.join(root,ent.name);
+              if(ent.isDirectory()) walk(p,out); else out.push(p);
+            }
+            return out;
+          }
+          function sourceSnapshot(root){
+            const files=walk(root).filter(p=>/\.(css|html)$/i.test(p));
+            const relevant=[]; const exactUrls=[];
+            for(const p of files){
+              const txt=fs.readFileSync(p,'utf8');
+              if(!(txt.includes(ASSET_ID)||txt.includes('.subsite-hero.tech')||txt.includes('axis-bridge-hero')||txt.includes('evidence-axis-bridge-body'))) continue;
+              const rel=path.relative(root,p).replace(/\\/g,'/');
+              const lines=txt.split(/\r?\n/);
+              const hits=[];
+              lines.forEach((line,i)=>{
+                if(line.includes(ASSET_ID)||line.includes('.subsite-hero.tech')||line.includes('axis-bridge-hero')||line.includes('evidence-axis-bridge-body')) hits.push({line:i+1,text:line.trim()});
+              });
+              const urls=[...txt.matchAll(/https:\/\/images\.unsplash\.com\/photo-1779896411954-9129882c996d[^'"\)\s]*/g)].map(m=>m[0]);
+              exactUrls.push(...urls);
+              relevant.push({file:rel,blob:gitBlob(root,rel),sha256:sha256File(p),hits});
+            }
+            const html=fs.readFileSync(path.join(root,'evidence-axis.html'),'utf8');
+            const linkOrder=[...html.matchAll(/<link[^>]+rel=["']stylesheet["'][^>]+href=["']([^"']+)["']/gi)].map(m=>m[1]);
+            const site=fs.readFileSync(path.join(root,'assets/site.css'),'utf8');
+            const layerOrder=(site.match(/@layer\s+([^;]+);/)||[])[1]?.split(',').map(x=>x.trim())||[];
+            const importOrder=[...site.matchAll(/@import\s+url\(['"]?([^)'"]+)['"]?\)\s+layer\(([^)]+)\)/g)].map(m=>({href:m[1],layer:m[2]}));
+            return {relevant,exactUrls:[...new Set(exactUrls)],linkOrder,layerOrder,importOrder,
+              internal:{blob:gitBlob(root,'assets/internal.css'),sha256:sha256File(path.join(root,'assets/internal.css'))},
+              bridge:{blob:gitBlob(root,'assets/evidence-axis-bridge.css'),sha256:sha256File(path.join(root,'assets/evidence-axis-bridge.css'))},
+              performance:{blob:gitBlob(root,'assets/performance.css'),sha256:sha256File(path.join(root,'assets/performance.css'))},
+              site:{blob:gitBlob(root,'assets/site.css'),sha256:sha256File(path.join(root,'assets/site.css'))}
+            };
+          }
+          function normalizedDeclarationHits(snapshot){
+            const rows=[];
+            for(const f of snapshot.relevant) for(const h of f.hits) rows.push(`${f.file}:${h.text}`);
+            return [...new Set(rows)].sort();
+          }
+          function initiatorSummary(i){
+            if(!i) return null;
+            const out={type:i.type||null,url:i.url||null,lineNumber:i.lineNumber??null,columnNumber:i.columnNumber??null};
+            if(i.stack?.callFrames?.length) out.stack=i.stack.callFrames.slice(0,4).map(f=>({functionName:f.functionName,url:f.url,lineNumber:f.lineNumber,columnNumber:f.columnNumber}));
+            return out;
+          }
+          async function styleCapture(page,stage){
+            return page.evaluate((stage)=>{
+              const el=document.querySelector('.subsite-hero.tech');
+              const cs=getComputedStyle(el,'::before');
+              const r=el.getBoundingClientRect();
+              return {stage,backgroundImage:cs.backgroundImage,background:cs.background,display:cs.display,visibility:cs.visibility,content:cs.content,
+                geometry:{x:r.x,y:r.y,width:r.width,height:r.height,top:r.top,right:r.right,bottom:r.bottom,left:r.left},
+                cls:(window.__phase21Cls||0)};
+            },stage);
+          }
+          async function cascadeCapture(page){
+            return page.evaluate(()=>{
+              const el=document.querySelector('.subsite-hero.tech');
+              const matches=[]; let serial=0;
+              function cleanBase(sel){ return sel.replace(/::?before\b/g,'').trim(); }
+              function visit(rules, href, pathLayers=[]){
+                if(!rules) return;
+                for(const rule of rules){
+                  serial++;
+                  if(rule.type===3 && rule.styleSheet){ try{ visit(rule.styleSheet.cssRules, rule.href||href, pathLayers.concat(['@import'])); }catch{} continue; }
+                  if(rule.cssRules && !rule.selectorText){
+                    const label=rule.name?`@layer ${rule.name}`:(rule.conditionText?`@media ${rule.conditionText}`:rule.constructor?.name||'group');
+                    try{ visit(rule.cssRules,href,pathLayers.concat([label])); }catch{}
+                    continue;
+                  }
+                  if(!rule.selectorText||!rule.style) continue;
+                  for(const selector of rule.selectorText.split(',')){
+                    if(!/::?before\b/.test(selector)) continue;
+                    const base=cleanBase(selector);
+                    let ok=false; try{ ok=!!base && el.matches(base); }catch{}
+                    if(!ok) continue;
+                    const props=[];
+                    for(const name of ['background','background-image','background-color','content','display','visibility']){
+                      const val=rule.style.getPropertyValue(name); if(val) props.push({name,value:val.trim(),important:rule.style.getPropertyPriority(name)==='important'});
+                    }
+                    if(props.length) matches.push({serial,href,layerPath:pathLayers,selector:selector.trim(),props,cssText:rule.cssText});
+                  }
+                }
+              }
+              for(const sheet of document.styleSheets){ try{ visit(sheet.cssRules,sheet.href||'inline',[]); }catch{} }
+              const c=getComputedStyle(el,'::before');
+              return {topLevelSheets:[...document.styleSheets].map(s=>s.href||'inline'),matches,computed:{backgroundImage:c.backgroundImage,background:c.background,display:c.display,visibility:c.visibility,content:c.content}};
+            });
+          }
+          async function runCold(group, index){
+            const browser=await puppeteer.launch({headless:true,executablePath:process.env.CHROME,args:['--no-sandbox','--disable-dev-shm-usage','--disable-application-cache','--disk-cache-size=1','--media-cache-size=1','--disable-features=BackForwardCache']});
+            const page=await browser.newPage();
+            await page.setViewport(VIEW);
+            await page.setCacheEnabled(false);
+            await page.setExtraHTTPHeaders({'Cache-Control':'no-cache, no-store, max-age=0','Pragma':'no-cache'});
+            const cdp=await page.createCDPSession();
+            await cdp.send('Network.enable',{maxTotalBufferSize:100000000,maxResourceBufferSize:50000000});
+            await cdp.send('Network.setCacheDisabled',{cacheDisabled:true});
+            await cdp.send('Network.setBypassServiceWorker',{bypass:true});
+            const req=new Map(); const bodyPromises=[];
+            cdp.on('Network.requestWillBeSent',ev=>{
+              req.set(ev.requestId,{requestId:ev.requestId,url:ev.request.url,resourceType:ev.type||null,initiator:initiatorSummary(ev.initiator),status:null,mimeType:null,transferBytes:0,decodedBytes:null,failed:null,fromDiskCache:false,fromServiceWorker:false});
+            });
+            cdp.on('Network.responseReceived',ev=>{
+              const x=req.get(ev.requestId); if(!x) return;
+              x.resourceType=ev.type||x.resourceType; x.status=ev.response.status; x.mimeType=ev.response.mimeType||null; x.fromDiskCache=!!ev.response.fromDiskCache; x.fromServiceWorker=!!ev.response.fromServiceWorker;
+            });
+            cdp.on('Network.loadingFinished',ev=>{
+              const x=req.get(ev.requestId); if(!x) return; x.transferBytes=ev.encodedDataLength||0;
+              if(x.url.includes(ASSET_ID)) bodyPromises.push(cdp.send('Network.getResponseBody',{requestId:ev.requestId}).then(b=>{x.decodedBytes=b.base64Encoded?Buffer.from(b.body,'base64').length:Buffer.byteLength(b.body||'');}).catch(()=>{}));
+            });
+            cdp.on('Network.loadingFailed',ev=>{const x=req.get(ev.requestId); if(x){x.failed=ev.errorText||'failed';x.status=`FAILED:${ev.errorText||'unknown'}`;}});
+            await page.evaluateOnNewDocument(()=>{
+              window.__phase21Cls=0;
+              new PerformanceObserver(list=>{for(const e of list.getEntries()){if(!e.hadRecentInput) window.__phase21Cls+=e.value;}}).observe({type:'layout-shift',buffered:true});
+            });
+            const timeline=[];
+            const url=`http://127.0.0.1:${group.port}/evidence-axis.html?phase21cold=${group.key}-${index}-${Date.now()}-${Math.random()}`;
+            await page.goto(url,{waitUntil:'domcontentloaded',timeout:30000});
+            timeline.push(await styleCapture(page,'DOMContentLoaded'));
+            await page.evaluate(async()=>{
+              const links=[...document.querySelectorAll('link[rel="stylesheet"]')];
+              await Promise.all(links.map(l=>l.sheet?Promise.resolve():new Promise(resolve=>{l.addEventListener('load',resolve,{once:true});l.addEventListener('error',resolve,{once:true});setTimeout(resolve,5000);}))); 
+            });
+            timeline.push(await styleCapture(page,'stylesheets loaded'));
+            try{await page.waitForNetworkIdle({idleTime:800,timeout:10000});}catch{}
+            timeline.push(await styleCapture(page,'network idle'));
+            await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
+            await new Promise(r=>setTimeout(r,120));
+            timeline.push(await styleCapture(page,'pre-screenshot'));
+            const cascade=await cascadeCapture(page);
+            const shot=path.join(OUT,'screenshots',`${group.key}-${String(index).padStart(2,'0')}.png`);
+            await page.screenshot({path:shot,fullPage:false});
+            await Promise.allSettled(bodyPromises);
+            const all=[...req.values()];
+            const asset=all.filter(x=>x.url.includes(ASSET_ID));
+            const thirdParty=all.filter(x=>{try{const h=new URL(x.url).hostname;return h!=='127.0.0.1'&&h!=='localhost';}catch{return false;}});
+            const perf=await page.evaluate((id)=>performance.getEntriesByType('resource').filter(e=>e.name.includes(id)).map(e=>({name:e.name,initiatorType:e.initiatorType,transferSize:e.transferSize,encodedBodySize:e.encodedBodySize,decodedBodySize:e.decodedBodySize,duration:e.duration})),ASSET_ID);
+            const cls=await page.evaluate(()=>window.__phase21Cls||0);
+            await browser.close();
+            return {group:group.key,sha:group.sha,index,url,requestCount:all.length,thirdPartyCount:thirdParty.length,transferTotal:all.reduce((s,x)=>s+(x.transferBytes||0),0),assetRequested:asset.length>0,assetRequests:asset,performanceEntries:perf,exactAssetUrls:[...new Set(asset.map(x=>x.url))],timeline,cascade,cls,screenshot:shot,pre:timeline[timeline.length-1]};
+          }
+          function summarizeGroup(runs){
+            const freq={};
+            for(const r of runs) for(const u of r.exactAssetUrls) freq[u]=(freq[u]||0)+1;
+            const cls=runs.map(r=>r.cls);
+            return {runCount:runs.length,assetRequestedRuns:runs.filter(r=>r.assetRequested).length,assetNotRequestedRuns:runs.filter(r=>!r.assetRequested).length,occurrenceFrequency:`${runs.filter(r=>r.assetRequested).length}/${runs.length}`,exactUrlRunFrequency:freq,
+              requestCounts:runs.map(r=>r.requestCount),thirdPartyCounts:runs.map(r=>r.thirdPartyCount),transferTotals:runs.map(r=>r.transferTotal),cls,
+              clsMax:Math.max(...cls),clsMean:cls.reduce((a,b)=>a+b,0)/cls.length};
+          }
+          function comparePng(a,b){
+            if(!a||!b) return null;
+            const ia=PNG.sync.read(fs.readFileSync(a)), ib=PNG.sync.read(fs.readFileSync(b));
+            if(ia.width!==ib.width||ia.height!==ib.height) return {comparable:false};
+            const diff=new PNG({width:ia.width,height:ia.height});
+            const n=pixelmatch(ia.data,ib.data,diff.data,ia.width,ia.height,{threshold:0.1,includeAA:false});
+            return {comparable:true,diffPixels:n,totalPixels:ia.width*ia.height,diffPercent:n/(ia.width*ia.height)*100};
+          }
+          function sameGeom(a,b){
+            if(!a||!b) return null; const keys=['x','y','width','height','top','right','bottom','left'];
+            return keys.every(k=>Math.abs(a[k]-b[k])<0.01);
+          }
+
+          (async()=>{
+            const source={baseline:sourceSnapshot(GROUPS[0].root),candidate:sourceSnapshot(GROUPS[1].root)};
+            const bHits=normalizedDeclarationHits(source.baseline), cHits=normalizedDeclarationHits(source.candidate);
+            const candidateAddedDeclarations=cHits.filter(x=>!bHits.includes(x));
+            const candidateRemovedDeclarations=bHits.filter(x=>!cHits.includes(x));
+            const bMap=new Map(source.baseline.relevant.map(x=>[x.file,x.blob]));
+            const cMap=new Map(source.candidate.relevant.map(x=>[x.file,x.blob]));
+            const responsibleSourceFilesChanged=[...new Set([...bMap.keys(),...cMap.keys()])].filter(f=>bMap.get(f)!==cMap.get(f)).map(f=>({file:f,baseline:bMap.get(f)||null,candidate:cMap.get(f)||null}));
+            const allRuns={};
+            for(const g of GROUPS){ allRuns[g.key]=[]; for(let i=1;i<=g.runs;i++){ console.log(`RUN ${g.key} ${i}/${g.runs}`); allRuns[g.key].push(await runCold(g,i)); } }
+            const summaries=Object.fromEntries(Object.entries(allRuns).map(([k,v])=>[k,summarizeGroup(v)]));
+            const sameTree=[...allRuns.candidate,...allRuns.aaLeft,...allRuns.aaRight];
+            const reqShot=sameTree.find(r=>r.assetRequested)?.screenshot||null;
+            const noShot=sameTree.find(r=>!r.assetRequested)?.screenshot||null;
+            const stateVisual=comparePng(reqShot,noShot);
+            const baseRep=allRuns.baseline[0], candRep=allRuns.candidate[0];
+            const baselineCandidateVisual=comparePng(baseRep.screenshot,candRep.screenshot);
+            const styleBaseline=baseRep.timeline, styleCandidate=candRep.timeline;
+            const finalNoneBoth=baseRep.pre.backgroundImage==='none'&&candRep.pre.backgroundImage==='none';
+            const sharedLogical=source.baseline.exactUrls.length>0&&source.candidate.exactUrls.length>0;
+            const overrideBoth=source.baseline.bridge.blob===source.candidate.bridge.blob && source.baseline.relevant.some(f=>f.file==='assets/evidence-axis-bridge.css'&&f.hits.some(h=>h.text.includes('background-image:none!important')));
+            const noIntendedMediaDisappears=finalNoneBoth && (!stateVisual || stateVisual.diffPercent<0.01);
+            const clsNoRegress=summaries.candidate.clsMax<=summaries.baseline.clsMax+0.01;
+            const screenshotsEquivalent=(!stateVisual||stateVisual.diffPercent<0.01) && baselineCandidateVisual && baselineCandidateVisual.diffPercent<0.01;
+            const sourceInert=sharedLogical&&overrideBoth&&responsibleSourceFilesChanged.length===0&&finalNoneBoth&&candidateAddedDeclarations.length===0&&noIntendedMediaDisappears&&screenshotsEquivalent&&clsNoRegress;
+            const result={title:'PHASE 21 — FINAL PERFORMANCE EVIDENCE',target:{route:'evidence-axis.html',viewport:'390x844',logicalAsset:`unsplash:images.unsplash.com:${ASSET_ID}`},source,
+              candidateAddedDeclarations,candidateRemovedDeclarations,responsibleSourceFilesChanged,summaries,runs:allRuns,
+              computedStyleTimeline:{baseline:styleBaseline,candidate:styleCandidate},cascade:{baseline:baseRep.cascade,candidate:candRep.cascade},
+              visual:{requestedRepresentative:reqShot,notRequestedRepresentative:noShot,stateComparison:stateVisual,baselineCandidateComparison:baselineCandidateVisual,heroBackgroundDelta:baseRep.pre.background!==candRep.pre.background||baseRep.pre.backgroundImage!==candRep.pre.backgroundImage,geometryDelta:!sameGeom(baseRep.pre.geometry,candRep.pre.geometry),missingIntendedMedia:!noIntendedMediaDisappears},
+              cls:{baseline:summaries.baseline.cls,candidate:summaries.candidate.cls,aaLeft:summaries.aaLeft.cls,aaRight:summaries.aaRight.cls,noRegression:clsNoRegress},
+              sourceInertChecks:{sharedLogicalAsset:sharedLogical,evidenceAxisOverrideBoth:overrideBoth,responsibleSourceFilesUnchanged:responsibleSourceFilesChanged.length===0,finalComputedBackgroundImageNoneBoth:finalNoneBoth,noCandidateAddedDeclaration:candidateAddedDeclarations.length===0,noIntendedMediaDisappears,screenshotsVisuallyEquivalent:screenshotsEquivalent,clsDoesNotRegress:clsNoRegress},
+              SOURCE_INERT:sourceInert,
+              PRODUCT_REGRESSION:!sourceInert,
+              finalClassification:sourceInert?'RUNTIME OCCURRENCE VARIANCE — SOURCE-INERT / NO PRODUCT REGRESSION':'UNRESOLVED — SOURCE-INERT TEST FAILED'};
+            fs.writeFileSync(path.join(OUT,'phase21-final-performance-evidence.json'),JSON.stringify(result,null,2));
+            fs.writeFileSync(path.join(OUT,'summary.json'),JSON.stringify({title:result.title,target:result.target,summaries:result.summaries,computedStyleTimeline:result.computedStyleTimeline,cssHashes:{baseline:{internal:source.baseline.internal,bridge:source.baseline.bridge,performance:source.baseline.performance,site:source.baseline.site},candidate:{internal:source.candidate.internal,bridge:source.candidate.bridge,performance:source.candidate.performance,site:source.candidate.site}},stylesheetOrder:{baseline:{links:source.baseline.linkOrder,layers:source.baseline.layerOrder,imports:source.baseline.importOrder},candidate:{links:source.candidate.linkOrder,layers:source.candidate.layerOrder,imports:source.candidate.importOrder}},cascade:result.cascade,candidateAddedDeclarations,candidateRemovedDeclarations,responsibleSourceFilesChanged,visual:result.visual,cls:result.cls,sourceInertChecks:result.sourceInertChecks,SOURCE_INERT:result.SOURCE_INERT,PRODUCT_REGRESSION:result.PRODUCT_REGRESSION,finalClassification:result.finalClassification},null,2));
+            console.log('PHASE21_EVIDENCE_SUMMARY_START');
+            console.log(fs.readFileSync(path.join(OUT,'summary.json'),'utf8'));
+            console.log('PHASE21_EVIDENCE_SUMMARY_END');
+            if(!sourceInert) process.exitCode=2;
+          })().catch(e=>{console.error(e);process.exit(1)});
+          NODE
+          NODE_PATH="$NODE/node_modules" CHROME="$CHROME" node "$OUT/diagnostic.cjs" | tee "$OUT/console.log"
+      - name: Upload targeted performance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase21-evidence-axis-final-performance-evidence
+          path: /tmp/phase21-evidence-axis/
+          if-no-files-found: error
+          compression-level: 6
