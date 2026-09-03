@@ -4,6 +4,7 @@ on:
     branches: ["phase21-release-candidate-runner"]
     paths:
       - '.github/workflows/phase21-final-review.yml'
+      - '.github/phase21/**'
 permissions:
   contents: read
 jobs:
