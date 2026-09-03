@@ -1,0 +1,58 @@
+name: Phase 21 final release-candidate review
+on:
+  push:
+    branches: ["phase21-release-candidate-runner"]
+    paths:
+      - '.github/workflows/phase21-final-review.yml'
+permissions:
+  contents: read
+jobs:
+  finalize:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout Phase 21 QA harness
+        uses: actions/checkout@v4
+        with:
+          ref: phase21-release-candidate-runner
+          path: qa21
+          fetch-depth: 1
+      - name: Checkout Phase 20 QA harness
+        uses: actions/checkout@v4
+        with:
+          ref: phase20-visual-qc-runner
+          path: qa20
+          fetch-depth: 1
+      - name: Checkout Phase 19 QA harness
+        uses: actions/checkout@v4
+        with:
+          ref: phase19-build-runner
+          path: qa19
+          fetch-depth: 1
+      - name: Checkout Phase 19 baseline harness
+        uses: actions/checkout@v4
+        with:
+          ref: phase19-audit-runner
+          path: baseqa19
+          fetch-depth: 1
+      - name: Checkout Phase 18 approved baseline
+        uses: actions/checkout@v4
+        with:
+          ref: 8d2811298c668865f5438f86337c9d8f9d959c80
+          path: before
+          fetch-depth: 0
+      - name: Checkout approved Phase 20 product tree
+        uses: actions/checkout@v4
+        with:
+          ref: b247b536eda5b1f48ada5b6a09c657b324d289f1
+          path: candidate
+          fetch-depth: 0
+      - name: Finalize Phase 21 no-change release candidate
+        shell: bash
+        run: bash qa21/.github/phase21/finalize_nochange.sh
+      - name: Upload Phase 21 review artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase21-review-packet-final
+          path: /tmp/phase21-review/
+          if-no-files-found: error
+          compression-level: 6
