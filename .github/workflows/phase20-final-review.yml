@@ -1,0 +1,58 @@
+name: Phase 20 final review
+on:
+  push:
+    branches: ["phase20-visual-qc-runner"]
+    paths:
+      - '.github/workflows/phase20-final-review.yml'
+permissions:
+  contents: read
+jobs:
+  finalize:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout Phase 20 QA harness
+        uses: actions/checkout@v4
+        with:
+          ref: phase20-visual-qc-runner
+          path: qa20
+          fetch-depth: 1
+
+      - name: Checkout Phase 19 QA harness
+        uses: actions/checkout@v4
+        with:
+          ref: phase19-build-runner
+          path: qa19
+          fetch-depth: 1
+
+      - name: Checkout Phase 19 baseline harness
+        uses: actions/checkout@v4
+        with:
+          ref: phase19-audit-runner
+          path: baseqa19
+          fetch-depth: 1
+
+      - name: Checkout Phase 18 approved baseline
+        uses: actions/checkout@v4
+        with:
+          ref: 8d2811298c668865f5438f86337c9d8f9d959c80
+          path: before
+          fetch-depth: 0
+
+      - name: Checkout approved Phase 19 product tree
+        uses: actions/checkout@v4
+        with:
+          ref: b247b536eda5b1f48ada5b6a09c657b324d289f1
+          path: candidate
+          fetch-depth: 0
+
+      - name: Finalize Phase 20 no-change review
+        shell: bash
+        run: bash qa20/.github/phase20/finalize_nochange.sh
+
+      - name: Upload Phase 20 final review artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase20-review-packet-final
+          path: /tmp/phase20-review/
+          if-no-files-found: error
+          compression-level: 6
