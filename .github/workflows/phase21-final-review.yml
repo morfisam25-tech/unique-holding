@@ -4,58 +4,74 @@ on:
     branches: ["phase21-release-candidate-runner"]
     paths:
       - '.github/workflows/phase21-final-review.yml'
-      - '.github/phase21/**'
 permissions:
   contents: read
 jobs:
-  finalize:
+  evidence-axis-mobile-only:
     runs-on: ubuntu-24.04
     steps:
-      - name: Checkout Phase 21 QA harness
+      - name: Checkout Phase 21 diagnostic harness
         uses: actions/checkout@v4
         with:
           ref: phase21-release-candidate-runner
           path: qa21
           fetch-depth: 1
-      - name: Checkout Phase 20 QA harness
-        uses: actions/checkout@v4
-        with:
-          ref: phase20-visual-qc-runner
-          path: qa20
-          fetch-depth: 1
-      - name: Checkout Phase 19 QA harness
-        uses: actions/checkout@v4
-        with:
-          ref: phase19-build-runner
-          path: qa19
-          fetch-depth: 1
-      - name: Checkout Phase 19 baseline harness
-        uses: actions/checkout@v4
-        with:
-          ref: phase19-audit-runner
-          path: baseqa19
-          fetch-depth: 1
-      - name: Checkout Phase 18 approved baseline
+      - name: Checkout Phase 18 baseline
         uses: actions/checkout@v4
         with:
           ref: 8d2811298c668865f5438f86337c9d8f9d959c80
-          path: before
-          fetch-depth: 0
-      - name: Checkout approved Phase 20 product tree
+          path: baseline
+          fetch-depth: 1
+      - name: Checkout current candidate
         uses: actions/checkout@v4
         with:
           ref: b247b536eda5b1f48ada5b6a09c657b324d289f1
           path: candidate
-          fetch-depth: 0
-      - name: Finalize Phase 21 no-change release candidate
+          fetch-depth: 1
+      - name: Checkout same-tree A/A left
+        uses: actions/checkout@v4
+        with:
+          ref: b247b536eda5b1f48ada5b6a09c657b324d289f1
+          path: aa-left
+          fetch-depth: 1
+      - name: Checkout same-tree A/A right
+        uses: actions/checkout@v4
+        with:
+          ref: b247b536eda5b1f48ada5b6a09c657b324d289f1
+          path: aa-right
+          fetch-depth: 1
+      - name: Run only Evidence Axis 390x844 diagnostic
         shell: bash
         run: |
-          sed -i 's#assets/hero-player.css#assets/site.css#g' qa21/.github/phase21/finalize_nochange.sh
-          bash qa21/.github/phase21/finalize_nochange.sh
-      - name: Upload Phase 21 review artifact
+          set -euo pipefail
+          OUT=/tmp/phase21-evidence-axis
+          NODEDIR=/tmp/phase21-evidence-axis-node
+          mkdir -p "$OUT/screenshots" "$NODEDIR"
+          cd "$NODEDIR"
+          npm init -y >/dev/null 2>&1
+          npm install --no-save --ignore-scripts puppeteer-core@24.16.0 pngjs@7.0.0 pixelmatch@6.0.0 >/dev/null
+          cd "$GITHUB_WORKSPACE"
+          python3 -m http.server 8101 --bind 127.0.0.1 --directory baseline >"$OUT/server-baseline.log" 2>&1 & P1=$!
+          python3 -m http.server 8102 --bind 127.0.0.1 --directory candidate >"$OUT/server-candidate.log" 2>&1 & P2=$!
+          python3 -m http.server 8103 --bind 127.0.0.1 --directory aa-left >"$OUT/server-aa-left.log" 2>&1 & P3=$!
+          python3 -m http.server 8104 --bind 127.0.0.1 --directory aa-right >"$OUT/server-aa-right.log" 2>&1 & P4=$!
+          trap 'kill $P1 $P2 $P3 $P4 2>/dev/null || true' EXIT
+          sleep 1
+          python3 - <<'PY'
+          from pathlib import Path
+          src=Path('qa21/.github/workflows/phase21-evidence-axis-performance-evidence.yml').read_text()
+          marker='cat > "$OUT/diagnostic.cjs" <<\'NODE\'\n'
+          body=src.split(marker,1)[1].split('\n          NODE\n',1)[0]
+          body='\n'.join((line[10:] if line.startswith('          ') else line) for line in body.splitlines())+'\n'
+          Path('/tmp/phase21-evidence-axis/diagnostic.cjs').write_text(body)
+          PY
+          CHROME="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium)"
+          NODE_PATH="$NODEDIR/node_modules" CHROME="$CHROME" node "$OUT/diagnostic.cjs" | tee "$OUT/console.log"
+      - name: Upload targeted performance evidence
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: phase21-review-packet-final
-          path: /tmp/phase21-review/
+          name: phase21-evidence-axis-final-performance-evidence
+          path: /tmp/phase21-evidence-axis/
           if-no-files-found: error
           compression-level: 6
