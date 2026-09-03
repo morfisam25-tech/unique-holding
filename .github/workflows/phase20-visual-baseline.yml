@@ -35,6 +35,7 @@ jobs:
           (cd /tmp/phase20-node && npm init -y >/dev/null 2>&1 && npm install --no-save --ignore-scripts puppeteer-core@24.16.0 >/dev/null)
           CHROME="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium)"
           test -n "$CHROME"
+          python3 qa-harness/.github/phase20/patch_visual_qc.py qa-harness/.github/phase20/visual_qc.cjs /tmp/phase20-visual-qc-final.cjs
           cd candidate
           python3 -m http.server 8000 --bind 127.0.0.1 >/tmp/phase20-visual/server.log 2>&1 &
           PID=$!
@@ -42,7 +43,7 @@ jobs:
           sleep 1
           curl -fsS http://127.0.0.1:8000/index.html >/dev/null
           set +e
-          PHASE20_OUT=/tmp/phase20-visual NODE_PATH=/tmp/phase20-node/node_modules CHROME="$CHROME" node ../qa-harness/.github/phase20/visual_qc.cjs | tee /tmp/phase20-visual/console.log
+          PHASE20_OUT=/tmp/phase20-visual NODE_PATH=/tmp/phase20-node/node_modules CHROME="$CHROME" node /tmp/phase20-visual-qc-final.cjs | tee /tmp/phase20-visual/console.log
           RC=${PIPESTATUS[0]}
           set -e
           echo "$RC" > /tmp/phase20-visual/harness-exit-code.txt
