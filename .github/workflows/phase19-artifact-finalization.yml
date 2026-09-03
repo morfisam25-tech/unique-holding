@@ -1,0 +1,51 @@
+name: Phase 19 artifact finalization
+on:
+  push:
+    branches: ["phase19-build-runner"]
+    paths:
+      - '.github/workflows/phase19-artifact-finalization.yml'
+permissions:
+  contents: read
+jobs:
+  finalize:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout QA harness
+        uses: actions/checkout@v4
+        with:
+          ref: phase19-build-runner
+          path: qa-harness
+          fetch-depth: 1
+
+      - name: Checkout baseline harness
+        uses: actions/checkout@v4
+        with:
+          ref: phase19-audit-runner
+          path: baseline-harness
+          fetch-depth: 1
+
+      - name: Checkout approved baseline
+        uses: actions/checkout@v4
+        with:
+          ref: 8d2811298c668865f5438f86337c9d8f9d959c80
+          path: before
+          fetch-depth: 0
+
+      - name: Checkout exact committed Phase 19 candidate
+        uses: actions/checkout@v4
+        with:
+          ref: b247b536eda5b1f48ada5b6a09c657b324d289f1
+          path: candidate
+          fetch-depth: 0
+
+      - name: Regenerate and verify Phase 19 review evidence
+        shell: bash
+        run: bash qa-harness/.github/phase19/artifact_finalize.sh
+
+      - name: Upload final Phase 19 review artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase19-review-packet-final
+          path: /tmp/phase19-review-final/
+          if-no-files-found: error
+          compression-level: 6
