@@ -40,7 +40,11 @@ jobs:
 
       - name: Regenerate and verify Phase 19 review evidence
         shell: bash
-        run: bash qa-harness/.github/phase19/artifact_finalize.sh
+        run: |
+          python3 qa-harness/.github/phase19/patch_artifact_finalize_server.py \
+            qa-harness/.github/phase19/artifact_finalize.sh \
+            /tmp/phase19-artifact-finalize-clean-server.sh
+          bash /tmp/phase19-artifact-finalize-clean-server.sh
 
       - name: Upload final Phase 19 review artifact
         uses: actions/upload-artifact@v4
