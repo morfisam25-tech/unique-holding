@@ -1,0 +1,62 @@
+name: Phase 20 visual baseline
+on:
+  push:
+    branches: ["phase20-visual-qc-runner"]
+    paths:
+      - '.github/workflows/phase20-visual-baseline.yml'
+permissions:
+  contents: read
+jobs:
+  capture:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout Phase 20 QA harness
+        uses: actions/checkout@v4
+        with:
+          ref: phase20-visual-qc-runner
+          path: qa-harness
+          fetch-depth: 1
+      - name: Checkout approved Phase 19 baseline
+        uses: actions/checkout@v4
+        with:
+          ref: b247b536eda5b1f48ada5b6a09c657b324d289f1
+          path: candidate
+          fetch-depth: 0
+      - name: Capture complete Phase 20 visual baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(cd candidate && git rev-parse HEAD)" = 'b247b536eda5b1f48ada5b6a09c657b324d289f1'
+          test "$(cd candidate && git rev-parse HEAD^)" = '8d2811298c668865f5438f86337c9d8f9d959c80'
+          test "$(cd candidate && git rev-parse HEAD^{tree})" = '30a289aaf26cb1944baf76a5d9f53b98cc6e54dd'
+          test "$(cd candidate && git ls-remote origin refs/heads/rebuild/award-level-corporate-v2 | cut -f1)" = 'b247b536eda5b1f48ada5b6a09c657b324d289f1'
+          test "$(cd candidate && git ls-remote origin refs/heads/main | cut -f1)" = '6d106520dd82bf4448312b5f45b54ae15981b1db'
+          mkdir -p /tmp/phase20-node /tmp/phase20-visual
+          (cd /tmp/phase20-node && npm init -y >/dev/null 2>&1 && npm install --no-save --ignore-scripts puppeteer-core@24.16.0 >/dev/null)
+          CHROME="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium)"
+          test -n "$CHROME"
+          cd candidate
+          python3 -m http.server 8000 --bind 127.0.0.1 >/tmp/phase20-visual/server.log 2>&1 &
+          PID=$!
+          trap 'kill "$PID" 2>/dev/null || true' EXIT
+          sleep 1
+          curl -fsS http://127.0.0.1:8000/index.html >/dev/null
+          set +e
+          PHASE20_OUT=/tmp/phase20-visual NODE_PATH=/tmp/phase20-node/node_modules CHROME="$CHROME" node ../qa-harness/.github/phase20/visual_qc.cjs | tee /tmp/phase20-visual/console.log
+          RC=${PIPESTATUS[0]}
+          set -e
+          echo "$RC" > /tmp/phase20-visual/harness-exit-code.txt
+          kill "$PID" 2>/dev/null || true
+          trap - EXIT
+          test -z "$(git status --porcelain)"
+      - name: Upload Phase 20 baseline visual artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase20-visual-baseline
+          path: /tmp/phase20-visual/
+          if-no-files-found: error
+          compression-level: 6
+      - name: Enforce structural visual harness
+        shell: bash
+        run: test "$(cat /tmp/phase20-visual/harness-exit-code.txt)" = '0'
