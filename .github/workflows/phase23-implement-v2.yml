@@ -4,6 +4,7 @@ on:
     branches: ["phase23-public-contact-image-qa-final2"]
     paths:
       - '.github/workflows/phase23-implement-v2.yml'
+      - '.github/phase23/**'
 permissions:
   contents: write
 jobs:
@@ -30,6 +31,7 @@ jobs:
           test "$(git rev-parse HEAD)" = b247b536eda5b1f48ada5b6a09c657b324d289f1
           test "$(git rev-parse HEAD^{tree})" = 30a289aaf26cb1944baf76a5d9f53b98cc6e54dd
           python3 ../qa23/.github/phase23/apply_phase23.py
+          python3 ../qa23/.github/phase23/fix_home_footer_hash.py
           printf 'PRODUCT_HTML_MOBILE_AFTER='; (git grep -o -F '+90 539 380 91 97' -- '*.html' || true) | wc -l
           printf 'PRODUCT_HTML_EMAIL_AFTER='; (git grep -o -F 'farahmand@uniqueholding.com.tr' -- '*.html' || true) | wc -l
           git diff --check
