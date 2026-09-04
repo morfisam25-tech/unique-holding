@@ -1,0 +1,73 @@
+name: Phase 23 preflight contact/image evidence
+on:
+  push:
+    branches: ["phase23-public-contact-image-qa-final2"]
+    paths:
+      - '.github/workflows/phase23-preflight.yml'
+permissions:
+  contents: read
+jobs:
+  preflight:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout exact Phase 23 baseline
+        uses: actions/checkout@v4
+        with:
+          ref: b247b536eda5b1f48ada5b6a09c657b324d289f1
+          path: baseline
+          fetch-depth: 0
+      - name: Exact repository-wide search and homepage media inspection
+        shell: bash
+        run: |
+          set -euo pipefail
+          OUT=/tmp/phase23-preflight
+          mkdir -p "$OUT/frames"
+          cd baseline
+          {
+            echo 'BASELINE_SHA='$(git rev-parse HEAD)
+            echo 'BASELINE_TREE='$(git rev-parse HEAD^{tree})
+            echo
+            echo '=== MOBILE MATCHES ==='
+            git grep -n -F '+90 539 380 91 97' -- . || true
+            echo
+            echo '=== EMAIL MATCHES ==='
+            git grep -n -F 'farahmand@uniqueholding.com.tr' -- . || true
+          } > "$OUT/exact-search-before.txt"
+          python3 - <<'PY'
+          import json,subprocess,pathlib,re
+          out=pathlib.Path('/tmp/phase23-preflight')
+          def grep(s):
+              p=subprocess.run(['git','grep','-n','-F',s,'--','.'],capture_output=True,text=True)
+              rows=[x for x in p.stdout.splitlines() if x.strip()]
+              files=sorted(set(x.split(':',1)[0] for x in rows))
+              return {'string':s,'occurrences':len(rows),'files':files,'matches':rows}
+          data={'mobile':grep('+90 539 380 91 97'),'email':grep('farahmand@uniqueholding.com.tr')}
+          (out/'exact-search-before.json').write_text(json.dumps(data,indent=2))
+          html=pathlib.Path('index.html').read_text()
+          phrase='Physical markets. Commercial execution.'
+          i=html.find(phrase)
+          if i<0:
+              raise SystemExit('target phrase missing')
+          chunk=html[max(0,i-2500):i+2500]
+          (out/'homepage-target-context.txt').write_text(chunk)
+          srcs=re.findall(r'<img\b[^>]*\bsrc=["\']([^"\']+)["\'][^>]*>',chunk,re.I)
+          (out/'homepage-target-images.json').write_text(json.dumps({'phrase':phrase,'nearbyImageSources':srcs},indent=2))
+          PY
+          grep -n -B 25 -A 30 'Physical markets. Commercial execution.' index.html > "$OUT/homepage-target-grep.txt"
+          echo '=== candidate local image assets ===' > "$OUT/image-assets.txt"
+          find assets -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' \) -print | sort >> "$OUT/image-assets.txt"
+          if command -v identify >/dev/null 2>&1; then
+            while IFS= read -r f; do identify "$f" 2>/dev/null || true; done < <(find assets -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' \) -print | sort) > "$OUT/image-dimensions.txt"
+          fi
+          ffprobe -v error -show_entries format=duration -of default=nw=1:nk=1 assets/media/unique-holding-film-720p.mp4 > "$OUT/film-duration.txt"
+          for t in 2 4 6 8 10 12 14 16; do
+            ffmpeg -hide_banner -loglevel error -ss "$t" -i assets/media/unique-holding-film-720p.mp4 -frames:v 1 -q:v 2 -vf "scale=1600:-2" "$OUT/frames/film-${t}s.jpg" || true
+          done
+          sha256sum assets/media/unique-holding-film-720p.mp4 assets/media/unique-holding-caption.vtt > "$OUT/protected-film-hashes.txt"
+      - name: Upload preflight evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase23-preflight-contact-image-evidence
+          path: /tmp/phase23-preflight/
+          if-no-files-found: error
+          compression-level: 6
