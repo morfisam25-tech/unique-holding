@@ -1,0 +1,69 @@
+name: Homepage Fix 01 final review
+
+on:
+  push:
+    branches: ["homepage-fix01-qa-final"]
+
+permissions:
+  contents: read
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout QA harness
+        uses: actions/checkout@v4
+        with:
+          ref: homepage-fix01-qa-final
+          path: qa
+          fetch-depth: 1
+      - name: Checkout final candidate
+        uses: actions/checkout@v4
+        with:
+          ref: 75f5a232297b61f9bf857d208d334ce3f794a603
+          path: candidate
+          fetch-depth: 0
+      - name: Verify scope, relationship and technical QA
+        run: |
+          set -euo pipefail
+          test "$(git -C candidate rev-parse HEAD)" = "75f5a232297b61f9bf857d208d334ce3f794a603"
+          test "$(git -C candidate rev-parse HEAD^{tree})" = "edcb52516223ce09185cc9ed36ddb7b6778b2613"
+          git -C candidate diff --name-only 46190b02d6760d5c3e59d042535479636c2f2b9a..75f5a232297b61f9bf857d208d334ce3f794a603 | sort > /tmp/changed.txt
+          printf '%s\n' assets/homepage-hero-positioning.css index.html > /tmp/expected.txt
+          diff -u /tmp/expected.txt /tmp/changed.txt
+          (cd candidate && node scripts/qa-site.mjs) | tee /tmp/homepage-fix01-site-qa.log
+          grep -q 'TECHNICAL QA PASS' /tmp/homepage-fix01-site-qa.log
+      - name: Install browser dependency
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/homepage-fix01-node && cd /tmp/homepage-fix01-node
+          npm init -y >/dev/null 2>&1
+          npm install --no-save --ignore-scripts puppeteer-core@24.16.0 >/dev/null
+          CHROME="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium)"
+          test -n "$CHROME"
+          echo "CHROME=$CHROME" >> "$GITHUB_ENV"
+      - name: Render five required viewports
+        run: |
+          set -euo pipefail
+          OUT="$PWD/homepage-fix01-evidence"
+          mkdir -p "$OUT/reports"
+          cp /tmp/homepage-fix01-site-qa.log "$OUT/reports/site-qa.log"
+          cp /tmp/changed.txt "$OUT/reports/changed-files.txt"
+          python3 -m http.server 4173 --bind 127.0.0.1 --directory candidate >/tmp/homepage-fix01-http.log 2>&1 &
+          SERVER=$!
+          trap 'kill $SERVER || true' EXIT
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:4173/index.html >/dev/null && break || sleep 0.2; done
+          cd candidate
+          OUT="$OUT" NODE_PATH='/tmp/homepage-fix01-node/node_modules' CHROME="$CHROME" node ../qa/.github/homepage-fix01-final/verify.cjs | tee "$OUT/reports/browser-console.log"
+      - name: Build checksum manifest
+        run: |
+          set -euo pipefail
+          OUT="$PWD/homepage-fix01-evidence"
+          printf 'HOMEPAGE FIX 01 — FINAL REVIEW\nSTATUS: AUTOMATED QA PASS\nBASELINE SHA: 46190b02d6760d5c3e59d042535479636c2f2b9a\nCANDIDATE SHA: 75f5a232297b61f9bf857d208d334ce3f794a603\nCANDIDATE TREE: edcb52516223ce09185cc9ed36ddb7b6778b2613\nPRODUCT CHANGED FILES: index.html; assets/homepage-hero-positioning.css\nDEPLOYMENT: NONE\n' > "$OUT/HOMEPAGE_FIX_01_REVIEW.txt"
+          (cd "$OUT" && find . -type f ! -name SHA256SUMS.txt -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+      - name: Upload final review artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: homepage-fix01-review-final
+          path: homepage-fix01-evidence/
+          if-no-files-found: error
