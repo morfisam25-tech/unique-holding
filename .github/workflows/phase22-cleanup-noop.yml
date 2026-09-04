@@ -1,0 +1,31 @@
+name: Phase 22 cleanup known no-op branch
+on:
+  push:
+    branches: ["phase22-release-qa-runner"]
+    paths:
+      - '.github/workflows/phase22-cleanup-noop.yml'
+permissions:
+  contents: write
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete only verified no-op branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          branch='__noop_should_not_create'
+          expected='b247b536eda5b1f48ada5b6a09c657b324d289f1'
+          remote="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          current="$(git ls-remote "$remote" "refs/heads/$branch" | cut -f1)"
+          if [ -z "$current" ]; then
+            echo 'NOOP_BRANCH_STATUS=ALREADY_ABSENT'
+            exit 0
+          fi
+          test "$current" = "$expected"
+          git push "$remote" --delete "$branch"
+          after="$(git ls-remote "$remote" "refs/heads/$branch" | cut -f1)"
+          test -z "$after"
+          echo 'NOOP_BRANCH_STATUS=DELETED_AND_VERIFIED'
