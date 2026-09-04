@@ -1,0 +1,78 @@
+name: Phase 23 final review packet v2
+on:
+  push:
+    branches: ["phase23-public-contact-image-qa-final2"]
+    paths:
+      - '.github/workflows/phase23-final-review-v2.yml'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  review:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout QA harness
+        uses: actions/checkout@v4
+        with:
+          ref: phase23-public-contact-image-qa-final2
+          path: qa23
+          fetch-depth: 1
+      - name: Checkout baseline
+        uses: actions/checkout@v4
+        with:
+          ref: b247b536eda5b1f48ada5b6a09c657b324d289f1
+          path: baseline
+          fetch-depth: 0
+      - name: Checkout Phase 23 candidate
+        uses: actions/checkout@v4
+        with:
+          ref: 46190b02d6760d5c3e59d042535479636c2f2b9a
+          path: candidate
+          fetch-depth: 0
+      - name: Run independent static QA
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/phase23-review/reports /tmp/phase23-review/screenshots
+          cd candidate
+          node scripts/qa-site.mjs | tee /tmp/phase23-review/reports/qa-site.log
+          node scripts/qa-seo.mjs | tee /tmp/phase23-review/reports/qa-seo.log
+          node scripts/qa-performance.mjs | tee /tmp/phase23-review/reports/qa-performance.log
+          node scripts/qa-accessibility.mjs | tee /tmp/phase23-review/reports/qa-accessibility.log
+          grep -q 'TECHNICAL QA PASS' /tmp/phase23-review/reports/qa-site.log
+          grep -q 'PHASE 18 SEO QA PASS' /tmp/phase23-review/reports/qa-seo.log
+          grep -q 'PHASE 19 PERFORMANCE QA PASS' /tmp/phase23-review/reports/qa-performance.log
+          grep -q 'PHASE 19 ACCESSIBILITY STATIC QA PASS' /tmp/phase23-review/reports/qa-accessibility.log
+      - name: Install browser dependency
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/phase23-node && cd /tmp/phase23-node
+          npm init -y >/dev/null 2>&1
+          npm install --no-save --ignore-scripts puppeteer-core@24.16.0 >/dev/null
+          CHROME="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium)"
+          test -n "$CHROME"
+          echo "CHROME=$CHROME" >> "$GITHUB_ENV"
+      - name: Run no-cache browser smoke and visual QA
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m http.server 4173 --bind 127.0.0.1 --directory candidate >/tmp/phase23-http.log 2>&1 &
+          SERVER=$!
+          trap 'kill $SERVER || true' EXIT
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:4173/index.html >/dev/null && break || sleep 0.2; done
+          PHASE23_BASE='http://127.0.0.1:4173/' PHASE23_OUT='/tmp/phase23-review' NODE_PATH='/tmp/phase23-node/node_modules' CHROME="$CHROME" bash qa23/.github/phase23/run_final_qa.sh | tee /tmp/phase23-review/reports/browser-qa-console.log
+      - name: Build and checksum final review packet
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 qa23/.github/phase23/final_packet.py | tee /tmp/phase23-review/reports/final-packet-build.log
+          (cd /tmp/phase23-review && find . -type f ! -name SHA256SUMS.txt -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+          echo "CHECKED_ENTRIES=$(wc -l < /tmp/phase23-review/SHA256SUMS.txt | tr -d ' ')" > /tmp/phase23-review/reports/checksum-count.txt
+      - name: Upload final Phase 23 review packet
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase23-public-contact-image-review-packet-final
+          path: /tmp/phase23-review/
+          if-no-files-found: error
+          compression-level: 6
