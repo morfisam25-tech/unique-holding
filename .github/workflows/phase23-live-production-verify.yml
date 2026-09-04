@@ -1,0 +1,85 @@
+name: Phase 23 live production verification
+on:
+  push:
+    branches: ["phase23-public-contact-image-qa-final2"]
+    paths:
+      - '.github/phase23/live_production_verify.cjs'
+      - '.github/workflows/phase23-live-production-verify.yml'
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout QA harness
+        uses: actions/checkout@v4
+        with:
+          ref: phase23-public-contact-image-qa-final2
+          fetch-depth: 1
+      - name: Checkout authorized production SHA
+        uses: actions/checkout@v4
+        with:
+          ref: 46190b02d6760d5c3e59d042535479636c2f2b9a
+          path: candidate
+          fetch-depth: 1
+      - name: Verify refs and HTTPS/TLS redirect state
+        shell: bash
+        run: |
+          set -euo pipefail
+          OUT="$PWD/live-evidence"
+          mkdir -p "$OUT/reports" "$OUT/screenshots"
+          MAIN="$(git ls-remote https://github.com/morfisam25-tech/unique-holding.git refs/heads/main | cut -f1)"
+          REBUILD="$(git ls-remote https://github.com/morfisam25-tech/unique-holding.git refs/heads/rebuild/award-level-corporate-v2 | cut -f1)"
+          test "$MAIN" = 46190b02d6760d5c3e59d042535479636c2f2b9a
+          test "$REBUILD" = 46190b02d6760d5c3e59d042535479636c2f2b9a
+          test "$(git -C candidate rev-parse HEAD)" = 46190b02d6760d5c3e59d042535479636c2f2b9a
+          test "$(git -C candidate rev-parse HEAD^{tree})" = 9c0e469b36582314363feab282c95852f4d81ffa
+          printf 'MAIN=%s\nREBUILD=%s\nAUTHORIZED_SHA=%s\nAUTHORIZED_TREE=%s\n' "$MAIN" "$REBUILD" "$(git -C candidate rev-parse HEAD)" "$(git -C candidate rev-parse HEAD^{tree})" | tee "$OUT/reports/ref-readback.txt"
+          curl -fsSIL --max-time 30 https://www.uniqueholding.com.tr/ | tee "$OUT/reports/https-headers.txt"
+          HTTP_CODE="$(curl -sS -o /dev/null -D "$OUT/reports/http-headers.txt" -w '%{http_code}' --max-time 30 http://www.uniqueholding.com.tr/)"
+          case "$HTTP_CODE" in 301|302|307|308) ;; *) echo "unexpected HTTP status $HTTP_CODE"; exit 1;; esac
+          grep -Eiq '^location: https://www\.uniqueholding\.com\.tr/?' "$OUT/reports/http-headers.txt"
+          echo | openssl s_client -servername www.uniqueholding.com.tr -connect www.uniqueholding.com.tr:443 2>/dev/null | openssl x509 -noout -subject -issuer -dates -serial | tee "$OUT/reports/certificate.txt"
+          echo | openssl s_client -servername www.uniqueholding.com.tr -connect www.uniqueholding.com.tr:443 2>/dev/null | openssl x509 -noout -checkend 0
+          printf 'HTTPS=PASS\nCERTIFICATE=VALID\nHTTP_TO_HTTPS=PASS\nHTTP_STATUS=%s\n' "$HTTP_CODE" | tee "$OUT/reports/transport-summary.txt"
+      - name: Install browser dependency
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/phase23-live-node && cd /tmp/phase23-live-node
+          npm init -y >/dev/null 2>&1
+          npm install --no-save --ignore-scripts puppeteer-core@24.16.0 >/dev/null
+          CHROME="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium)"
+          test -n "$CHROME"
+          echo "CHROME=$CHROME" >> "$GITHUB_ENV"
+      - name: Verify live public source and required visual matrix
+        shell: bash
+        run: |
+          set -euo pipefail
+          CANDIDATE_DIR="$PWD/candidate" OUT="$PWD/live-evidence" NODE_PATH='/tmp/phase23-live-node/node_modules' CHROME="$CHROME" node .github/phase23/live_production_verify.cjs | tee live-evidence/reports/live-browser-console.log
+      - name: Build evidence summary
+        shell: bash
+        run: |
+          set -euo pipefail
+          OUT="$PWD/live-evidence"
+          cat > "$OUT/PHASE_23_LIVE_PRODUCTION_VERIFY.txt" <<'EOF'
+          PHASE 23 — LIVE PRODUCTION VERIFY
+          STATUS: PASS
+          AUTHORIZED SHA: 46190b02d6760d5c3e59d042535479636c2f2b9a
+          AUTHORIZED TREE: 9c0e469b36582314363feab282c95852f4d81ffa
+          MAIN: 46190b02d6760d5c3e59d042535479636c2f2b9a
+          REBUILD: 46190b02d6760d5c3e59d042535479636c2f2b9a
+          HTTPS: PASS
+          CERTIFICATE: VALID
+          HTTP -> HTTPS: PASS
+          LIVE PUBLIC MOBILE OCCURRENCES: 0
+          LIVE PUBLIC PERSONAL EMAIL OCCURRENCES: 0
+          REQUIRED LIVE VISUAL MATRIX: 8/8 PASS
+          EOF
+          (cd "$OUT" && find . -type f ! -name SHA256SUMS.txt -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+      - name: Upload live production verification
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase23-live-production-verification
+          path: live-evidence/
+          if-no-files-found: error
