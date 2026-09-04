@@ -42,7 +42,7 @@
 }
 @media(max-width:520px){
   .home-hero-positioning{top:108px;left:22px;width:calc(100vw - 44px)}
-  .home-hero-positioning::before{inset:-14px -24px -20px -22px;background:linear-gradient(90deg,rgba(4,6,7,.34),rgba(4,6,7,0))}
+  .home-hero-positioning::before{inset:-14px -20px -20px -20px;background:linear-gradient(90deg,rgba(4,6,7,.34),rgba(4,6,7,0))}
   .home-hero-positioning__title{font-size:clamp(35px,10.1vw,40px);line-height:.98;letter-spacing:-.035em}
   .home-hero-positioning__location{gap:10px;margin-top:15px;font-size:9px;letter-spacing:.14em}
   .home-hero-positioning__location::before{width:24px}
