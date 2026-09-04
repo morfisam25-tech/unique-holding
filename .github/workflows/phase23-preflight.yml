@@ -27,7 +27,7 @@ jobs:
         run: |
           set -euo pipefail
           OUT=/tmp/phase23-preflight
-          mkdir -p "$OUT/frames"
+          mkdir -p "$OUT/frames" "$OUT/existing-candidates"
           cd baseline
           {
             echo 'BASELINE_SHA='$(git rev-parse HEAD)
@@ -52,24 +52,24 @@ jobs:
           html=pathlib.Path('index.html').read_text()
           phrase='Physical markets. Commercial execution.'
           i=html.find(phrase)
-          if i<0:
-              raise SystemExit('target phrase missing')
+          if i<0: raise SystemExit('target phrase missing')
           chunk=html[max(0,i-2500):i+2500]
           (out/'homepage-target-context.txt').write_text(chunk)
           srcs=re.findall(r'<img\b[^>]*\bsrc=["\']([^"\']+)["\'][^>]*>',chunk,re.I)
           (out/'homepage-target-images.json').write_text(json.dumps({'phrase':phrase,'nearbyImageSources':srcs},indent=2))
           PY
           grep -n -B 25 -A 30 'Physical markets. Commercial execution.' index.html > "$OUT/homepage-target-grep.txt"
-          echo '=== candidate local image assets ===' > "$OUT/image-assets.txt"
-          find assets -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' \) -print | sort >> "$OUT/image-assets.txt"
-          while IFS= read -r f; do identify "$f" 2>/dev/null || true; done < <(find assets -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' \) -print | sort) > "$OUT/image-dimensions.txt"
+          find assets -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' \) -print | sort > "$OUT/image-assets.txt"
+          while IFS= read -r f; do identify "$f" 2>/dev/null || true; done < "$OUT/image-assets.txt" > "$OUT/image-dimensions.txt"
+          cp assets/phase04/film-still-logistics.webp "$OUT/existing-candidates/current-film-still-logistics.webp"
+          cp assets/phase08/film-still-physical-trade.webp "$OUT/existing-candidates/phase08-film-still-physical-trade.webp"
+          cp assets/social/industrial-trade.png "$OUT/existing-candidates/social-industrial-trade.png"
           ffprobe -v error -show_entries format=duration -of default=nw=1:nk=1 assets/media/unique-holding-film-720p.mp4 > "$OUT/film-duration.txt"
           duration=$(cat "$OUT/film-duration.txt")
           python3 - "$duration" > "$OUT/frame-times.txt" <<'PY'
           import sys
-          d=float(sys.argv[1]);
-          for f in (0.08,0.18,0.28,0.38,0.48,0.58,0.68,0.78,0.88):
-              print(f'{max(0.2,d*f):.3f}')
+          d=float(sys.argv[1])
+          for f in (0.08,0.18,0.28,0.38,0.48,0.58,0.68,0.78,0.88): print(f'{max(0.2,d*f):.3f}')
           PY
           n=1
           while IFS= read -r t; do
@@ -81,7 +81,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: phase23-preflight-contact-image-evidence
+          name: phase23-preflight-contact-image-evidence-v2
           path: /tmp/phase23-preflight/
           if-no-files-found: error
           compression-level: 6
