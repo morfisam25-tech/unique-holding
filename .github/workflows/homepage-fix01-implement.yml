@@ -1,0 +1,121 @@
+name: Homepage Fix 01 implement
+
+on:
+  push:
+    branches: ["homepage-fix01-implement-runner"]
+
+permissions:
+  contents: write
+
+jobs:
+  implement:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout authorized rebuild baseline
+        uses: actions/checkout@v4
+        with:
+          ref: rebuild/award-level-corporate-v2
+          fetch-depth: 0
+      - name: Assert baseline
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "46190b02d6760d5c3e59d042535479636c2f2b9a"
+      - name: Apply independent hero positioning layer
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('index.html')
+          s=p.read_text()
+          link='  <link rel="stylesheet" href="assets/site.css">\n'
+          new_link='  <link rel="stylesheet" href="assets/site.css">\n  <link rel="stylesheet" href="assets/homepage-hero-positioning.css">\n'
+          if 'assets/homepage-hero-positioning.css' in s:
+              raise SystemExit('positioning stylesheet already present')
+          if link not in s:
+              raise SystemExit('site.css marker missing')
+          s=s.replace(link,new_link,1)
+          marker='  <main id="main">\n'
+          overlay='''  <main id="main">\n    <div class="home-hero-positioning">\n      <p class="home-hero-positioning__title"><span>Industrial trade.</span><span>Technology.</span><span>Intelligence.</span></p>\n      <p class="home-hero-positioning__location">Operating from Istanbul.</p>\n    </div>\n'''
+          if marker not in s:
+              raise SystemExit('main marker missing')
+          s=s.replace(marker,overlay,1)
+          p.write_text(s)
+          PY
+          cat > assets/homepage-hero-positioning.css <<'CSS'
+          @layer page{
+          .home-hero-positioning{
+            position:absolute;
+            z-index:6;
+            top:clamp(150px,19vh,210px);
+            left:max(40px,calc((100vw - var(--layout-max))/2 + 40px));
+            width:min(540px,calc(100vw - 80px));
+            color:#f3efe7;
+            pointer-events:none;
+            text-shadow:0 2px 20px rgba(0,0,0,.62),0 1px 2px rgba(0,0,0,.78);
+          }
+          .home-hero-positioning::before{
+            content:'';
+            position:absolute;
+            inset:-30px -72px -38px -48px;
+            z-index:-1;
+            background:radial-gradient(ellipse at 25% 48%,rgba(4,6,7,.38) 0%,rgba(4,6,7,.15) 48%,rgba(4,6,7,0) 74%);
+            pointer-events:none;
+          }
+          .home-hero-positioning__title{
+            margin:0;
+            font:400 clamp(50px,4.35vw,72px)/.94 var(--font-serif);
+            letter-spacing:-.042em;
+          }
+          .home-hero-positioning__title span{display:block}
+          .home-hero-positioning__location{
+            display:flex;
+            align-items:center;
+            gap:12px;
+            margin:24px 0 0;
+            color:#d8d3ca;
+            font:700 10px/1.4 var(--font-sans);
+            letter-spacing:.15em;
+            text-transform:uppercase;
+          }
+          .home-hero-positioning__location::before{content:'';width:30px;height:1px;background:var(--color-accent);flex:0 0 auto}
+          @media(max-width:1180px) and (orientation:portrait){
+            .home-hero-positioning{top:104px;left:max(28px,calc((100vw - 760px)/2));width:min(560px,calc(100vw - 56px))}
+            .home-hero-positioning::before{inset:-18px -42px -24px -28px;background:linear-gradient(90deg,rgba(4,6,7,.45),rgba(4,6,7,0))}
+            .home-hero-positioning__title{font-size:clamp(40px,6.3vw,54px);line-height:.96}
+            .home-hero-positioning__location{margin-top:16px}
+          }
+          @media(max-width:520px){
+            .home-hero-positioning{top:108px;left:22px;width:calc(100vw - 44px)}
+            .home-hero-positioning::before{inset:-14px -24px -20px -22px;background:linear-gradient(90deg,rgba(4,6,7,.34),rgba(4,6,7,0))}
+            .home-hero-positioning__title{font-size:clamp(35px,10.1vw,40px);line-height:.98;letter-spacing:-.035em}
+            .home-hero-positioning__location{gap:10px;margin-top:15px;font-size:9px;letter-spacing:.14em}
+            .home-hero-positioning__location::before{width:24px}
+          }
+          @media(max-width:380px){.home-hero-positioning{top:104px}.home-hero-positioning__title{font-size:36px}}
+          }
+          CSS
+      - name: Verify locked copy and protected film hashes
+        run: |
+          set -euo pipefail
+          grep -q 'Industrial trade.</span><span>Technology.</span><span>Intelligence.' index.html
+          grep -q 'Operating from Istanbul.' index.html
+          node scripts/qa-site.mjs | tee /tmp/homepage-fix01-qa.log
+          grep -q 'TECHNICAL QA PASS' /tmp/homepage-fix01-qa.log
+      - name: Enforce exact product diff
+        run: |
+          set -euo pipefail
+          printf '%s\n' assets/homepage-hero-positioning.css index.html > /tmp/expected.txt
+          git diff --name-only | sort > /tmp/actual.txt
+          diff -u /tmp/expected.txt /tmp/actual.txt
+          test "$(git diff --numstat | wc -l | tr -d ' ')" = "2"
+      - name: Commit to rebuild only
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html assets/homepage-hero-positioning.css
+          git commit -m "HOMEPAGE FIX 01 — Add restrained visible hero positioning"
+          test "$(git rev-parse HEAD^)" = "46190b02d6760d5c3e59d042535479636c2f2b9a"
+          git push origin HEAD:rebuild/award-level-corporate-v2
+          echo "CANDIDATE_SHA=$(git rev-parse HEAD)"
+          echo "CANDIDATE_TREE=$(git rev-parse HEAD^{tree})"
