@@ -1,0 +1,113 @@
+name: Phase 23 implement public contact sanitization and image fix
+on:
+  push:
+    branches: ["phase23-public-contact-image-qa-final2"]
+    paths:
+      - '.github/workflows/phase23-implement.yml'
+permissions:
+  contents: write
+jobs:
+  implement:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout authorized target branch
+        uses: actions/checkout@v4
+        with:
+          ref: rebuild/award-level-corporate-v2
+          fetch-depth: 0
+      - name: Assert exact baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = b247b536eda5b1f48ada5b6a09c657b324d289f1
+          test "$(git rev-parse HEAD^{tree})" = 30a289aaf26cb1944baf76a5d9f53b98cc6e54dd
+      - name: Apply narrow Phase 23 corrections
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re,hashlib
+          mobile='+90 539 380 91 97'
+          email='farahmand@uniqueholding.com.tr'
+          htmls=sorted(Path('.').glob('*.html'))
+          # Contact page: replace personal-email CTAs with restrained internal/public routes before removing personal anchors globally.
+          p=Path('contact.html'); s=p.read_text()
+          s=s.replace('<article class="contact-route-card" data-contact-route="corporate"><div class="contact-route-meta"><span>EMAIL</span><b>CORPORATE COMMUNICATION</b></div><h3>Group or business inquiry</h3><p>For corporate communication and general business matters involving Unique Holding.</p><a class="button-link" href="mailto:farahmand@uniqueholding.com.tr?subject=Corporate%20Inquiry%20%E2%80%94%20Unique%20Holding">Email Corporate Communication</a></article>', '<article class="contact-route-card" data-contact-route="corporate"><div class="contact-route-meta"><span>PUBLIC ROUTE</span><b>CORPORATE COMMUNICATION</b></div><h3>Group or business inquiry</h3><p>For corporate communication and general business matters involving Unique Holding.</p><a class="button-link" href="#istanbul-office">View Public Office Contact</a></article>')
+          s=s.replace('<article class="contact-route-card" data-contact-route="technology-venture"><div class="contact-route-meta"><span>EMAIL</span><b>TECHNOLOGY / VENTURE</b></div><h3>Technology or portfolio context</h3><p>For Technology &amp; Intelligence, venture-development or portfolio-context inquiries that belong at group level.</p><a class="button-link" href="mailto:farahmand@uniqueholding.com.tr?subject=Technology%20%2F%20Venture%20Inquiry%20%E2%80%94%20Unique%20Holding">Email Technology / Venture Inquiry</a></article>', '<article class="contact-route-card" data-contact-route="technology-venture"><div class="contact-route-meta"><span>INTERNAL ROUTE</span><b>TECHNOLOGY / VENTURE</b></div><h3>Technology or portfolio context</h3><p>For Technology &amp; Intelligence, venture-development or portfolio-context inquiries that belong at group level.</p><a class="button-link" href="#corporate-communication">View Technology / Portfolio Routes</a></article>')
+          s=s.replace('<section class="subsite-section alt contact-section" id="corporate-communication"><div class="section-cap"><span class="num">04 / Corporate Communication</span><h2>Use the group contact for corporate and venture context.</h2><p>No separate Technology or Ventures inbox is published. Both use the established corporate communication route.</p></div>', '<section class="subsite-section alt contact-section" id="corporate-communication"><div class="section-cap"><span class="num">04 / Corporate Communication</span><h2>Use the public routes that match the context.</h2><p>No separate Technology or Ventures inbox is published. Corporate matters use the public office contact; technology and portfolio context remain available through their dedicated pages.</p></div>')
+          s=s.replace('<a class="text-link" href="mailto:farahmand@uniqueholding.com.tr?subject=Corporate%20Inquiry%20%E2%80%94%20Unique%20Holding">farahmand@uniqueholding.com.tr</a>', '<a class="text-link" href="#istanbul-office">View Public Office Contact</a>')
+          s=s.replace('<p>Technology, venture-development and portfolio questions route through the same established corporate email with a distinct subject.</p><a class="text-link" href="mailto:farahmand@uniqueholding.com.tr?subject=Technology%20%2F%20Venture%20Inquiry%20%E2%80%94%20Unique%20Holding">Email Technology / Venture Inquiry</a>', '<p>Technology, venture-development and portfolio questions can continue through the relevant public context page.</p><a class="text-link" href="technology.html">Open Technology Context</a>')
+          s=s.replace('The approved public office and direct-contact details are presented without additional department or availability claims.','The approved public office and sales-contact details are presented without additional department or availability claims.')
+          p.write_text(s)
+          # Homepage image: switch only the first below-film trade still to the sharper approved internal Phase 08 asset.
+          p=Path('index.html'); s=p.read_text()
+          old='<img src="assets/phase04/film-still-logistics.webp" width="800" height="450" loading="lazy" decoding="async" alt="Illustrative corporate-film still showing logistics and supply-chain activity">'
+          new='<img src="assets/phase08/film-still-physical-trade.webp" width="960" height="540" loading="lazy" decoding="async" alt="Illustrative still showing physical trade and logistics handling activity">'
+          if old not in s: raise SystemExit('homepage target image tag not found exactly')
+          p.write_text(s.replace(old,new,1))
+          # Remove personal phone/email anchors from every public HTML route, including footers/body contact blocks.
+          for p in htmls:
+              s=p.read_text()
+              s=re.sub(r'<a\b[^>]*href=["\']tel:\+905393809197["\'][^>]*>[\s\S]*?</a>','',s,flags=re.I)
+              s=re.sub(r'<a\b[^>]*href=["\']mailto:farahmand@uniqueholding\.com\.tr(?:\?[^"\']*)?["\'][^>]*>[\s\S]*?</a>','',s,flags=re.I)
+              p.write_text(s)
+          # Update stale QA expectations to the newly authorized public-contact policy and new homepage still.
+          q=Path('scripts/qa-site.mjs'); s=q.read_text()
+          s=s.replace("['assets/phase04/film-still-logistics.webp',800,450]", "['assets/phase08/film-still-physical-trade.webp',960,540]")
+          s=s.replace(",'+90 539 380 91 97'","")
+          s=s.replace(",'farahmand@uniqueholding.com.tr'","")
+          s=s.replace("'farahmand@uniqueholding.com.tr',","")
+          s=s.replace("['sales@uniqueholding.com.tr','farahmand@uniqueholding.com.tr']","['sales@uniqueholding.com.tr']")
+          s=s.replace("if(!main.includes('tel:+902127272222')||!main.includes('tel:+905393809197'))errors.push('contact.html: normalized tel routes missing');", "if(!main.includes('tel:+902127272222'))errors.push('contact.html: approved office tel route missing');")
+          s=s.replace("for(const token of ['subject=Corporate%20Inquiry%20%E2%80%94%20Unique%20Holding','subject=Technology%20%2F%20Venture%20Inquiry%20%E2%80%94%20Unique%20Holding','subject=Industrial%20Sales%20Inquiry%20%E2%80%94%20Unique%20Holding'])", "for(const token of ['subject=Industrial%20Sales%20Inquiry%20%E2%80%94%20Unique%20Holding'])")
+          s=s.replace("if(!privacyMain.includes('farahmand@uniqueholding.com.tr')||!privacyMain.includes('+90 212 727 22 22'))errors.push('privacy.html: current privacy contact point missing');", "if(!privacyMain.includes('+90 212 727 22 22'))errors.push('privacy.html: current public office contact point missing');")
+          # Update protected common footer hash after authorized contact sanitization.
+          corp=Path('corporate.html').read_text(); m=re.search(r'<footer class=["\']site-footer["\'][\s\S]*?</footer>',corp,re.I)
+          if not m: raise SystemExit('footer missing')
+          footer_hash=hashlib.sha256(m.group(0).encode()).hexdigest()
+          s=s.replace('fb78cdce26ad95e93209faaec99e957f7fd2f882d3e5a6a83ecd781db170045a',footer_hash)
+          q.write_text(s)
+          # Hard product-output gates.
+          for p in htmls:
+              txt=p.read_text()
+              if mobile in txt or email in txt or 'tel:+905393809197' in txt or 'mailto:farahmand@uniqueholding.com.tr' in txt:
+                  raise SystemExit(f'personal contact remains in public HTML: {p}')
+          idx=Path('index.html').read_text()
+          if 'assets/phase08/film-still-physical-trade.webp' not in idx: raise SystemExit('replacement image missing')
+          if 'assets/phase04/film-still-logistics.webp' in idx: raise SystemExit('old blurry homepage still still referenced')
+          PY
+          printf 'PRODUCT HTML AFTER MOBILE='; git grep -l -F '+90 539 380 91 97' -- '*.html' | wc -l || true
+          printf 'PRODUCT HTML AFTER EMAIL='; git grep -l -F 'farahmand@uniqueholding.com.tr' -- '*.html' | wc -l || true
+          git diff --check
+          git diff --name-only
+      - name: Run technical QA before commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/qa-site.mjs
+          node scripts/qa-seo.mjs
+          node scripts/qa-performance.mjs
+          node scripts/qa-accessibility.mjs
+      - name: Commit only authorized Phase 23 product correction
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- '*.html' scripts/qa-site.mjs
+          git diff --cached --name-only > /tmp/phase23-changed-files.txt
+          test -s /tmp/phase23-changed-files.txt
+          git commit -m 'PHASE 23 — Sanitize public contacts and sharpen homepage trade image'
+          git push origin HEAD:rebuild/award-level-corporate-v2
+          echo "NEW_SHA=$(git rev-parse HEAD)" > /tmp/phase23-implementation.txt
+          echo "NEW_TREE=$(git rev-parse HEAD^{tree})" >> /tmp/phase23-implementation.txt
+          cat /tmp/phase23-changed-files.txt >> /tmp/phase23-implementation.txt
+      - name: Upload implementation evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase23-implementation-evidence
+          path: |
+            /tmp/phase23-implementation.txt
+            /tmp/phase23-changed-files.txt
+          if-no-files-found: error
