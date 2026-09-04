@@ -16,6 +16,12 @@ jobs:
           ref: b247b536eda5b1f48ada5b6a09c657b324d289f1
           path: baseline
           fetch-depth: 0
+      - name: Install media inspection tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg imagemagick >/dev/null
       - name: Exact repository-wide search and homepage media inspection
         shell: bash
         run: |
@@ -56,15 +62,23 @@ jobs:
           grep -n -B 25 -A 30 'Physical markets. Commercial execution.' index.html > "$OUT/homepage-target-grep.txt"
           echo '=== candidate local image assets ===' > "$OUT/image-assets.txt"
           find assets -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' \) -print | sort >> "$OUT/image-assets.txt"
-          if command -v identify >/dev/null 2>&1; then
-            while IFS= read -r f; do identify "$f" 2>/dev/null || true; done < <(find assets -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' \) -print | sort) > "$OUT/image-dimensions.txt"
-          fi
+          while IFS= read -r f; do identify "$f" 2>/dev/null || true; done < <(find assets -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' \) -print | sort) > "$OUT/image-dimensions.txt"
           ffprobe -v error -show_entries format=duration -of default=nw=1:nk=1 assets/media/unique-holding-film-720p.mp4 > "$OUT/film-duration.txt"
-          for t in 2 4 6 8 10 12 14 16; do
-            ffmpeg -hide_banner -loglevel error -ss "$t" -i assets/media/unique-holding-film-720p.mp4 -frames:v 1 -q:v 2 -vf "scale=1600:-2" "$OUT/frames/film-${t}s.jpg" || true
-          done
+          duration=$(cat "$OUT/film-duration.txt")
+          python3 - "$duration" > "$OUT/frame-times.txt" <<'PY'
+          import sys
+          d=float(sys.argv[1]);
+          for f in (0.08,0.18,0.28,0.38,0.48,0.58,0.68,0.78,0.88):
+              print(f'{max(0.2,d*f):.3f}')
+          PY
+          n=1
+          while IFS= read -r t; do
+            ffmpeg -hide_banner -loglevel error -ss "$t" -i assets/media/unique-holding-film-720p.mp4 -frames:v 1 -q:v 2 -vf "scale=1600:-2" "$OUT/frames/film-candidate-${n}.jpg"
+            n=$((n+1))
+          done < "$OUT/frame-times.txt"
           sha256sum assets/media/unique-holding-film-720p.mp4 assets/media/unique-holding-caption.vtt > "$OUT/protected-film-hashes.txt"
       - name: Upload preflight evidence
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: phase23-preflight-contact-image-evidence
