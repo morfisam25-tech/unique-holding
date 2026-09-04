@@ -1,0 +1,176 @@
+name: Phase 22 live production acceptance
+on:
+  push:
+    branches: ["phase22-release-qa-runner"]
+    paths:
+      - '.github/phase22/**'
+      - '.github/workflows/phase22-production-acceptance.yml'
+permissions:
+  contents: read
+  actions: read
+  pages: read
+jobs:
+  production:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout Phase 22 QA harness
+        uses: actions/checkout@v4
+        with:
+          ref: phase22-release-qa-runner
+          path: qa22
+          fetch-depth: 1
+      - name: Checkout Phase 21 approved QA harness
+        uses: actions/checkout@v4
+        with:
+          ref: phase21-release-candidate-runner
+          path: qa21
+          fetch-depth: 1
+      - name: Checkout exact production candidate
+        uses: actions/checkout@v4
+        with:
+          ref: b247b536eda5b1f48ada5b6a09c657b324d289f1
+          path: candidate
+          fetch-depth: 0
+      - name: Freeze and static integrity
+        shell: bash
+        run: |
+          set -euo pipefail
+          PACK=/tmp/phase22-review
+          mkdir -p "$PACK/reports" "$PACK/live-spotcheck" "$PACK/live"
+          cd candidate
+          test "$(git rev-parse HEAD)" = b247b536eda5b1f48ada5b6a09c657b324d289f1
+          test "$(git rev-parse HEAD^{tree})" = 30a289aaf26cb1944baf76a5d9f53b98cc6e54dd
+          test "$(git rev-parse HEAD^)" = 8d2811298c668865f5438f86337c9d8f9d959c80
+          MAIN="$(git ls-remote origin refs/heads/main | cut -f1)"
+          REBUILD="$(git ls-remote origin refs/heads/rebuild/award-level-corporate-v2 | cut -f1)"
+          test "$MAIN" = b247b536eda5b1f48ada5b6a09c657b324d289f1
+          test "$REBUILD" = b247b536eda5b1f48ada5b6a09c657b324d289f1
+          test -z "$(git status --porcelain)"
+          printf 'RC=%s\nTREE=%s\nPARENT=%s\nMAIN=%s\nREBUILD=%s\nPRODUCT_CHANGE=NONE_REQUIRED\n' \
+            "$(git rev-parse HEAD)" "$(git rev-parse HEAD^{tree})" "$(git rev-parse HEAD^)" "$MAIN" "$REBUILD" > "$PACK/reports/freeze.txt"
+          node scripts/qa-site.mjs | tee "$PACK/reports/qa-site.log"
+          node scripts/qa-seo.mjs | tee "$PACK/reports/qa-seo.log"
+          node scripts/qa-performance.mjs | tee "$PACK/reports/qa-performance.log"
+          node scripts/qa-accessibility.mjs | tee "$PACK/reports/qa-accessibility.log"
+          grep -q 'TECHNICAL QA PASS' "$PACK/reports/qa-site.log"
+          grep -q 'REFERENCE DETAIL=3 / INQUIRY DETAIL=62 / INVALID=0' "$PACK/reports/qa-site.log"
+          grep -q 'protected film hashes verified' "$PACK/reports/qa-site.log"
+          grep -q 'PHASE 18 SEO QA PASS' "$PACK/reports/qa-seo.log"
+          grep -q 'PHASE 19 PERFORMANCE QA PASS' "$PACK/reports/qa-performance.log"
+          grep -q 'PHASE 19 ACCESSIBILITY STATIC QA PASS' "$PACK/reports/qa-accessibility.log"
+          sha256sum index.html assets/site.js assets/media/unique-holding-film-720p.mp4 assets/media/unique-holding-caption.vtt > "$PACK/reports/protected-film-local-sha256.txt"
+      - name: Capture GitHub Pages and deployment evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          PACK=/tmp/phase22-review/reports
+          curl -fsS -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/pages" > "$PACK/pages-raw.json"
+          curl -fsS -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/33818987323" > "$PACK/deployment-run-raw.json"
+          python3 - <<'PY'
+          import json,pathlib
+          p=pathlib.Path('/tmp/phase22-review/reports')
+          d=json.loads((p/'pages-raw.json').read_text())
+          keep={k:d.get(k) for k in ['html_url','cname','build_type','source','https_enforced','https_certificate','public','protected_domain_state','pending_domain_unverified_at'] if k in d}
+          (p/'pages.json').write_text(json.dumps(keep,indent=2))
+          r=json.loads((p/'deployment-run-raw.json').read_text())
+          keep2={k:r.get(k) for k in ['id','name','head_branch','head_sha','path','event','status','conclusion','run_number','created_at','updated_at','run_started_at','html_url']}
+          (p/'deployment-run.json').write_text(json.dumps(keep2,indent=2))
+          assert keep.get('html_url')=='https://www.uniqueholding.com.tr/'
+          assert keep.get('cname')=='www.uniqueholding.com.tr'
+          assert keep.get('https_enforced') is True
+          cert=keep.get('https_certificate') or {}
+          assert cert.get('state')=='approved'
+          assert set(cert.get('domains') or [])=={'www.uniqueholding.com.tr','uniqueholding.com.tr'}
+          assert keep2.get('id')==33818987323 and keep2.get('head_sha')=='b247b536eda5b1f48ada5b6a09c657b324d289f1' and keep2.get('conclusion')=='success'
+          PY
+          rm "$PACK/pages-raw.json" "$PACK/deployment-run-raw.json"
+          for server in 8.8.8.8 1.1.1.1; do
+            echo "### resolver=$server www CNAME" >> "$PACK/dns.txt"
+            dig +short @$server www.uniqueholding.com.tr CNAME >> "$PACK/dns.txt"
+            echo "### resolver=$server apex A" >> "$PACK/dns.txt"
+            dig +short @$server uniqueholding.com.tr A | sort >> "$PACK/dns.txt"
+          done
+          printf 'MX_RECORDS_PRESENT=' >> "$PACK/dns-preservation.txt"; test -n "$(dig +short uniqueholding.com.tr MX)" && echo YES >> "$PACK/dns-preservation.txt" || echo NO >> "$PACK/dns-preservation.txt"
+          printf 'TXT_RECORD_COUNT=' >> "$PACK/dns-preservation.txt"; dig +short uniqueholding.com.tr TXT | wc -l >> "$PACK/dns-preservation.txt"
+      - name: Install browser QA dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/phase22-node
+          cd /tmp/phase22-node
+          npm init -y >/dev/null 2>&1
+          npm install --no-save --ignore-scripts puppeteer-core@24.16.0 axe-core@4.10.3 >/dev/null
+          CHROME="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium)"
+          test -n "$CHROME"
+          echo "CHROME=$CHROME" >> "$GITHUB_ENV"
+      - name: Live 32-route smoke, 30 screenshots and interactions
+        shell: bash
+        run: |
+          set -euo pipefail
+          PHASE21_BASE='https://www.uniqueholding.com.tr/' \
+          PHASE21_OUT='/tmp/phase22-review/live-spotcheck' \
+          NODE_PATH='/tmp/phase22-node/node_modules' CHROME="$CHROME" \
+            node qa21/.github/phase21/spotcheck.cjs | tee /tmp/phase22-review/reports/live-spotcheck-console.log
+          python3 - <<'PY'
+          import json,pathlib
+          p=pathlib.Path('/tmp/phase22-review/live-spotcheck/phase21-spotcheck.json')
+          d=json.loads(p.read_text()); s=d['summary']
+          assert s['smokeCases']==32 and s['smokeFailures']==0
+          assert s['spotcheckCount']==30 and s['spotcheckFailures']==0 and s['screenshotCount']==30
+          assert s['interactionCases']==7 and s['interactionFailures']==0
+          PY
+      - name: Deep live TLS fingerprint SEO film catalog and security checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          PHASE22_CANDIDATE="$GITHUB_WORKSPACE/candidate" \
+          PHASE22_OUT='/tmp/phase22-review/live' \
+          NODE_PATH='/tmp/phase22-node/node_modules' CHROME="$CHROME" \
+            node qa22/.github/phase22/live_release.cjs | tee /tmp/phase22-review/reports/live-deep-console.log
+      - name: Build preliminary production evidence packet
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json,pathlib
+          P=pathlib.Path('/tmp/phase22-review')
+          live=json.loads((P/'live/summary.json').read_text())
+          spot=json.loads((P/'live-spotcheck/phase21-spotcheck.json').read_text())['summary']
+          pages=json.loads((P/'reports/pages.json').read_text())
+          dep=json.loads((P/'reports/deployment-run.json').read_text())
+          assert live['totalErrors']==0, live['errors']
+          assert spot['smokeCases']==32 and spot['smokeFailures']==0
+          assert spot['spotcheckCount']==30 and spot['spotcheckFailures']==0
+          assert spot['interactionCases']==7 and spot['interactionFailures']==0
+          out={
+            'status':'AUTOMATED LIVE EVIDENCE PASS — MANUAL 30-SCREENSHOT REVIEW PENDING',
+            'releaseCandidateSha':'b247b536eda5b1f48ada5b6a09c657b324d289f1',
+            'releaseCandidateTree':'30a289aaf26cb1944baf76a5d9f53b98cc6e54dd',
+            'main':'b247b536eda5b1f48ada5b6a09c657b324d289f1','rebuild':'b247b536eda5b1f48ada5b6a09c657b324d289f1',
+            'productionSha':dep['head_sha'],'deploymentRun':dep['id'],'deploymentConclusion':dep['conclusion'],
+            'productionUrl':pages['html_url'],'httpsEnforced':pages['https_enforced'],'certificate':pages['https_certificate'],
+            'httpsBlocker':'CLOSURE ELIGIBLE — AUTOMATED TLS/REDIRECT/MIXED-CONTENT PASS',
+            'routeSmoke':{'cases':spot['smokeCases'],'failures':spot['smokeFailures']},
+            'liveVisuals':{'captured':spot['screenshotCount'],'automatedFailures':spot['spotcheckFailures'],'manualReview':'PENDING'},
+            'interactions':{'cases':spot['interactionCases'],'failures':spot['interactionFailures']},
+            'seo':{'routes':live['routeSurface'],'indexable':live['indexable'],'noindex':live['noindex'],'sitemap':live['sitemap']},
+            'counts':live['liveCounts'],'filmPass':live['filmPass'],'mixedContentRequests':live['mixedContentRequests'],
+            'criticalSameOriginNetworkFailures':live['criticalSameOriginNetworkFailures'],'totalAutomatedErrors':live['totalErrors']
+          }
+          (P/'phase22-automated-manifest.json').write_text(json.dumps(out,indent=2,ensure_ascii=False))
+          md=f'''# PHASE 22 — LIVE PRODUCTION EVIDENCE (PRELIMINARY)\n\n**AUTOMATED LIVE EVIDENCE: PASS**  \n**MANUAL 30-SCREENSHOT REVIEW: PENDING**\n\nProduction SHA: `{out['productionSha']}`  \nProduction URL: `{out['productionUrl']}`  \nDeployment run: `{out['deploymentRun']}` — `{out['deploymentConclusion']}`\n\n- HTTPS enforced: `{out['httpsEnforced']}`; certificate state: `{out['certificate'].get('state')}`.\n- Route smoke: `{out['routeSmoke']['cases']-out['routeSmoke']['failures']}/{out['routeSmoke']['cases']}` PASS.\n- Live screenshots captured: `{out['liveVisuals']['captured']}`; automated failures: `{out['liveVisuals']['automatedFailures']}`.\n- Interactions: `{out['interactions']['cases']-out['interactions']['failures']}/{out['interactions']['cases']}` PASS.\n- SEO: {out['seo']['routes']} routes / {out['seo']['indexable']} indexable / {out['seo']['noindex']} noindex / {out['seo']['sitemap']} sitemap URLs.\n- Product counts: {out['counts']['core']} / {out['counts']['inquiry']} / {out['counts']['invalid']}.\n- Film live regression: {'PASS' if out['filmPass'] else 'FAIL'}. Prior real-device approval remains CARRIED FORWARD.\n- Mixed-content HTTP requests: {out['mixedContentRequests']}.\n- Critical same-origin network failures: {out['criticalSameOriginNetworkFailures']}.\n\nThis packet is not the final Phase 22 release packet until the 30 actual production screenshots are manually inspected.\n'''
+          (P/'PHASE_22_LIVE_EVIDENCE_PRELIMINARY.md').write_text(md)
+          PY
+          (cd /tmp/phase22-review && find . -type f ! -name SHA256SUMS.txt -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+      - name: Upload live production evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase22-live-production-evidence
+          path: /tmp/phase22-review/
+          if-no-files-found: error
+          compression-level: 6
