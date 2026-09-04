@@ -13,7 +13,6 @@ fs.mkdirSync(path.join(out,'screenshots'),{recursive:true});
 fs.mkdirSync(path.join(out,'reports'),{recursive:true});
 const routes=['index.html','contact.html','corporate.html','technology.html','evidence-axis.html','ventures.html','legal.html','privacy.html','energy.html','products.html','sales.html','product.html','urea-46.html','caustic-soda-solid.html','sodium-sulphate-anhydrous.html','404.html'];
 const forbidden=['+90 539 380 91 97','farahmand@uniqueholding.com.tr'];
-const approved=['+90 212 727 22 22','sales@uniqueholding.com.tr'];
 const sha256=b=>crypto.createHash('sha256').update(b).digest('hex');
 const errors=[];
 const sourceResults=[];
@@ -98,7 +97,18 @@ async function fetchBuffer(url){
         }
         const shot=`${route.replace('.html','')}-${vp.w}x${vp.h}.png`;
         await page.screenshot({path:path.join(out,'screenshots',shot),fullPage:false});
-        visual.push({route,viewport:`${vp.w}x${vp.h}`,status:response?.status(),consoleErrors,pageErrors,failedRequests:sameOriginFailed,badResponses:sameOriginBad,...state,screenshot:shot});
+        let tradeScreenshot=null;
+        if(route==='index.html'){
+          const target=await page.$('img[src*="assets/phase08/film-still-physical-trade.webp"]');
+          if(!target){errors.push(`index ${vp.w}x${vp.h}: live trade image element missing for focused visual`);}
+          else{
+            await target.evaluate(el=>el.scrollIntoView({block:'center',inline:'nearest'}));
+            await new Promise(r=>setTimeout(r,500));
+            tradeScreenshot=`index-trade-area-${vp.w}x${vp.h}.png`;
+            await page.screenshot({path:path.join(out,'screenshots',tradeScreenshot),fullPage:false});
+          }
+        }
+        visual.push({route,viewport:`${vp.w}x${vp.h}`,status:response?.status(),consoleErrors,pageErrors,failedRequests:sameOriginFailed,badResponses:sameOriginBad,...state,screenshot:shot,tradeScreenshot});
         await page.close();
       }
     }
