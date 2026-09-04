@@ -1,0 +1,84 @@
+name: Phase 23 implement v2 public contact sanitization and image fix
+on:
+  push:
+    branches: ["phase23-public-contact-image-qa-final2"]
+    paths:
+      - '.github/workflows/phase23-implement-v2.yml'
+permissions:
+  contents: write
+jobs:
+  implement:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout Phase 23 QA implementation
+        uses: actions/checkout@v4
+        with:
+          ref: phase23-public-contact-image-qa-final2
+          path: qa23
+          fetch-depth: 1
+      - name: Checkout authorized target branch
+        uses: actions/checkout@v4
+        with:
+          ref: rebuild/award-level-corporate-v2
+          path: candidate
+          fetch-depth: 0
+      - name: Assert exact baseline and apply narrow corrections
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd candidate
+          test "$(git rev-parse HEAD)" = b247b536eda5b1f48ada5b6a09c657b324d289f1
+          test "$(git rev-parse HEAD^{tree})" = 30a289aaf26cb1944baf76a5d9f53b98cc6e54dd
+          python3 ../qa23/.github/phase23/apply_phase23.py
+          printf 'PRODUCT_HTML_MOBILE_AFTER='; (git grep -o -F '+90 539 380 91 97' -- '*.html' || true) | wc -l
+          printf 'PRODUCT_HTML_EMAIL_AFTER='; (git grep -o -F 'farahmand@uniqueholding.com.tr' -- '*.html' || true) | wc -l
+          git diff --check
+          git diff --name-only | tee /tmp/phase23-changed-files.txt
+      - name: Run full static QA before commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd candidate
+          node scripts/qa-site.mjs | tee /tmp/phase23-qa-site.log
+          node scripts/qa-seo.mjs | tee /tmp/phase23-qa-seo.log
+          node scripts/qa-performance.mjs | tee /tmp/phase23-qa-performance.log
+          node scripts/qa-accessibility.mjs | tee /tmp/phase23-qa-accessibility.log
+          grep -q 'TECHNICAL QA PASS' /tmp/phase23-qa-site.log
+          grep -q 'REFERENCE DETAIL=3 / INQUIRY DETAIL=62 / INVALID=0' /tmp/phase23-qa-site.log
+          grep -q 'protected film hashes verified' /tmp/phase23-qa-site.log
+          grep -q 'PHASE 18 SEO QA PASS' /tmp/phase23-qa-seo.log
+          grep -q 'PHASE 19 PERFORMANCE QA PASS' /tmp/phase23-qa-performance.log
+          grep -q 'PHASE 19 ACCESSIBILITY STATIC QA PASS' /tmp/phase23-qa-accessibility.log
+      - name: Commit only authorized Phase 23 correction
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd candidate
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- '*.html' scripts/qa-site.mjs
+          test -n "$(git diff --cached --name-only)"
+          git commit -m 'PHASE 23 — Sanitize public contacts and sharpen homepage trade image'
+          NEW_SHA="$(git rev-parse HEAD)"
+          NEW_TREE="$(git rev-parse HEAD^{tree})"
+          git push origin HEAD:rebuild/award-level-corporate-v2
+          {
+            echo "BASELINE_SHA=b247b536eda5b1f48ada5b6a09c657b324d289f1"
+            echo "NEW_SHA=$NEW_SHA"
+            echo "NEW_TREE=$NEW_TREE"
+            echo 'CHANGED_FILES:'
+            git diff-tree --no-commit-id --name-only -r HEAD
+          } > /tmp/phase23-implementation.txt
+      - name: Upload implementation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase23-implementation-v2-evidence
+          path: |
+            /tmp/phase23-implementation.txt
+            /tmp/phase23-changed-files.txt
+            /tmp/phase23-qa-site.log
+            /tmp/phase23-qa-seo.log
+            /tmp/phase23-qa-performance.log
+            /tmp/phase23-qa-accessibility.log
+          if-no-files-found: warn
