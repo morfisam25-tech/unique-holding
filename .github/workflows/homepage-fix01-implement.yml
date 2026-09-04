@@ -105,9 +105,10 @@ jobs:
         run: |
           set -euo pipefail
           printf '%s\n' assets/homepage-hero-positioning.css index.html > /tmp/expected.txt
-          git diff --name-only | sort > /tmp/actual.txt
+          { git diff --name-only; git ls-files --others --exclude-standard; } | sort > /tmp/actual.txt
           diff -u /tmp/expected.txt /tmp/actual.txt
-          test "$(git diff --numstat | wc -l | tr -d ' ')" = "2"
+          test "$(git diff --numstat | wc -l | tr -d ' ')" = "1"
+          test "$(git ls-files --others --exclude-standard | wc -l | tr -d ' ')" = "1"
       - name: Commit to rebuild only
         run: |
           set -euo pipefail
