@@ -1,0 +1,69 @@
+name: Homepage Fix 01 final2 review
+
+on:
+  push:
+    branches: ["homepage-fix01-qa-final2"]
+
+permissions:
+  contents: read
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout QA harness
+        uses: actions/checkout@v4
+        with:
+          ref: homepage-fix01-qa-final2
+          path: qa
+          fetch-depth: 1
+      - name: Checkout candidate
+        uses: actions/checkout@v4
+        with:
+          ref: a1fda66759397c1083149a1d1e1eb400f1ba0baf
+          path: candidate
+          fetch-depth: 0
+      - name: Verify scope and technical QA
+        run: |
+          set -euo pipefail
+          test "$(git -C candidate rev-parse HEAD)" = "a1fda66759397c1083149a1d1e1eb400f1ba0baf"
+          test "$(git -C candidate rev-parse HEAD^{tree})" = "51faf36bd87e35d9895d981a196b54746d9482bb"
+          git -C candidate diff --name-only 46190b02d6760d5c3e59d042535479636c2f2b9a..a1fda66759397c1083149a1d1e1eb400f1ba0baf | sort > /tmp/changed.txt
+          printf '%s\n' assets/homepage-hero-positioning.css index.html > /tmp/expected.txt
+          diff -u /tmp/expected.txt /tmp/changed.txt
+          (cd candidate && node scripts/qa-site.mjs) | tee /tmp/site-qa.log
+          grep -q 'TECHNICAL QA PASS' /tmp/site-qa.log
+      - name: Install browser dependency
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/hf01-node && cd /tmp/hf01-node
+          npm init -y >/dev/null 2>&1
+          npm install --no-save --ignore-scripts puppeteer-core@24.16.0 >/dev/null
+          CHROME="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium)"
+          test -n "$CHROME"
+          echo "CHROME=$CHROME" >> "$GITHUB_ENV"
+      - name: Render required viewports
+        run: |
+          set -euo pipefail
+          OUT="$PWD/homepage-fix01-evidence"
+          mkdir -p "$OUT/reports"
+          cp /tmp/site-qa.log "$OUT/reports/site-qa.log"
+          cp /tmp/changed.txt "$OUT/reports/changed-files.txt"
+          python3 -m http.server 4173 --bind 127.0.0.1 --directory candidate >/tmp/hf01-http.log 2>&1 &
+          SERVER=$!
+          trap 'kill $SERVER || true' EXIT
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:4173/index.html >/dev/null && break || sleep 0.2; done
+          cd candidate
+          OUT="$OUT" NODE_PATH='/tmp/hf01-node/node_modules' CHROME="$CHROME" node ../qa/.github/homepage-fix01-final2/verify.cjs | tee "$OUT/reports/browser-console.log"
+      - name: Build checksum manifest
+        run: |
+          set -euo pipefail
+          OUT="$PWD/homepage-fix01-evidence"
+          printf 'HOMEPAGE FIX 01 — READY FOR MANUAL REVIEW\nBASELINE SHA: 46190b02d6760d5c3e59d042535479636c2f2b9a\nCANDIDATE SHA: a1fda66759397c1083149a1d1e1eb400f1ba0baf\nCANDIDATE TREE: 51faf36bd87e35d9895d981a196b54746d9482bb\nDEPLOYMENT: NONE\n' > "$OUT/HOMEPAGE_FIX_01_REVIEW.txt"
+          (cd "$OUT" && find . -type f ! -name SHA256SUMS.txt -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+      - name: Upload review artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: homepage-fix01-review-final
+          path: homepage-fix01-evidence/
+          if-no-files-found: error
