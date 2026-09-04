@@ -1,0 +1,164 @@
+name: Phase 23 final review packet
+on:
+  push:
+    branches: ["phase23-public-contact-image-qa-final2"]
+    paths:
+      - '.github/workflows/phase23-final-review.yml'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  review:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout Phase 23 QA harness
+        uses: actions/checkout@v4
+        with:
+          ref: phase23-public-contact-image-qa-final2
+          path: qa23
+          fetch-depth: 1
+      - name: Checkout exact baseline
+        uses: actions/checkout@v4
+        with:
+          ref: b247b536eda5b1f48ada5b6a09c657b324d289f1
+          path: baseline
+          fetch-depth: 0
+      - name: Checkout exact Phase 23 candidate
+        uses: actions/checkout@v4
+        with:
+          ref: 46190b02d6760d5c3e59d042535479636c2f2b9a
+          path: candidate
+          fetch-depth: 0
+      - name: Independent branch, diff, occurrence and asset evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          OUT=/tmp/phase23-review
+          mkdir -p "$OUT/reports" "$OUT/screenshots"
+          MAIN="$(git -C candidate ls-remote origin refs/heads/main | cut -f1)"
+          REBUILD="$(git -C candidate ls-remote origin refs/heads/rebuild/award-level-corporate-v2 | cut -f1)"
+          test "$MAIN" = b247b536eda5b1f48ada5b6a09c657b324d289f1
+          test "$REBUILD" = 46190b02d6760d5c3e59d042535479636c2f2b9a
+          test "$(git -C candidate rev-parse HEAD)" = 46190b02d6760d5c3e59d042535479636c2f2b9a
+          test "$(git -C candidate rev-parse HEAD^{tree})" = 9c0e469b36582314363feab282c95852f4d81ffa
+          test "$(git -C candidate rev-parse HEAD^)" = b247b536eda5b1f48ada5b6a09c657b324d289f1
+          printf 'MAIN=%s\nREBUILD=%s\nCANDIDATE=%s\nTREE=%s\nPARENT=%s\n' "$MAIN" "$REBUILD" "$(git -C candidate rev-parse HEAD)" "$(git -C candidate rev-parse HEAD^{tree})" "$(git -C candidate rev-parse HEAD^)" > "$OUT/reports/branch-readback.txt"
+          git -C candidate diff --name-only b247b536eda5b1f48ada5b6a09c657b324d289f1..46190b02d6760d5c3e59d042535479636c2f2b9a > "$OUT/reports/changed-files.txt"
+          git -C candidate diff --stat b247b536eda5b1f48ada5b6a09c657b324d289f1..46190b02d6760d5c3e59d042535479636c2f2b9a > "$OUT/reports/diff-stat.txt"
+          git -C candidate diff --exit-code b247b536eda5b1f48ada5b6a09c657b324d289f1..46190b02d6760d5c3e59d042535479636c2f2b9a -- assets/media/unique-holding-film-720p.mp4 assets/media/unique-holding-caption.vtt
+          sha256sum candidate/assets/media/unique-holding-film-720p.mp4 candidate/assets/media/unique-holding-caption.vtt > "$OUT/reports/protected-film-sha256.txt"
+          python3 - <<'PY'
+          import json,pathlib,subprocess,re
+          OUT=pathlib.Path('/tmp/phase23-review/reports')
+          strings={'mobile':'+90 539 380 91 97','email':'farahmand@uniqueholding.com.tr'}
+          def grep(root,s,html_only=False):
+              cmd=['git','-C',root,'grep','-n','-F',s,'--']
+              if html_only: cmd.append('*.html')
+              p=subprocess.run(cmd,capture_output=True,text=True)
+              rows=[x for x in p.stdout.splitlines() if x.strip()]
+              return {'occurrences':len(rows),'files':sorted(set(x.split(':',1)[0] for x in rows)),'matches':rows}
+          data={}
+          for k,s in strings.items():
+              data[k]={'baselineRepository':grep('baseline',s,False),'baselinePublicHtml':grep('baseline',s,True),'candidateRepository':grep('candidate',s,False),'candidatePublicHtml':grep('candidate',s,True)}
+          assert data['mobile']['baselineRepository']['occurrences']==25
+          assert data['email']['baselineRepository']['occurrences']==34
+          assert data['mobile']['baselinePublicHtml']['occurrences']==20
+          assert data['email']['baselinePublicHtml']['occurrences']==25
+          assert data['mobile']['candidatePublicHtml']['occurrences']==0
+          assert data['email']['candidatePublicHtml']['occurrences']==0
+          (OUT/'exact-string-sweep.json').write_text(json.dumps(data,indent=2,ensure_ascii=False))
+          # Asset evidence: WebP VP8/VP8X dimensions + exact byte size.
+          def webp_dims(path):
+              b=pathlib.Path(path).read_bytes();
+              if b[:4]!=b'RIFF' or b[8:12]!=b'WEBP': raise ValueError(path)
+              kind=b[12:16]
+              if kind==b'VP8 ':
+                  i=b.find(b'\x9d\x01\x2a'); w=int.from_bytes(b[i+3:i+5],'little')&0x3fff; h=int.from_bytes(b[i+5:i+7],'little')&0x3fff
+              elif kind==b'VP8X':
+                  w=1+int.from_bytes(b[24:27],'little');h=1+int.from_bytes(b[27:30],'little')
+              elif kind==b'VP8L':
+                  bits=int.from_bytes(b[21:25],'little');w=(bits&0x3fff)+1;h=((bits>>14)&0x3fff)+1
+              else: raise ValueError(kind)
+              return w,h,len(b)
+          old='baseline/assets/phase04/film-still-logistics.webp';new='candidate/assets/phase08/film-still-physical-trade.webp'
+          ow,oh,os=webp_dims(old);nw,nh,ns=webp_dims(new)
+          assert (ow,oh,os)==(800,450,14924),(ow,oh,os)
+          assert (nw,nh,ns)==(960,540,32966),(nw,nh,ns)
+          img={'replacedReference':{'path':'assets/phase04/film-still-logistics.webp','dimensions':[ow,oh],'bytes':os},'replacement':{'path':'assets/phase08/film-still-physical-trade.webp','dimensions':[nw,nh],'bytes':ns,'sourceClass':'EXISTING APPROVED INTERNAL / PROVENANCE-SAFE PHASE 08 ASSET','binaryModifiedInPhase23':False},'protectedFilmSampleReview':'Sampled approved film frames did not provide a suitable industrial/logistics still; priority-2 approved internal asset used instead.'}
+          (OUT/'homepage-image-evidence.json').write_text(json.dumps(img,indent=2))
+          PY
+      - name: Run full static QA independently
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd candidate
+          node scripts/qa-site.mjs | tee /tmp/phase23-review/reports/qa-site.log
+          node scripts/qa-seo.mjs | tee /tmp/phase23-review/reports/qa-seo.log
+          node scripts/qa-performance.mjs | tee /tmp/phase23-review/reports/qa-performance.log
+          node scripts/qa-accessibility.mjs | tee /tmp/phase23-review/reports/qa-accessibility.log
+          grep -q 'TECHNICAL QA PASS' /tmp/phase23-review/reports/qa-site.log
+          grep -q 'REFERENCE DETAIL=3 / INQUIRY DETAIL=62 / INVALID=0' /tmp/phase23-review/reports/qa-site.log
+          grep -q 'protected film hashes verified' /tmp/phase23-review/reports/qa-site.log
+          grep -q 'PHASE 18 SEO QA PASS' /tmp/phase23-review/reports/qa-seo.log
+          grep -q 'PHASE 19 PERFORMANCE QA PASS' /tmp/phase23-review/reports/qa-performance.log
+          grep -q 'PHASE 19 ACCESSIBILITY STATIC QA PASS' /tmp/phase23-review/reports/qa-accessibility.log
+      - name: Install browser QA dependency
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/phase23-node && cd /tmp/phase23-node
+          npm init -y >/dev/null 2>&1
+          npm install --no-save --ignore-scripts puppeteer-core@24.16.0 >/dev/null
+          CHROME="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium)"
+          test -n "$CHROME"
+          echo "CHROME=$CHROME" >> "$GITHUB_ENV"
+      - name: Run local browser smoke and required visual QA
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m http.server 4173 --bind 127.0.0.1 --directory candidate >/tmp/phase23-http.log 2>&1 &
+          SERVER=$!
+          trap 'kill $SERVER || true' EXIT
+          for i in $(seq 1 20); do curl -fsS http://127.0.0.1:4173/index.html >/dev/null && break || sleep 0.3; done
+          PHASE23_BASE='http://127.0.0.1:4173/' PHASE23_OUT='/tmp/phase23-review' NODE_PATH='/tmp/phase23-node/node_modules' CHROME="$CHROME" node qa23/.github/phase23/final_qa.cjs | tee /tmp/phase23-review/reports/browser-qa-console.log
+      - name: Build Phase 23 review packet
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json,pathlib
+          P=pathlib.Path('/tmp/phase23-review');R=P/'reports'
+          sweep=json.loads((R/'exact-string-sweep.json').read_text());img=json.loads((R/'homepage-image-evidence.json').read_text());b=json.loads((P/'browser-qa.json').read_text())
+          changed=(R/'changed-files.txt').read_text().splitlines();branch=(R/'branch-readback.txt').read_text()
+          assert b['totalErrors']==0 and b['smokeFailures']==0 and b['visualAutomatedFailures']==0
+          assert b['visualCases']==9
+          assert len(list((P/'screenshots').glob('*.png')))==12
+          # Root product outputs are clean; only historical QA/docs may retain original values.
+          manifest={
+            'status':'READY FOR REVIEW',
+            'baselineSha':'b247b536eda5b1f48ada5b6a09c657b324d289f1',
+            'newSha':'46190b02d6760d5c3e59d042535479636c2f2b9a',
+            'newTree':'9c0e469b36582314363feab282c95852f4d81ffa',
+            'mainSha':'b247b536eda5b1f48ada5b6a09c657b324d289f1',
+            'targetBranch':'rebuild/award-level-corporate-v2',
+            'changedFiles':changed,
+            'personalMobile':{'baselineRepositoryOccurrences':sweep['mobile']['baselineRepository']['occurrences'],'baselinePublicHtmlOccurrences':sweep['mobile']['baselinePublicHtml']['occurrences'],'candidateRepositoryOccurrences':sweep['mobile']['candidateRepository']['occurrences'],'candidatePublicHtmlOccurrences':0},
+            'personalEmail':{'baselineRepositoryOccurrences':sweep['email']['baselineRepository']['occurrences'],'baselinePublicHtmlOccurrences':sweep['email']['baselinePublicHtml']['occurrences'],'candidateRepositoryOccurrences':sweep['email']['candidateRepository']['occurrences'],'candidatePublicHtmlOccurrences':0},
+            'replacementImage':img['replacement'],'replacedImage':img['replacedReference'],
+            'technicalQa':'PASS','seoQa':'PASS','performanceStaticQa':'PASS','accessibilityStaticQa':'PASS',
+            'browserSmokeCases':b['smokeCases'],'browserSmokeFailures':b['smokeFailures'],'requiredVisualCases':b['visualCases'],'requiredVisualAutomatedFailures':b['visualAutomatedFailures'],
+            'protectedFilmChanged':False,'productCounts':{'reference':3,'inquiry':62,'invalid':0},
+            'mainModified':False,'deployed':False
+          }
+          (P/'phase23-review-manifest.json').write_text(json.dumps(manifest,indent=2,ensure_ascii=False))
+          md=f'''# PHASE 23 — PUBLIC CONTACT SANITIZATION + HOMEPAGE IMAGE QUALITY FIX\n\n**STATUS: READY FOR REVIEW**\n\nBaseline SHA: `b247b536eda5b1f48ada5b6a09c657b324d289f1`  \nNew SHA: `46190b02d6760d5c3e59d042535479636c2f2b9a`  \nNew tree: `9c0e469b36582314363feab282c95852f4d81ffa`  \nTarget: `rebuild/award-level-corporate-v2`\n\n## Contact sanitization\n- Personal mobile: repository-wide baseline **{manifest['personalMobile']['baselineRepositoryOccurrences']}**, public HTML baseline **{manifest['personalMobile']['baselinePublicHtmlOccurrences']}**, public HTML after **0**.\n- `farahmand@uniqueholding.com.tr`: repository-wide baseline **{manifest['personalEmail']['baselineRepositoryOccurrences']}**, public HTML baseline **{manifest['personalEmail']['baselinePublicHtmlOccurrences']}**, public HTML after **0**.\n- Approved public office phone `+90 212 727 22 22` remains.\n- Approved sales email `sales@uniqueholding.com.tr` remains.\n- Any residual exact strings outside public HTML are historical QA/docs only and are itemized in `reports/exact-string-sweep.json`.\n\n## Homepage image\nThe first below-film image in “Physical markets. Commercial execution.” now references `{img['replacement']['path']}` (**960×540, {img['replacement']['bytes']} bytes**) instead of `{img['replacedReference']['path']}` (**800×450, {img['replacedReference']['bytes']} bytes**). Source class: **{img['replacement']['sourceClass']}**. The asset already existed in the approved repository and its binary was not changed in Phase 23. The protected film was sampled first; no suitable industrial/logistics frame was found.\n\n## QA\n- Technical QA: **PASS**.\n- SEO QA: **PASS**.\n- Performance static QA: **PASS**.\n- Accessibility static QA: **PASS**.\n- Browser smoke: **{b['smokeCases']-b['smokeFailures']}/{b['smokeCases']} PASS** across all 16 routes desktop plus required eight routes mobile.\n- Required visual/browser cases: **{b['visualCases']-b['visualAutomatedFailures']}/{b['visualCases']} PASS**.\n- Personal mobile visible: **0**. Personal email visible: **0**.\n- Broken forbidden tel/mailto links: **0**. Empty contact cards: **0**.\n- Horizontal overflow: **0 cases**. Console/page errors introduced: **0**. Broken same-origin asset responses: **0**.\n- Homepage image natural dimensions/load/density gates: **PASS** at 1440×900, 390×844 and 360×800.\n- Product counts: **REFERENCE=3 / INQUIRY=62 / INVALID=0**.\n- Protected film/media diff: **NONE**.\n- Main remains `b247b536eda5b1f48ada5b6a09c657b324d289f1`; no deployment performed.\n\n## Changed files\n''' + ''.join(f'- `{x}`\n' for x in changed) + '''\n## Visual evidence\nRequired and requested screenshots are in `screenshots/`, including the fixed homepage image area, Contact page, Corporate page (previous personal-email location), and clean 390×844 mobile contact output.\n'''
+          (P/'PHASE_23_REVIEW_PACKET.md').write_text(md)
+          PY
+          (cd /tmp/phase23-review && find . -type f ! -name SHA256SUMS.txt -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+      - name: Upload Phase 23 review packet
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase23-public-contact-image-review-packet
+          path: /tmp/phase23-review/
+          if-no-files-found: error
+          compression-level: 6
