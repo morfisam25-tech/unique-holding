@@ -1,0 +1,97 @@
+name: Homepage Fix 02 final review
+
+on:
+  push:
+    branches: ["homepage-fix02-qa-final"]
+
+permissions:
+  contents: read
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout QA harness
+        uses: actions/checkout@v4
+        with:
+          ref: homepage-fix02-qa-final
+          path: qa
+          fetch-depth: 1
+      - name: Checkout candidate
+        uses: actions/checkout@v4
+        with:
+          ref: 7a768f2ab8e4ccd463d5ac3334de840f92be13f4
+          path: candidate
+          fetch-depth: 0
+      - name: Verify scope and technical QA
+        run: |
+          set -euo pipefail
+          test "$(git -C candidate rev-parse HEAD)" = "7a768f2ab8e4ccd463d5ac3334de840f92be13f4"
+          test "$(git -C candidate rev-parse HEAD^)" = "46190b02d6760d5c3e59d042535479636c2f2b9a"
+          test "$(git -C candidate rev-parse HEAD^{tree})" = "c8f1423686f65b531d03f6333ce9305ecdc4c818"
+          git -C candidate diff --name-only 46190b02d6760d5c3e59d042535479636c2f2b9a..7a768f2ab8e4ccd463d5ac3334de840f92be13f4 | sort > /tmp/changed.txt
+          printf '%s\n' assets/homepage/home-trade-port-arthur.webp index.html scripts/qa-site.mjs > /tmp/expected.txt
+          diff -u /tmp/expected.txt /tmp/changed.txt
+          test ! -e candidate/assets/homepage-hero-positioning.css
+          if grep -q 'Operating from Istanbul\.' candidate/index.html; then exit 1; fi
+          if grep -q 'Industrial trade.</span><span>Technology.</span><span>Intelligence.' candidate/index.html; then exit 1; fi
+          git -C candidate diff --exit-code 46190b02d6760d5c3e59d042535479636c2f2b9a..7a768f2ab8e4ccd463d5ac3334de840f92be13f4 -- energy.html
+          git -C candidate diff --exit-code 46190b02d6760d5c3e59d042535479636c2f2b9a..7a768f2ab8e4ccd463d5ac3334de840f92be13f4 -- assets/phase08/film-still-physical-trade.webp
+          (cd candidate && node scripts/qa-site.mjs) | tee /tmp/fix02-site-qa.log
+          grep -q 'TECHNICAL QA PASS' /tmp/fix02-site-qa.log
+          grep -q 'protected film hashes verified' /tmp/fix02-site-qa.log
+      - name: Install browser dependency
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/fix02-node && cd /tmp/fix02-node
+          npm init -y >/dev/null 2>&1
+          npm install --no-save --ignore-scripts puppeteer-core@24.16.0 >/dev/null
+          CHROME="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium)"
+          test -n "$CHROME"
+          echo "CHROME=$CHROME" >> "$GITHUB_ENV"
+      - name: Render and inspect three required viewports
+        run: |
+          set -euo pipefail
+          OUT="$PWD/homepage-fix02-evidence"
+          mkdir -p "$OUT/reports"
+          cp /tmp/fix02-site-qa.log "$OUT/reports/site-qa.log"
+          cp /tmp/changed.txt "$OUT/reports/changed-files.txt"
+          python3 - <<'PY'
+          from PIL import Image
+          from pathlib import Path
+          old=Path('candidate/assets/phase08/film-still-physical-trade.webp')
+          new=Path('candidate/assets/homepage/home-trade-port-arthur.webp')
+          for p in [old,new]:
+            im=Image.open(p)
+            print(p, im.size, p.stat().st_size)
+          PY
+          python3 -m http.server 4173 --bind 127.0.0.1 --directory candidate >/tmp/fix02-http.log 2>&1 &
+          SERVER=$!
+          trap 'kill $SERVER || true' EXIT
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:4173/index.html >/dev/null && break || sleep 0.2; done
+          OUT="$OUT" NODE_PATH='/tmp/fix02-node/node_modules' CHROME="$CHROME" node qa/.github/homepage-fix02-final/verify.cjs | tee "$OUT/reports/browser-console.log"
+          cp /tmp/fix02-http.log "$OUT/reports/http-server.log"
+          cat > "$OUT/PROVENANCE.txt" <<'EOF'
+          Selected source: Crude Oil Tanker in Port Arthur, Texas.jpg
+          Author: Quintin Soloviev
+          Source: Wikimedia Commons
+          Source description: Own work; crude oil tanker Eagle Kinabalu passing an LNG facility in Port Arthur, Texas.
+          License: CC0 1.0 Universal Public Domain Dedication
+          Original dimensions: 8064 x 5858
+          Original SHA-1: 04978f958c8daca6fbba86ad130ddaa2f71eacf2
+          Production derivative: assets/homepage/home-trade-port-arthur.webp
+          Derivative dimensions: 1920 x 1080
+          Derivative bytes: 276692
+          EOF
+      - name: Build checksum manifest
+        run: |
+          set -euo pipefail
+          OUT="$PWD/homepage-fix02-evidence"
+          printf 'HOMEPAGE FIX 02 — FINAL REVIEW\nSTATUS: AUTOMATED QA PASS\nBASELINE SHA: 46190b02d6760d5c3e59d042535479636c2f2b9a\nCANDIDATE SHA: 7a768f2ab8e4ccd463d5ac3334de840f92be13f4\nCANDIDATE TREE: c8f1423686f65b531d03f6333ce9305ecdc4c818\nDEPLOYMENT: NONE\nFIX 01 DELTA: NONE\n' > "$OUT/HOMEPAGE_FIX_02_REVIEW.txt"
+          (cd "$OUT" && find . -type f ! -name SHA256SUMS.txt -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+      - name: Upload final review artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: homepage-fix02-review-final
+          path: homepage-fix02-evidence/
+          if-no-files-found: error
