@@ -1,0 +1,110 @@
+name: Homepage Fix 02 source audit
+
+on:
+  push:
+    branches: ["homepage-fix02-source-audit"]
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install image tools
+        run: |
+          python3 -m pip install --quiet pillow numpy
+      - name: Recover historical embedded and file image candidates
+        run: |
+          set -euo pipefail
+          mkdir -p fix02-source-audit/candidates
+          python3 - <<'PY'
+          import base64, io, json, os, re, subprocess, hashlib
+          from pathlib import Path
+          from PIL import Image, ImageOps, ImageDraw, ImageFont, ImageFilter
+          import numpy as np
+
+          out=Path('fix02-source-audit'); cand=out/'candidates'
+          def sh(*args):
+              return subprocess.check_output(args, text=True, errors='ignore')
+          def sharpness(im):
+              g=np.asarray(ImageOps.grayscale(im).resize((min(im.width,1200), max(1,int(im.height*min(im.width,1200)/im.width)))),dtype=np.float32)
+              if g.size<9:return 0.0
+              lap=(-4*g + np.roll(g,1,0)+np.roll(g,-1,0)+np.roll(g,1,1)+np.roll(g,-1,1))
+              return float(lap.var())
+
+          records=[]; seen=set()
+          # Current image A.
+          cur=Path('assets/phase08/film-still-physical-trade.webp')
+          im=Image.open(cur).convert('RGB')
+          records.append({'id':'A-current','kind':'current','path':str(cur),'commit':'46190b02d6760d5c3e59d042535479636c2f2b9a','width':im.width,'height':im.height,'bytes':cur.stat().st_size,'sharpness':sharpness(im),'file':str(cur)})
+
+          commits=sh('git','rev-list','--all','--max-count=180').splitlines()
+          idx=0
+          for c in commits:
+              try:
+                  names=sh('git','ls-tree','-r','--name-only',c).splitlines()
+              except Exception: continue
+              for path in names:
+                  low=path.lower()
+                  # Recover binary image files from history.
+                  if low.endswith(('.jpg','.jpeg','.png','.webp')):
+                      try: data=subprocess.check_output(['git','show',f'{c}:{path}'])
+                      except Exception: continue
+                      h=hashlib.sha256(data).hexdigest()
+                      if h in seen: continue
+                      try: im=Image.open(io.BytesIO(data)).convert('RGB')
+                      except Exception: continue
+                      seen.add(h); idx+=1
+                      ext='.jpg' if im.format=='JPEG' else '.png'
+                      f=cand/f'hist-{idx:03d}.jpg'; im.save(f,'JPEG',quality=94)
+                      records.append({'id':f'hist-{idx:03d}','kind':'historical-file','path':path,'commit':c,'width':im.width,'height':im.height,'bytes':len(data),'sharpness':sharpness(im),'file':str(f),'sha256':h})
+                  if not low.endswith(('.html','.htm')): continue
+                  try: txt=subprocess.check_output(['git','show',f'{c}:{path}'], text=True, errors='ignore')
+                  except Exception: continue
+                  for m in re.finditer(r'data:image/(jpeg|jpg|png|webp);base64,([^\"\')\s]+)',txt,re.I):
+                      try: data=base64.b64decode(m.group(2), validate=False)
+                      except Exception: continue
+                      h=hashlib.sha256(data).hexdigest()
+                      if h in seen: continue
+                      try: im=Image.open(io.BytesIO(data)).convert('RGB')
+                      except Exception: continue
+                      seen.add(h); idx+=1
+                      context=re.sub(r'<[^>]+>',' ',txt[max(0,m.start()-700):min(len(txt),m.end()+700)])
+                      context=' '.join(context.split())[:500]
+                      f=cand/f'hist-{idx:03d}.jpg'; im.save(f,'JPEG',quality=94)
+                      records.append({'id':f'hist-{idx:03d}','kind':'historical-embedded','path':path,'commit':c,'width':im.width,'height':im.height,'bytes':len(data),'sharpness':sharpness(im),'file':str(f),'sha256':h,'context':context})
+
+          # Rank: privilege large dimensions, then sharpness.
+          for r in records:
+              r['area']=r['width']*r['height']
+              r['score']=r['area']*(1+min(r['sharpness'],500)/500)
+          ranked=sorted(records[1:], key=lambda r:(r['area']>=1600*900, r['score']), reverse=True)
+          top=ranked[:24]
+          (out/'candidates.json').write_text(json.dumps({'current':records[0],'top':top,'all_count':len(records)-1},indent=2))
+
+          # Contact sheet current + top candidates, large enough for rough audit.
+          cards=[records[0]]+top[:12]
+          W=1600; cardw=760; imageh=430; gap=32; labelh=92
+          rows=(len(cards)+1)//2
+          sheet=Image.new('RGB',(W,rows*(imageh+labelh+gap)+gap),'white')
+          d=ImageDraw.Draw(sheet)
+          for i,r in enumerate(cards):
+              x=gap+(i%2)*(cardw+gap); y=gap+(i//2)*(imageh+labelh+gap)
+              src=Image.open(r['file']).convert('RGB')
+              fitted=ImageOps.fit(src,(cardw,imageh),method=Image.Resampling.LANCZOS)
+              sheet.paste(fitted,(x,y))
+              label=f"{r['id']} | {r['width']}x{r['height']} | {r['bytes']} bytes | sharp {r['sharpness']:.1f}\n{r.get('kind','')} | {r.get('path','')[:70]}"
+              d.multiline_text((x,y+imageh+8),label,fill='black',spacing=5)
+          sheet.save(out/'comparison-internal-history.jpg','JPEG',quality=94)
+          PY
+      - name: Upload audit artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: homepage-fix02-source-audit
+          path: fix02-source-audit/
+          if-no-files-found: error
