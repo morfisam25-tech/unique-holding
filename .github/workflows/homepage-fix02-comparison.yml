@@ -1,0 +1,70 @@
+name: Homepage Fix 02 precommit comparison
+
+on:
+  push:
+    branches: ["homepage-fix02-source-audit"]
+
+permissions:
+  contents: read
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout production baseline
+        uses: actions/checkout@v4
+        with:
+          ref: 46190b02d6760d5c3e59d042535479636c2f2b9a
+      - name: Install image tools
+        run: python3 -m pip install --quiet pillow numpy
+      - name: Download provenance-safe candidates
+        run: |
+          set -euo pipefail
+          mkdir -p fix02-comparison/source fix02-comparison/processed
+          cp assets/phase08/film-still-physical-trade.webp fix02-comparison/source/A-current.webp
+          curl -fL --retry 3 -o fix02-comparison/source/B-preemraff-terminal.jpg 'https://upload.wikimedia.org/wikipedia/commons/a/a1/Product_terminal_at_Preemraff_Lysekil_with_tankers.jpg'
+          curl -fL --retry 3 -o fix02-comparison/source/C-preemraff-terminal-wide.jpg 'https://upload.wikimedia.org/wikipedia/commons/7/76/Preemraff_product_terminal_at_night.jpg'
+      - name: Build comparison sheet and metrics
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          from PIL import Image,ImageOps,ImageDraw,ImageFont,ImageFilter
+          import numpy as np, json, os
+          root=Path('fix02-comparison')
+          items=[
+            ('A — CURRENT','source/A-current.webp','Current Phase 23 film still / internal protected asset'),
+            ('B — PROPOSED','source/B-preemraff-terminal.jpg','Product terminal at Preemraff Lysekil with tankers — W.carter — CC BY-SA 4.0 — Wikimedia Commons Quality image'),
+            ('C — ALTERNATE','source/C-preemraff-terminal-wide.jpg','Preemraff product terminal at night — W.carter — CC BY-SA 4.0 — Wikimedia Commons')]
+          def sharp(im):
+            g=np.asarray(ImageOps.grayscale(im),dtype=np.float32)
+            if max(g.shape)>1800:
+              scale=1800/max(g.shape); im2=ImageOps.grayscale(im).resize((int(im.width*scale),int(im.height*scale)),Image.Resampling.LANCZOS); g=np.asarray(im2,dtype=np.float32)
+            lap=-4*g+np.roll(g,1,0)+np.roll(g,-1,0)+np.roll(g,1,1)+np.roll(g,-1,1)
+            return float(lap.var())
+          metrics=[]
+          W=2600; fullw=1700; fullh=956; detail=620; pad=70; labelh=150; rowh=fullh+labelh+pad
+          sheet=Image.new('RGB',(W,pad+rowh*len(items)),(238,235,228)); d=ImageDraw.Draw(sheet)
+          for i,(label,path,prov) in enumerate(items):
+            p=root/path; im=Image.open(p).convert('RGB'); y=pad+i*rowh
+            fit=ImageOps.fit(im,(fullw,fullh),method=Image.Resampling.LANCZOS,centering=(.5,.5))
+            sheet.paste(fit,(pad,y))
+            # 1:1-style high-detail crop from central/industrial content, displayed without upscaling beyond source crop.
+            crop_side=min(im.width,im.height,1200)
+            cx=int(im.width*.55); cy=int(im.height*.55)
+            l=max(0,min(im.width-crop_side,cx-crop_side//2)); t=max(0,min(im.height-crop_side,cy-crop_side//2))
+            crop=im.crop((l,t,l+crop_side,t+crop_side)).resize((detail,detail),Image.Resampling.LANCZOS)
+            sheet.paste(crop,(pad+fullw+70,y+30))
+            s=sharp(im)
+            metrics.append({'label':label,'file':path,'width':im.width,'height':im.height,'bytes':p.stat().st_size,'sharpness_metric':round(s,2),'provenance':prov})
+            d.text((pad,y+fullh+20),f'{label}  |  {im.width}×{im.height}  |  {p.stat().st_size:,} bytes  |  sharpness metric {s:.1f}',fill=(18,18,18))
+            d.text((pad,y+fullh+58),prov,fill=(70,70,70))
+            d.text((pad+fullw+70,y+detail+45),'DETAIL CROP',fill=(80,80,80))
+          sheet.save(root/'HOMEPAGE_FIX_02_PRECOMMIT_COMPARISON.jpg','JPEG',quality=94,subsampling=0)
+          (root/'comparison-metrics.json').write_text(json.dumps(metrics,indent=2))
+          PY
+      - name: Upload comparison
+        uses: actions/upload-artifact@v4
+        with:
+          name: homepage-fix02-precommit-comparison
+          path: fix02-comparison/
+          if-no-files-found: error
