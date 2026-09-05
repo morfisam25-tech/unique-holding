@@ -40,9 +40,10 @@ jobs:
           (cd candidate && node scripts/qa-site.mjs) | tee /tmp/fix02-site-qa.log
           grep -q 'TECHNICAL QA PASS' /tmp/fix02-site-qa.log
           grep -q 'protected film hashes verified' /tmp/fix02-site-qa.log
-      - name: Install browser dependency
+      - name: Install browser and image dependencies
         run: |
           set -euo pipefail
+          python3 -m pip install --quiet pillow
           mkdir -p /tmp/fix02-node && cd /tmp/fix02-node
           npm init -y >/dev/null 2>&1
           npm install --no-save --ignore-scripts puppeteer-core@24.16.0 >/dev/null
