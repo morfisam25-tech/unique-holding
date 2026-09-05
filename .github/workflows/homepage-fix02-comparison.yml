@@ -22,8 +22,9 @@ jobs:
           set -euo pipefail
           mkdir -p fix02-comparison/source
           cp assets/phase08/film-still-physical-trade.webp fix02-comparison/source/A-current.webp
-          curl -fL --retry 3 -o fix02-comparison/source/B-coralius-cc0.jpg 'https://commons.wikimedia.org/wiki/Special:Redirect/file/Coralius_IMO_9769128_backing_into_the_product_terminal_at_Preemraff_Lysekil.jpg'
-          curl -fL --retry 3 -o fix02-comparison/source/C-preemraff-quality.jpg 'https://upload.wikimedia.org/wikipedia/commons/a/a1/Product_terminal_at_Preemraff_Lysekil_with_tankers.jpg'
+          curl -fL --retry 3 -o fix02-comparison/source/B-botlek-cc0.jpg 'https://commons.wikimedia.org/wiki/Special:Redirect/file/Botlek_Tank_Terminal%2C_Port_of_Rotterdam_pic1.JPG'
+          curl -fL --retry 3 -o fix02-comparison/source/C-port-arthur-cc0.jpg 'https://commons.wikimedia.org/wiki/Special:Redirect/file/Crude_Oil_Tanker_in_Port_Arthur%2C_Texas.jpg'
+          curl -fL --retry 3 -o fix02-comparison/source/D-preemraff-quality.jpg 'https://upload.wikimedia.org/wikipedia/commons/a/a1/Product_terminal_at_Preemraff_Lysekil_with_tankers.jpg'
       - name: Build comparison sheet and metrics
         run: |
           python3 - <<'PY'
@@ -33,8 +34,9 @@ jobs:
           root=Path('fix02-comparison')
           items=[
             ('A — CURRENT','source/A-current.webp','Current Phase 23 film still / internal approved asset'),
-            ('B — CC0 CANDIDATE','source/B-coralius-cc0.jpg','Coralius backing into product terminal at Preemraff Lysekil — W.carter — CC0 1.0 — Wikimedia Commons — source 4925×2770'),
-            ('C — QUALITY ALTERNATE','source/C-preemraff-quality.jpg','Product terminal at Preemraff Lysekil with tankers — W.carter — CC BY-SA 4.0 — Wikimedia Commons Quality image — source 4764×3136')]
+            ('B — BOTLEK CC0','source/B-botlek-cc0.jpg','Botlek Tank Terminal, Port of Rotterdam — Alf van Beem — Own work — CC0 1.0 — source 4608×2592'),
+            ('C — PORT ARTHUR CC0','source/C-port-arthur-cc0.jpg','Crude Oil Tanker in Port Arthur passing LNG facility — Quintin Soloviev — Own work — CC0 1.0 — source 8064×5858'),
+            ('D — PREEMRAFF QUALITY','source/D-preemraff-quality.jpg','Product terminal at Preemraff Lysekil with tankers — W.carter — Own work — CC BY-SA 4.0 — Wikimedia Commons Quality image — source 4764×3136')]
           def sharp(im):
             g=np.asarray(ImageOps.grayscale(im),dtype=np.float32)
             if max(g.shape)>1800:
@@ -59,6 +61,6 @@ jobs:
       - name: Upload comparison
         uses: actions/upload-artifact@v4
         with:
-          name: homepage-fix02-precommit-comparison-cc0
+          name: homepage-fix02-precommit-comparison-final-options
           path: fix02-comparison/
           if-no-files-found: error
