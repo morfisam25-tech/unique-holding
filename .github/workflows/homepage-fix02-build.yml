@@ -1,0 +1,148 @@
+name: Homepage Fix 02 build candidate
+
+on:
+  push:
+    branches: ["homepage-fix02-build-runner"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout clean Fix 02 candidate branch
+        uses: actions/checkout@v4
+        with:
+          ref: homepage-fix02-trade-image-candidate
+          fetch-depth: 0
+      - name: Assert authoritative production baseline
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "46190b02d6760d5c3e59d042535479636c2f2b9a"
+          test ! -e assets/homepage-hero-positioning.css
+          ! grep -q 'Operating from Istanbul\.' index.html
+          ! grep -q 'Industrial trade.</span><span>Technology.</span><span>Intelligence.' index.html
+      - name: Install image processor
+        run: python3 -m pip install --quiet pillow
+      - name: Download and verify selected CC0 source
+        run: |
+          set -euo pipefail
+          curl -fL --retry 3 -o /tmp/fix02-source.jpg 'https://commons.wikimedia.org/wiki/Special:Redirect/file/Crude_Oil_Tanker_in_Port_Arthur%2C_Texas.jpg'
+          test "$(sha1sum /tmp/fix02-source.jpg | awk '{print $1}')" = "04978f958c8daca6fbba86ad130ddaa2f71eacf2"
+          python3 - <<'PY'
+          from PIL import Image
+          im=Image.open('/tmp/fix02-source.jpg')
+          assert im.size==(8064,5858), im.size
+          print('SOURCE_DIMENSIONS=8064x5858')
+          PY
+      - name: Create premium 2x-density homepage asset
+        run: |
+          set -euo pipefail
+          mkdir -p assets/homepage
+          python3 - <<'PY'
+          from PIL import Image,ImageOps
+          from pathlib import Path
+          src=Image.open('/tmp/fix02-source.jpg').convert('RGB')
+          out=ImageOps.fit(src,(1920,1080),method=Image.Resampling.LANCZOS,centering=(0.5,0.53))
+          p=Path('assets/homepage/home-trade-port-arthur.webp')
+          out.save(p,'WEBP',quality=84,method=6)
+          check=Image.open(p)
+          assert check.size==(1920,1080), check.size
+          size=p.stat().st_size
+          assert 180000 <= size <= 320000, size
+          print(f'NEW_ASSET_DIMENSIONS={check.width}x{check.height}')
+          print(f'NEW_ASSET_BYTES={size}')
+          PY
+      - name: Change only homepage image source and its QA guard
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          old='assets/phase08/film-still-physical-trade.webp'
+          new='assets/homepage/home-trade-port-arthur.webp'
+          p=Path('index.html'); s=p.read_text()
+          if s.count(old)!=1: raise SystemExit(f'homepage expected one old asset reference, found {s.count(old)}')
+          s=s.replace(old,new,1); p.write_text(s)
+          baseline=subprocess.check_output(['git','show','46190b02d6760d5c3e59d042535479636c2f2b9a:index.html'],text=True)
+          if s.replace(new,old,1)!=baseline: raise SystemExit('index.html changed beyond image src')
+
+          q=Path('scripts/qa-site.mjs'); t=q.read_text()
+          # Update only Phase 04 required-token slice.
+          a=t.index('const phase04Required='); b=t.index("for(const token of phase04Required)",a)
+          phase=t[a:b]
+          if phase.count(old)!=1: raise SystemExit('Phase04 required token pattern drift')
+          t=t[:a]+phase.replace(old,new,1)+t[b:]
+
+          old_block="""for(const asset of ['assets/phase08/film-still-physical-trade.webp','assets/phase04/film-still-intelligence.webp']){
+  if(!files.includes(asset))errors.push(`Phase 04 asset missing -> ${asset}`);
+  else if(fs.statSync(path.join(root,asset)).size>120000)errors.push(`Phase 04 asset exceeds 120 KB -> ${asset}`);
+}
+const phase04ImageExpectations=[
+  ['assets/phase08/film-still-physical-trade.webp',960,540],
+  ['assets/phase04/film-still-intelligence.webp',800,450]
+];
+for(const [asset,expectedWidth,expectedHeight] of phase04ImageExpectations){
+  if(!files.includes(asset))continue;
+  const dims=webpDimensions(asset);
+  if(!dims)errors.push(`Phase 04 asset dimensions unreadable -> ${asset}`);
+  else if(dims.width!==expectedWidth||dims.height!==expectedHeight)errors.push(`Phase 04 intrinsic dimensions changed -> ${asset}: ${dims.width}x${dims.height}`);
+  const escaped=asset.replaceAll('.','\\\\.');
+  const tag=index.match(new RegExp(`<img\\\\b[^>]*src=[\"']${escaped}[\"'][^>]*>`,'i'))?.[0]||'';
+  if(!tag)errors.push(`index.html: Phase 04 image tag missing -> ${asset}`);
+  else if(Number(attr(tag,'width'))!==expectedWidth||Number(attr(tag,'height'))!==expectedHeight)errors.push(`index.html: Phase 04 image attributes must match intrinsic ${expectedWidth}x${expectedHeight} -> ${asset}`);
+}
+"""
+          new_block="""const phase04AssetLimits=[
+  ['assets/homepage/home-trade-port-arthur.webp',320000],
+  ['assets/phase04/film-still-intelligence.webp',120000]
+];
+for(const [asset,maxBytes] of phase04AssetLimits){
+  if(!files.includes(asset))errors.push(`Phase 04 asset missing -> ${asset}`);
+  else if(fs.statSync(path.join(root,asset)).size>maxBytes)errors.push(`Phase 04 asset exceeds approved byte budget -> ${asset}`);
+}
+const phase04ImageExpectations=[
+  ['assets/homepage/home-trade-port-arthur.webp',1920,1080,960,540],
+  ['assets/phase04/film-still-intelligence.webp',800,450,800,450]
+];
+for(const [asset,expectedWidth,expectedHeight,markupWidth,markupHeight] of phase04ImageExpectations){
+  if(!files.includes(asset))continue;
+  const dims=webpDimensions(asset);
+  if(!dims)errors.push(`Phase 04 asset dimensions unreadable -> ${asset}`);
+  else if(dims.width!==expectedWidth||dims.height!==expectedHeight)errors.push(`Phase 04 intrinsic dimensions changed -> ${asset}: ${dims.width}x${dims.height}`);
+  const escaped=asset.replaceAll('.','\\\\.');
+  const tag=index.match(new RegExp(`<img\\\\b[^>]*src=[\"']${escaped}[\"'][^>]*>`,'i'))?.[0]||'';
+  if(!tag)errors.push(`index.html: Phase 04 image tag missing -> ${asset}`);
+  else if(Number(attr(tag,'width'))!==markupWidth||Number(attr(tag,'height'))!==markupHeight)errors.push(`index.html: Phase 04 image presentation attributes changed -> ${asset}`);
+}
+"""
+          if t.count(old_block)!=1: raise SystemExit('Phase04 image guard block drift')
+          t=t.replace(old_block,new_block,1)
+          q.write_text(t)
+          PY
+      - name: Technical and scope QA before commit
+        run: |
+          set -euo pipefail
+          node scripts/qa-site.mjs | tee /tmp/fix02-site-qa.log
+          grep -q 'TECHNICAL QA PASS' /tmp/fix02-site-qa.log
+          grep -q 'protected film hashes verified' /tmp/fix02-site-qa.log
+          test ! -e assets/homepage-hero-positioning.css
+          ! grep -q 'Operating from Istanbul\.' index.html
+          ! grep -q 'Industrial trade.</span><span>Technology.</span><span>Intelligence.' index.html
+          git diff --exit-code -- energy.html
+          git diff --exit-code -- assets/phase08/film-still-physical-trade.webp
+          printf '%s\n' assets/homepage/home-trade-port-arthur.webp index.html scripts/qa-site.mjs > /tmp/expected.txt
+          { git diff --name-only; git ls-files --others --exclude-standard; } | sort > /tmp/actual.txt
+          diff -u /tmp/expected.txt /tmp/actual.txt
+      - name: Commit candidate only
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html scripts/qa-site.mjs assets/homepage/home-trade-port-arthur.webp
+          git commit -m "HOMEPAGE FIX 02 — Replace homepage trade image"
+          test "$(git rev-parse HEAD^)" = "46190b02d6760d5c3e59d042535479636c2f2b9a"
+          git push origin HEAD:homepage-fix02-trade-image-candidate
+          echo "CANDIDATE_SHA=$(git rev-parse HEAD)"
+          echo "CANDIDATE_TREE=$(git rev-parse HEAD^{tree})"
