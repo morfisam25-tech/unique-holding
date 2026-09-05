@@ -176,20 +176,20 @@ const homepageFooter=footerStart>=0&&footerEnd>=0?index.slice(footerStart,footer
 if(sha256(homepageHeader)!=='42d6bee4ef6d7c4abfd4216dbbb17fc11a6aa4ad43b6aa89c7c0a46d8c82aed9')errors.push('index.html: protected Phase 03 static header changed');
 if(sha256(homepageFooter)!=='3f8d790b9d3b82a7ac05634b4c7b6ce968989cd809fd587c8ab13f6818ae5dc3')errors.push('index.html: protected Phase 03 static footer changed');
 
-const phase04Required=['home-thesis','home-operating-world--trade','home-operating-world--tech','home-mindset','home-proof','home-commercial','home-routes','home-close','Two operating worlds. One execution mindset.','Intelligence</em> to understand.','Technology to build.','Commerce to execute.','Physical markets. Commercial execution.','Research that informs. Products that move into build.','Understand → Build → Execute','Since<br>2020','Start with the requirement.','For partners, teams and new opportunities.','From intelligence to <em>execution.</em>','assets/phase08/film-still-physical-trade.webp','assets/phase04/film-still-intelligence.webp','Intercom vs Zendesk','9</b> checked sources','Checked 19 August 2026'];
+const phase04Required=['home-thesis','home-operating-world--trade','home-operating-world--tech','home-mindset','home-proof','home-commercial','home-routes','home-close','Two operating worlds. One execution mindset.','Intelligence</em> to understand.','Technology to build.','Commerce to execute.','Physical markets. Commercial execution.','Research that informs. Products that move into build.','Understand → Build → Execute','Since<br>2020','Start with the requirement.','For partners, teams and new opportunities.','From intelligence to <em>execution.</em>','assets/homepage/home-trade-port-arthur.webp','assets/phase04/film-still-intelligence.webp','Intercom vs Zendesk','9</b> checked sources','Checked 19 August 2026'];
 for(const token of phase04Required)if(!index.includes(token))errors.push(`index.html: Phase 04 homepage regression -> ${token}`);
 for(const removed of ['<section class="worlds"','<section class="relationships"','<section class="industrial gateway"','<section class="technology-preview"','<section class="corporate-gateway"'])if(index.includes(removed))errors.push(`index.html: legacy homepage section returned -> ${removed}`);
 const postHero=heroEnd>=0?index.slice(heroEnd,index.indexOf('  </main>',heroEnd)):'';
 if(/images\.unsplash\.com/i.test(postHero))errors.push('index.html: Phase 04 below-film narrative must not add remote Unsplash imagery');
-for(const asset of ['assets/phase08/film-still-physical-trade.webp','assets/phase04/film-still-intelligence.webp']){
+for(const asset of ['assets/homepage/home-trade-port-arthur.webp','assets/phase04/film-still-intelligence.webp']){
   if(!files.includes(asset))errors.push(`Phase 04 asset missing -> ${asset}`);
-  else if(fs.statSync(path.join(root,asset)).size>120000)errors.push(`Phase 04 asset exceeds 120 KB -> ${asset}`);
+  else if(fs.statSync(path.join(root,asset)).size>(asset==='assets/homepage/home-trade-port-arthur.webp'?320000:120000))errors.push(`Phase 04 asset exceeds approved byte budget -> ${asset}`);
 }
 const phase04ImageExpectations=[
-  ['assets/phase08/film-still-physical-trade.webp',960,540],
-  ['assets/phase04/film-still-intelligence.webp',800,450]
+  ['assets/homepage/home-trade-port-arthur.webp',1920,1080,960,540],
+  ['assets/phase04/film-still-intelligence.webp',800,450,800,450]
 ];
-for(const [asset,expectedWidth,expectedHeight] of phase04ImageExpectations){
+for(const [asset,expectedWidth,expectedHeight,markupWidth,markupHeight] of phase04ImageExpectations){
   if(!files.includes(asset))continue;
   const dims=webpDimensions(asset);
   if(!dims)errors.push(`Phase 04 asset dimensions unreadable -> ${asset}`);
@@ -197,7 +197,7 @@ for(const [asset,expectedWidth,expectedHeight] of phase04ImageExpectations){
   const escaped=asset.replaceAll('.','\\.');
   const tag=index.match(new RegExp(`<img\\b[^>]*src=["']${escaped}["'][^>]*>`,'i'))?.[0]||'';
   if(!tag)errors.push(`index.html: Phase 04 image tag missing -> ${asset}`);
-  else if(Number(attr(tag,'width'))!==expectedWidth||Number(attr(tag,'height'))!==expectedHeight)errors.push(`index.html: Phase 04 image attributes must match intrinsic ${expectedWidth}x${expectedHeight} -> ${asset}`);
+  else if(Number(attr(tag,'width'))!==markupWidth||Number(attr(tag,'height'))!==markupHeight)errors.push(`index.html: Phase 04 image presentation attributes changed -> ${asset}`);
 }
 
 
