@@ -170,7 +170,7 @@ jobs:
             if (report.failures.length) { console.error(report.failures.join('\n')); process.exit(1); }
           })().catch(e=>{console.error(e);process.exit(1)});
           JS
-          node /tmp/fix02-qa.cjs
+          NODE_PATH="$PWD/node_modules" node /tmp/fix02-qa.cjs
           kill "$(cat /tmp/fix02-http.pid)" || true
           rm -f baseline-index.html
 
