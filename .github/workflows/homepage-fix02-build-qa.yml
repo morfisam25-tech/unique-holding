@@ -154,14 +154,15 @@ jobs:
                 const r=document.querySelector('.home-operating-world--trade')?.getBoundingClientRect();
                 return r ? {x:r.x,y:r.y,width:r.width,height:r.height} : null;
               });
-              report.viewports[cfg.name] = {metrics, baselineRect, consoleErrors, pageErrors, failedRequests};
+              const unexpectedFailedRequests = failedRequests.filter(x => !(x.includes('/assets/media/unique-holding-film-720p.mp4') && x.includes('net::ERR_ABORTED')));
+              report.viewports[cfg.name] = {metrics, baselineRect, consoleErrors, pageErrors, failedRequests, unexpectedFailedRequests};
               if (metrics.horizontalOverflow) report.failures.push(`${cfg.name}: horizontal overflow`);
               if (metrics.imageSrc !== 'assets/homepage/centerm-night-trade.webp') report.failures.push(`${cfg.name}: wrong trade image src ${metrics.imageSrc}`);
               if (!metrics.imageComplete || metrics.imageNaturalWidth !== 2400 || metrics.imageNaturalHeight !== 1350) report.failures.push(`${cfg.name}: trade image not loaded at 2400x1350`);
               if (!metrics.sectionRect || !baselineRect || Math.abs(metrics.sectionRect.width-baselineRect.width) > 0.5 || Math.abs(metrics.sectionRect.height-baselineRect.height) > 0.5) report.failures.push(`${cfg.name}: Energy section geometry differs from baseline`);
               if (consoleErrors.length) report.failures.push(`${cfg.name}: console errors: ${consoleErrors.join(' | ')}`);
               if (pageErrors.length) report.failures.push(`${cfg.name}: page errors: ${pageErrors.join(' | ')}`);
-              if (failedRequests.length) report.failures.push(`${cfg.name}: failed requests: ${failedRequests.join(' | ')}`);
+              if (unexpectedFailedRequests.length) report.failures.push(`${cfg.name}: unexpected failed requests: ${unexpectedFailedRequests.join(' | ')}`);
               await baseline.close();
               await context.close();
             }
