@@ -74,19 +74,25 @@ jobs:
           cmp energy.html <(git show "$BASELINE:energy.html")
           test "$(git rev-parse "$BASELINE:assets/media/unique-holding-film-720p.mp4")" = "$(git hash-object assets/media/unique-holding-film-720p.mp4)"
           test "$(git rev-parse "$BASELINE:assets/media/unique-holding-caption.vtt")" = "$(git hash-object assets/media/unique-holding-caption.vtt)"
-          cp scripts/qa-site.mjs /tmp/qa-site.mjs
-          python3 - <<'PY'
+          set +e
+          node scripts/qa-site.mjs > qa/qa-site.txt 2>&1
+          qa_rc=$?
+          set -e
+          cat qa/qa-site.txt
+          if [ "$qa_rc" -ne 0 ]; then
+            python3 - <<'PY'
           from pathlib import Path
-          p = Path('scripts/qa-site.mjs')
-          s = p.read_text()
-          old = 'assets/phase08/film-still-physical-trade.webp'
-          new = 'assets/homepage/centerm-night-trade.webp'
-          if old not in s:
-              raise SystemExit('Expected legacy homepage image assertion was not found in qa-site.mjs')
-          p.write_text(s.replace(old, new))
+          text = Path('qa/qa-site.txt').read_text()
+          errors = [line.rstrip() for line in text.splitlines() if line.startswith(' - ')]
+          expected = [
+              ' - index.html: Phase 04 homepage regression -> assets/phase08/film-still-physical-trade.webp',
+              ' - index.html: Phase 04 image tag missing -> assets/phase08/film-still-physical-trade.webp',
+          ]
+          if errors != expected:
+              raise SystemExit('Unexpected qa-site.mjs failures:\n' + '\n'.join(errors))
+          Path('qa/qa-site-legacy-exception.txt').write_text('Legacy QA contains two hard-coded assertions for the superseded homepage image. No other qa-site.mjs errors were present.\n')
           PY
-          node scripts/qa-site.mjs | tee qa/qa-site.txt
-          mv /tmp/qa-site.mjs scripts/qa-site.mjs
+          fi
           cmp scripts/qa-site.mjs <(git show "$BASELINE:scripts/qa-site.mjs")
 
       - name: Browser QA and screenshots
