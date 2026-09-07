@@ -38,18 +38,15 @@ jobs:
           from pathlib import Path
           p=Path('scripts/qa-site.mjs')
           text=p.read_text()
-
           old_req="'assets/phase08/film-still-physical-trade.webp','assets/phase04/film-still-intelligence.webp'"
           new_req="'assets/homepage/centerm-night-trade.webp','assets/phase04/film-still-intelligence.webp'"
           if old_req not in text:
               raise SystemExit('Phase 04 required-image token pair not found')
           text=text.replace(old_req,new_req,1)
-
           start_marker="for(const asset of ['assets/phase08/film-still-physical-trade.webp','assets/phase04/film-still-intelligence.webp']){"
           end_marker="const corporate=read('corporate.html');"
           start=text.index(start_marker)
           end=text.index(end_marker,start)
-
           new_block=r'''const homepageTradeAsset='assets/homepage/centerm-night-trade.webp';
           if(!files.includes(homepageTradeAsset))errors.push(`Homepage trade asset missing -> ${homepageTradeAsset}`);
           else{
@@ -109,15 +106,11 @@ jobs:
           grep -q 'Dllu' legal.html
           grep -q 'creativecommons.org/licenses/by-sa/4.0/' legal.html
 
+          git add -N assets/homepage/centerm-night-trade.webp
           mapfile -t changed < <(git diff --name-only "$BASE" -- | sort)
-          printf '%s\n' "${changed[@]}"
-          expected=(
-            assets/homepage/centerm-night-trade.webp
-            index.html
-            legal.html
-            scripts/qa-site.mjs
-          )
+          expected=(assets/homepage/centerm-night-trade.webp index.html legal.html scripts/qa-site.mjs)
           mapfile -t expected_sorted < <(printf '%s\n' "${expected[@]}" | sort)
+          printf 'Pre-commit clean diff:\n%s\n' "$(printf '%s\n' "${changed[@]}")"
           test "$(printf '%s\n' "${changed[@]}")" = "$(printf '%s\n' "${expected_sorted[@]}")"
 
           git config user.name "github-actions[bot]"
@@ -126,7 +119,8 @@ jobs:
           git commit -m "HOMEPAGE FIX 02 — Deploy selected Centerm Night trade image"
           test "$(git rev-parse HEAD^)" = "$BASE"
           test "$(git rev-list --count "$BASE..HEAD")" = "1"
-          git diff --exit-code "$BASE..HEAD" -- . ':!.github/workflows/homepage-fix02-final-builder.yml'
+          mapfile -t committed < <(git diff --name-only "$BASE..HEAD" | sort)
+          test "$(printf '%s\n' "${committed[@]}")" = "$(printf '%s\n' "${expected_sorted[@]}")"
           echo "FINAL_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
 
       - name: Production Technical QA
@@ -170,12 +164,7 @@ jobs:
             await page.waitForTimeout(1800);
             const state=await page.evaluate(()=>{
               const img=document.querySelector('.home-operating-world--trade .home-world-media img');
-              return {
-                src:img?.getAttribute('src')||'', complete:img?.complete||false,
-                naturalWidth:img?.naturalWidth||0,naturalHeight:img?.naturalHeight||0,
-                horizontalOverflow:document.documentElement.scrollWidth>document.documentElement.clientWidth,
-                brokenImages:[...document.images].filter(i=>i.complete&&i.naturalWidth===0).map(i=>i.getAttribute('src'))
-              };
+              return {src:img?.getAttribute('src')||'',complete:img?.complete||false,naturalWidth:img?.naturalWidth||0,naturalHeight:img?.naturalHeight||0,horizontalOverflow:document.documentElement.scrollWidth>document.documentElement.clientWidth,brokenImages:[...document.images].filter(i=>i.complete&&i.naturalWidth===0).map(i=>i.getAttribute('src'))};
             });
             if(state.src!=='assets/homepage/centerm-night-trade.webp')report.failures.push(`${name}: homepage trade src mismatch`);
             if(!state.complete||state.naturalWidth!==2400||state.naturalHeight!==1350)report.failures.push(`${name}: homepage trade natural dimensions/load failure`);
@@ -185,11 +174,11 @@ jobs:
             if(pageErrors.length)report.failures.push(`${name}: page errors ${pageErrors.join(' | ')}`);
             const unexpectedFailed=failed.filter(x=>!x.url.includes('unique-holding-film-720p.mp4'));
             if(unexpectedFailed.length)report.failures.push(`${name}: failed requests ${JSON.stringify(unexpectedFailed)}`);
-            await page.screenshot({path:`/tmp/fix02-browser/live-shape-home-${name}.png`,fullPage:false});
+            await page.screenshot({path:`/tmp/fix02-browser/home-${name}.png`,fullPage:false});
             const section=page.locator('.home-operating-world--trade');
             await section.scrollIntoViewIfNeeded();
             await page.waitForTimeout(250);
-            await section.screenshot({path:`/tmp/fix02-browser/live-shape-energy-${name}.png`});
+            await section.screenshot({path:`/tmp/fix02-browser/energy-${name}.png`});
             report.viewports[name]={state,consoleErrors,pageErrors,failedRequests:unexpectedFailed};
             await context.close();
           }
@@ -214,7 +203,7 @@ jobs:
           path: |
             /tmp/technical-qa.log
             /tmp/fix02-browser/browser-qa.json
-            /tmp/fix02-browser/live-shape-home-1440.png
-            /tmp/fix02-browser/live-shape-home-390.png
-            /tmp/fix02-browser/live-shape-energy-1440.png
-            /tmp/fix02-browser/live-shape-energy-390.png
+            /tmp/fix02-browser/home-1440.png
+            /tmp/fix02-browser/home-390.png
+            /tmp/fix02-browser/energy-1440.png
+            /tmp/fix02-browser/energy-390.png
