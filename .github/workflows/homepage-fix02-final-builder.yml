@@ -1,0 +1,220 @@
+name: Homepage Fix 02 Final Builder
+
+on:
+  push:
+    branches:
+      - ops/homepage-fix02-centerm-final-builder
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-preflight:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout baseline builder branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Build exact clean release from production baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE=46190b02d6760d5c3e59d042535479636c2f2b9a
+          SOURCE_BRANCH=release/homepage-fix02-centerm-clean
+          FINAL_BRANCH=release/homepage-fix02-centerm-final
+
+          git fetch origin "$SOURCE_BRANCH"
+          git switch --detach "$BASE"
+          git switch -c "$FINAL_BRANCH"
+
+          mkdir -p assets/homepage
+          git show "origin/$SOURCE_BRANCH:assets/homepage/centerm-night-trade.webp" > assets/homepage/centerm-night-trade.webp
+          git show "origin/$SOURCE_BRANCH:index.html" > index.html
+          git show "origin/$SOURCE_BRANCH:legal.html" > legal.html
+
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('scripts/qa-site.mjs')
+          text=p.read_text()
+
+          old_req="'assets/phase08/film-still-physical-trade.webp','assets/phase04/film-still-intelligence.webp'"
+          new_req="'assets/homepage/centerm-night-trade.webp','assets/phase04/film-still-intelligence.webp'"
+          if old_req not in text:
+              raise SystemExit('Phase 04 required-image token pair not found')
+          text=text.replace(old_req,new_req,1)
+
+          start_marker="for(const asset of ['assets/phase08/film-still-physical-trade.webp','assets/phase04/film-still-intelligence.webp']){"
+          end_marker="const corporate=read('corporate.html');"
+          start=text.index(start_marker)
+          end=text.index(end_marker,start)
+
+          new_block=r'''const homepageTradeAsset='assets/homepage/centerm-night-trade.webp';
+          if(!files.includes(homepageTradeAsset))errors.push(`Homepage trade asset missing -> ${homepageTradeAsset}`);
+          else{
+            const homepageTradeBytes=fs.statSync(path.join(root,homepageTradeAsset)).size;
+            if(homepageTradeBytes>394588)errors.push(`Homepage trade asset exceeds approved 394,588-byte maximum -> ${homepageTradeAsset}: ${homepageTradeBytes}`);
+            const homepageTradeDims=webpDimensions(homepageTradeAsset);
+            if(!homepageTradeDims)errors.push(`Homepage trade asset dimensions unreadable -> ${homepageTradeAsset}`);
+            else if(homepageTradeDims.width!==2400||homepageTradeDims.height!==1350)errors.push(`Homepage trade intrinsic dimensions changed -> ${homepageTradeAsset}: ${homepageTradeDims.width}x${homepageTradeDims.height}`);
+            const homepageTradeHash=sha256(fs.readFileSync(path.join(root,homepageTradeAsset)));
+            if(homepageTradeHash!=='e3cdb7cfcb56f6945c67edcf15a970e6d0728fc8364eb66925baf88c3c0434cb')errors.push(`Homepage trade asset SHA-256 mismatch -> ${homepageTradeAsset}`);
+          }
+          const homepageTradeEscaped=homepageTradeAsset.replaceAll('.','\\.');
+          const homepageTradeTag=index.match(new RegExp(`<img\\b[^>]*src=["']${homepageTradeEscaped}["'][^>]*>`,'i'))?.[0]||'';
+          if(!homepageTradeTag)errors.push(`index.html: homepage trade image tag missing -> ${homepageTradeAsset}`);
+          else if(Number(attr(homepageTradeTag,'width'))!==960||Number(attr(homepageTradeTag,'height'))!==540)errors.push(`index.html: homepage trade image layout attributes must remain 960x540 -> ${homepageTradeAsset}`);
+
+          const phase08EnergyAsset='assets/phase08/film-still-physical-trade.webp';
+          if(!files.includes(phase08EnergyAsset))errors.push(`Phase 08 energy asset missing -> ${phase08EnergyAsset}`);
+          else{
+            if(fs.statSync(path.join(root,phase08EnergyAsset)).size>120000)errors.push(`Phase 08 energy asset exceeds 120 KB -> ${phase08EnergyAsset}`);
+            const phase08EnergyDims=webpDimensions(phase08EnergyAsset);
+            if(!phase08EnergyDims)errors.push(`Phase 08 energy asset dimensions unreadable -> ${phase08EnergyAsset}`);
+            else if(phase08EnergyDims.width!==960||phase08EnergyDims.height!==540)errors.push(`Phase 08 energy intrinsic dimensions changed -> ${phase08EnergyAsset}: ${phase08EnergyDims.width}x${phase08EnergyDims.height}`);
+          }
+          const phase08EnergyHtml=read('energy.html');
+          const phase08EnergyEscaped=phase08EnergyAsset.replaceAll('.','\\.');
+          const phase08EnergyTag=phase08EnergyHtml.match(new RegExp(`<img\\b[^>]*src=["']${phase08EnergyEscaped}["'][^>]*>`,'i'))?.[0]||'';
+          if(!phase08EnergyTag)errors.push(`energy.html: Phase 08 image tag missing -> ${phase08EnergyAsset}`);
+          else if(Number(attr(phase08EnergyTag,'width'))!==960||Number(attr(phase08EnergyTag,'height'))!==540)errors.push(`energy.html: Phase 08 image attributes must remain 960x540 -> ${phase08EnergyAsset}`);
+
+          const phase04ImageExpectations=[['assets/phase04/film-still-intelligence.webp',800,450]];
+          for(const [asset,expectedWidth,expectedHeight] of phase04ImageExpectations){
+            if(!files.includes(asset)){errors.push(`Phase 04 asset missing -> ${asset}`);continue}
+            if(fs.statSync(path.join(root,asset)).size>120000)errors.push(`Phase 04 asset exceeds 120 KB -> ${asset}`);
+            const dims=webpDimensions(asset);
+            if(!dims)errors.push(`Phase 04 asset dimensions unreadable -> ${asset}`);
+            else if(dims.width!==expectedWidth||dims.height!==expectedHeight)errors.push(`Phase 04 intrinsic dimensions changed -> ${asset}: ${dims.width}x${dims.height}`);
+            const escaped=asset.replaceAll('.','\\.');
+            const tag=index.match(new RegExp(`<img\\b[^>]*src=["']${escaped}["'][^>]*>`,'i'))?.[0]||'';
+            if(!tag)errors.push(`index.html: Phase 04 image tag missing -> ${asset}`);
+            else if(Number(attr(tag,'width'))!==expectedWidth||Number(attr(tag,'height'))!==expectedHeight)errors.push(`index.html: Phase 04 image attributes must match intrinsic ${expectedWidth}x${expectedHeight} -> ${asset}`);
+          }
+
+          '''
+          text=text[:start]+new_block+text[end:]
+          p.write_text(text)
+          PY
+
+          test "$(sha256sum assets/homepage/centerm-night-trade.webp | awk '{print $1}')" = "e3cdb7cfcb56f6945c67edcf15a970e6d0728fc8364eb66925baf88c3c0434cb"
+          test "$(git show "$BASE:energy.html" | sha256sum | awk '{print $1}')" = "$(sha256sum energy.html | awk '{print $1}')"
+          test "$(git show "$BASE:assets/media/unique-holding-film-720p.mp4" | sha256sum | awk '{print $1}')" = "$(sha256sum assets/media/unique-holding-film-720p.mp4 | awk '{print $1}')"
+          test "$(git show "$BASE:assets/media/unique-holding-caption.vtt" | sha256sum | awk '{print $1}')" = "$(sha256sum assets/media/unique-holding-caption.vtt | awk '{print $1}')"
+          test ! -e assets/homepage-hero-positioning.css
+          ! grep -q 'homepage-hero-positioning.css' index.html
+          grep -q 'assets/homepage/centerm-night-trade.webp' index.html
+          grep -q 'assets/phase08/film-still-physical-trade.webp' energy.html
+          grep -q 'Dllu' legal.html
+          grep -q 'creativecommons.org/licenses/by-sa/4.0/' legal.html
+
+          mapfile -t changed < <(git diff --name-only "$BASE" -- | sort)
+          printf '%s\n' "${changed[@]}"
+          expected=(
+            assets/homepage/centerm-night-trade.webp
+            index.html
+            legal.html
+            scripts/qa-site.mjs
+          )
+          mapfile -t expected_sorted < <(printf '%s\n' "${expected[@]}" | sort)
+          test "$(printf '%s\n' "${changed[@]}")" = "$(printf '%s\n' "${expected_sorted[@]}")"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add assets/homepage/centerm-night-trade.webp index.html legal.html scripts/qa-site.mjs
+          git commit -m "HOMEPAGE FIX 02 — Deploy selected Centerm Night trade image"
+          test "$(git rev-parse HEAD^)" = "$BASE"
+          test "$(git rev-list --count "$BASE..HEAD")" = "1"
+          git diff --exit-code "$BASE..HEAD" -- . ':!.github/workflows/homepage-fix02-final-builder.yml'
+          echo "FINAL_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      - name: Production Technical QA
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/qa-site.mjs | tee /tmp/technical-qa.log
+
+      - name: Browser QA setup
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/fix02-browser
+          cd /tmp/fix02-browser
+          npm init -y >/dev/null 2>&1
+          npm install playwright@1.55.0 >/dev/null 2>&1
+          npx playwright install --with-deps chromium >/dev/null
+
+      - name: Browser QA 1440 and 390
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m http.server 4173 --bind 127.0.0.1 >/tmp/fix02-http.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID || true' EXIT
+          sleep 2
+          cat >/tmp/fix02-browser/qa.mjs <<'JS'
+          import { chromium } from 'playwright';
+          import fs from 'node:fs';
+          const browser=await chromium.launch({headless:true});
+          const cases=[['1440',1440,900],['390',390,844]];
+          const report={failures:[],viewports:{}};
+          for(const [name,width,height] of cases){
+            const context=await browser.newContext({viewport:{width,height},reducedMotion:'reduce'});
+            const page=await context.newPage();
+            const consoleErrors=[]; const pageErrors=[]; const failed=[];
+            page.on('console',m=>{if(m.type()==='error')consoleErrors.push(m.text())});
+            page.on('pageerror',e=>pageErrors.push(String(e)));
+            page.on('requestfailed',r=>failed.push({url:r.url(),error:r.failure()?.errorText||''}));
+            await page.goto('http://127.0.0.1:4173/',{waitUntil:'domcontentloaded',timeout:30000});
+            await page.waitForTimeout(1800);
+            const state=await page.evaluate(()=>{
+              const img=document.querySelector('.home-operating-world--trade .home-world-media img');
+              return {
+                src:img?.getAttribute('src')||'', complete:img?.complete||false,
+                naturalWidth:img?.naturalWidth||0,naturalHeight:img?.naturalHeight||0,
+                horizontalOverflow:document.documentElement.scrollWidth>document.documentElement.clientWidth,
+                brokenImages:[...document.images].filter(i=>i.complete&&i.naturalWidth===0).map(i=>i.getAttribute('src'))
+              };
+            });
+            if(state.src!=='assets/homepage/centerm-night-trade.webp')report.failures.push(`${name}: homepage trade src mismatch`);
+            if(!state.complete||state.naturalWidth!==2400||state.naturalHeight!==1350)report.failures.push(`${name}: homepage trade natural dimensions/load failure`);
+            if(state.horizontalOverflow)report.failures.push(`${name}: horizontal overflow`);
+            if(state.brokenImages.length)report.failures.push(`${name}: broken images ${state.brokenImages.join(',')}`);
+            if(consoleErrors.length)report.failures.push(`${name}: console errors ${consoleErrors.join(' | ')}`);
+            if(pageErrors.length)report.failures.push(`${name}: page errors ${pageErrors.join(' | ')}`);
+            const unexpectedFailed=failed.filter(x=>!x.url.includes('unique-holding-film-720p.mp4'));
+            if(unexpectedFailed.length)report.failures.push(`${name}: failed requests ${JSON.stringify(unexpectedFailed)}`);
+            await page.screenshot({path:`/tmp/fix02-browser/live-shape-home-${name}.png`,fullPage:false});
+            const section=page.locator('.home-operating-world--trade');
+            await section.scrollIntoViewIfNeeded();
+            await page.waitForTimeout(250);
+            await section.screenshot({path:`/tmp/fix02-browser/live-shape-energy-${name}.png`});
+            report.viewports[name]={state,consoleErrors,pageErrors,failedRequests:unexpectedFailed};
+            await context.close();
+          }
+          await browser.close();
+          fs.writeFileSync('/tmp/fix02-browser/browser-qa.json',JSON.stringify(report,null,2));
+          if(report.failures.length){console.error(report.failures.join('\n'));process.exit(1)}
+          JS
+          cd /tmp/fix02-browser
+          node qa.mjs
+          cat browser-qa.json
+
+      - name: Push clean release branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git push origin HEAD:refs/heads/release/homepage-fix02-centerm-final
+
+      - name: Upload preflight evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: homepage-fix02-final-preflight
+          path: |
+            /tmp/technical-qa.log
+            /tmp/fix02-browser/browser-qa.json
+            /tmp/fix02-browser/live-shape-home-1440.png
+            /tmp/fix02-browser/live-shape-home-390.png
+            /tmp/fix02-browser/live-shape-energy-1440.png
+            /tmp/fix02-browser/live-shape-energy-390.png
