@@ -77,21 +77,26 @@
 
         .home-operating-world{display:grid;grid-template-columns:minmax(0,1.12fr) minmax(360px,.88fr);min-height:760px}
         .home-operating-world--trade{background:#e8e3da;color:#101213}
-        .home-operating-world--tech{grid-template-columns:minmax(360px,.88fr) minmax(0,1.12fr);background:#0c1012;color:#ece8df}
+        .home-operating-world--tech{grid-template-columns:1fr;background:#0c1012;color:#ece8df}
         .home-world-media{position:relative;min-height:620px;background:#111}
         .home-world-media img{width:100%;height:100%;display:block;object-fit:cover}
-        .home-world-media--technology img{object-position:52% 50%}
+        .home-operating-world--tech .home-world-media{height:clamp(480px,52vw,780px);min-height:0}
+        .home-world-media--technology img{object-position:50% 48%}
         .home-world-media::after{content:'';position:absolute;inset:0;background:rgba(5,7,8,.12);pointer-events:none}
         .home-world-copy{display:flex;flex-direction:column;justify-content:center;padding:clamp(72px,8vw,124px) clamp(42px,6vw,96px)}
         .home-world-copy h2{margin:18px 0 0;font:400 clamp(48px,5.2vw,78px)/.96 var(--font-serif);letter-spacing:-.04em;max-width:9ch}
         .home-world-copy>p:not(.home-kicker){max-width:580px;margin:28px 0 0;font-size:17px;line-height:1.72;color:#50585b}
         .home-operating-world--tech .home-world-copy>p:not(.home-kicker){color:#aeb5b7}
+        .home-tech-editorial>p:not(.home-kicker){max-width:580px;margin:28px 0 0;color:#aeb5b7;font-size:17px;line-height:1.72}
         .home-world-links{display:flex;flex-wrap:wrap;gap:14px 28px;margin-top:38px}
         .home-world-links a{min-height:44px;display:inline-flex;align-items:center;border-bottom:1px solid currentColor;font:700 11px/1.2 var(--font-sans);letter-spacing:.09em;text-transform:uppercase}
         .home-operating-world--trade .home-world-links a{color:#15191a}.home-operating-world--tech .home-world-links a{color:#f0ece4}
         .home-world-links a span{margin-left:10px;color:var(--color-accent)}
+        .home-operating-world--tech .home-world-copy{display:grid;grid-template-columns:minmax(0,.92fr) minmax(420px,1.08fr);gap:clamp(48px,8vw,128px);align-items:start}
+        .home-tech-editorial{max-width:660px}
 
         .ea-public-sample{margin-top:48px;background:#f2eee5;color:#17202a;padding:26px 28px 24px;border-top:4px solid #17202a;max-width:610px}
+        .home-operating-world--tech .ea-public-sample{margin-top:0;max-width:none}
         .ea-public-sample__top{display:flex;justify-content:space-between;gap:20px;align-items:center;color:#626d78;font:700 9px/1.3 var(--font-sans);letter-spacing:.14em;text-transform:uppercase}
         .ea-public-sample h3{margin:24px 0 8px;font:400 clamp(30px,3vw,44px)/1 var(--font-serif);letter-spacing:-.035em}
         .ea-public-sample>p{margin:0;color:#66717c!important;font-size:13px!important;line-height:1.55!important}
@@ -141,14 +146,14 @@
         @media(max-width:980px){
           .home-thesis,.home-mindset__head,.home-proof,.home-commercial,.home-routes__head{grid-template-columns:1fr}
           .home-thesis{gap:30px}.home-thesis h2{max-width:15ch}.home-thesis__line{margin-top:42px}
-          .home-operating-world,.home-operating-world--tech{grid-template-columns:1fr;min-height:0}.home-operating-world--tech .home-world-media{order:1}.home-operating-world--tech .home-world-copy{order:2}.home-world-media{min-height:min(68vw,620px)}
+          .home-operating-world,.home-operating-world--tech{grid-template-columns:1fr;min-height:0}.home-operating-world--tech .home-world-media{height:min(68vw,620px);min-height:0}.home-operating-world--tech .home-world-copy{grid-template-columns:1fr}.home-operating-world--tech .ea-public-sample{margin-top:0}.home-world-media{min-height:min(68vw,620px)}
           .home-sequence{grid-template-columns:1fr}.home-sequence article,.home-sequence article+article{padding:28px 0;border-left:0;border-top:1px solid rgba(255,255,255,.16)}.home-sequence article:first-child{border-top:0}
           .home-commercial{align-items:start}.home-proof__anchor strong{font-size:clamp(76px,16vw,126px)}
         }
         @media(max-width:680px){
           .home-thesis,.home-mindset,.home-proof,.home-commercial,.home-routes,.home-close{padding-left:20px;padding-right:20px}
           .home-thesis{padding-top:82px;padding-bottom:86px}.home-thesis h2{font-size:46px}.home-thesis__intro{font-size:16px}.home-thesis__line{font-size:28px}
-          .home-world-copy{padding:64px 20px}.home-world-copy h2{font-size:50px}.home-world-media{min-height:72vw}
+          .home-world-copy{padding:64px 20px}.home-world-copy h2{font-size:50px}.home-world-media{min-height:72vw}.home-operating-world--tech .home-world-media{height:72vw;min-height:280px}
           .ea-public-sample{padding:22px 20px}.ea-public-sample__top{align-items:flex-start;flex-direction:column;gap:8px}.ea-public-sample__meta{flex-direction:column;gap:7px}
           .home-mindset,.home-proof,.home-commercial,.home-routes{padding-top:82px;padding-bottom:82px}.home-mindset h2{font-size:52px}.home-sequence{margin-top:48px}
           .home-proof{gap:44px}.home-proof__row{grid-template-columns:1fr;gap:8px}.home-proof__row b{font-size:24px}
@@ -230,11 +235,15 @@
     </section>
 
     <section class="home-operating-world home-operating-world--tech" aria-labelledby="home-tech-title">
+      <!-- Generated illustrative asset: an orbital view used as editorial context; not documentary evidence of Unique Holding infrastructure, networks or operations. -->
+      <figure class="home-world-media home-world-media--technology"><img src="assets/homepage/technology-earth-intelligence-illustrative.webp" width="1500" height="844" loading="lazy" decoding="async" alt="Illustrative orbital view of Earth at night"></figure>
       <div class="home-world-copy">
-        <p class="home-kicker">02 / Technology &amp; Intelligence</p>
-        <h2 id="home-tech-title">Research that informs. Products that move into build.</h2>
-        <p>Evidence Axis is a specialist venture within the Unique Holding portfolio. Digital products are developed separately through the technology track.</p>
-        <div class="home-world-links"><a href="technology.html">Technology &amp; Intelligence <span aria-hidden="true">↗</span></a><a href="evidence-axis.html">Evidence Axis <span aria-hidden="true">↗</span></a></div>
+        <div class="home-tech-editorial">
+          <p class="home-kicker">02 / Technology &amp; Intelligence</p>
+          <h2 id="home-tech-title">Research that informs. Products that move into build.</h2>
+          <p>Evidence Axis is a specialist venture within the Unique Holding portfolio. Digital products are developed separately through the technology track.</p>
+          <div class="home-world-links"><a href="technology.html">Technology &amp; Intelligence <span aria-hidden="true">↗</span></a><a href="evidence-axis.html">Evidence Axis <span aria-hidden="true">↗</span></a></div>
+        </div>
         <div class="ea-public-sample" role="group" aria-label="Evidence Axis public sample preview">
           <div class="ea-public-sample__top"><span>Evidence Axis · Public Sample</span><span>Intelligence Brief</span></div>
           <h3>Intercom vs Zendesk</h3>
@@ -244,8 +253,6 @@
           <a class="ea-public-sample__link" href="https://evidenceaxis.com/sample-report/" target="_blank" rel="noopener">Open the public sample ↗</a>
         </div>
       </div>
-      <!-- Generated illustrative asset: anonymous architectural abstraction; not documentary evidence of Unique Holding facilities, staff or infrastructure. -->
-      <figure class="home-world-media home-world-media--technology"><img src="assets/homepage/technology-precision-illustrative.webp" width="1254" height="1254" loading="lazy" decoding="async" alt="Illustrative architectural study in glass and dark metal"></figure>
     </section>
 
     <section class="home-mindset" aria-labelledby="home-mindset-title">
@@ -275,8 +282,8 @@
         <div class="home-rfq-line" aria-label="Industrial RFQ fields"><span>Product</span><span>Grade</span><span>Quantity</span><span>Destination</span><span>Timing</span></div>
         <div class="home-commercial__links"><a href="sales.html">Industrial Sales</a><a href="products.html">View Products</a></div>
       </div>
-      <!-- Generated illustrative asset: category-level studio material study; not documentary evidence of a Unique Holding facility, shipment or product lot. -->
-      <figure class="home-commercial__media"><img src="assets/homepage/materials-resin-illustrative.webp" width="1536" height="1024" loading="lazy" decoding="async" alt="Illustrative studio study of polymer resin granules and sampling tools"></figure>
+      <!-- Generated illustrative asset: anonymous sector context; not documentary evidence of a Unique Holding vessel, shipment, facility or operation. -->
+      <figure class="home-commercial__media"><img src="assets/homepage/energy-tanker-context-illustrative.webp" width="1600" height="900" loading="lazy" decoding="async" alt="Illustrative sector image of an anonymous tanker at blue hour"></figure>
     </section>
 
     <section class="home-routes" aria-labelledby="home-routes-title">

@@ -164,7 +164,7 @@ const phase04StyleStart=headHtml.indexOf('    <style>\n      @layer page{');
 const phase04StyleEnd=phase04StyleStart>=0?headHtml.indexOf('    </style>',phase04StyleStart):-1;
 const phase04Style=phase04StyleStart>=0&&phase04StyleEnd>=0?headHtml.slice(phase04StyleStart,phase04StyleEnd+'    </style>'.length):'';
 if(!phase04Style)errors.push('index.html: Phase 04 @layer page styles must exist in head');
-else if(sha256(phase04Style)!=='b8470a4b71ca6b33170ee2c6776411335f078e3e1ba3dab647e1c7498f842c37')errors.push('index.html: accepted Phase 04 CSS changed');
+else if(sha256(phase04Style)!=='6915eb6bba6dc8cdb1a3c2b90819b69200d8f93bda1e8b9b46cc91b39ed7f275')errors.push('index.html: accepted Phase 04 CSS changed');
 if(/@layer\s+page\s*\{/.test(mainHtml)||/<style\b[^>]*>[\s\S]*?\.home-thesis/i.test(mainHtml))errors.push('index.html: Phase 04 styles must not appear inside main');
 
 const headerStart=index.indexOf('  <header class="site-header"');
@@ -176,7 +176,7 @@ const homepageFooter=footerStart>=0&&footerEnd>=0?index.slice(footerStart,footer
 if(sha256(homepageHeader)!=='42d6bee4ef6d7c4abfd4216dbbb17fc11a6aa4ad43b6aa89c7c0a46d8c82aed9')errors.push('index.html: protected Phase 03 static header changed');
 if(sha256(homepageFooter)!=='3f8d790b9d3b82a7ac05634b4c7b6ce968989cd809fd587c8ab13f6818ae5dc3')errors.push('index.html: protected Phase 03 static footer changed');
 
-const phase04Required=['home-thesis','home-operating-world--trade','home-operating-world--tech','home-mindset','home-proof','home-commercial','home-routes','home-close','Two operating worlds. One execution mindset.','Intelligence</em> to understand.','Technology to build.','Commerce to execute.','Physical markets. Commercial execution.','Research that informs. Products that move into build.','Understand → Build → Execute','Since<br>2020','Start with the requirement.','For partners, teams and new opportunities.','From intelligence to <em>execution.</em>','assets/homepage/centerm-night-trade.webp','assets/homepage/technology-precision-illustrative.webp','assets/homepage/materials-resin-illustrative.webp','Intercom vs Zendesk','9</b> checked sources','Checked 19 August 2026'];
+const phase04Required=['home-thesis','home-operating-world--trade','home-operating-world--tech','home-mindset','home-proof','home-commercial','home-routes','home-close','Two operating worlds. One execution mindset.','Intelligence</em> to understand.','Technology to build.','Commerce to execute.','Physical markets. Commercial execution.','Research that informs. Products that move into build.','Understand → Build → Execute','Since<br>2020','Start with the requirement.','For partners, teams and new opportunities.','From intelligence to <em>execution.</em>','assets/homepage/centerm-night-trade.webp','assets/homepage/technology-earth-intelligence-illustrative.webp','assets/homepage/energy-tanker-context-illustrative.webp','Intercom vs Zendesk','9</b> checked sources','Checked 19 August 2026'];
 for(const token of phase04Required)if(!index.includes(token))errors.push(`index.html: Phase 04 homepage regression -> ${token}`);
 for(const removed of ['<section class="worlds"','<section class="relationships"','<section class="industrial gateway"','<section class="technology-preview"','<section class="corporate-gateway"'])if(index.includes(removed))errors.push(`index.html: legacy homepage section returned -> ${removed}`);
 const postHero=heroEnd>=0?index.slice(heroEnd,index.indexOf('  </main>',heroEnd)):'';
@@ -212,8 +212,8 @@ if(!phase08EnergyTag)errors.push(`energy.html: Phase 08 image tag missing -> ${p
 else if(Number(attr(phase08EnergyTag,'width'))!==960||Number(attr(phase08EnergyTag,'height'))!==540)errors.push(`energy.html: Phase 08 image attributes must remain 960x540 -> ${phase08EnergyAsset}`);
 
 const phase04ImageExpectations=[
-  ['assets/homepage/technology-precision-illustrative.webp',1254,1254],
-  ['assets/homepage/materials-resin-illustrative.webp',1536,1024]
+  ['assets/homepage/technology-earth-intelligence-illustrative.webp',1500,844],
+  ['assets/homepage/energy-tanker-context-illustrative.webp',1600,900]
 ];
 for(const [asset,expectedWidth,expectedHeight] of phase04ImageExpectations){
   if(!files.includes(asset)){errors.push(`Phase 04 asset missing -> ${asset}`);continue}
