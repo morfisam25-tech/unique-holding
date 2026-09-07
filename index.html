@@ -80,6 +80,7 @@
         .home-operating-world--tech{grid-template-columns:minmax(360px,.88fr) minmax(0,1.12fr);background:#0c1012;color:#ece8df}
         .home-world-media{position:relative;min-height:620px;background:#111}
         .home-world-media img{width:100%;height:100%;display:block;object-fit:cover}
+        .home-world-media--technology img{object-position:52% 50%}
         .home-world-media::after{content:'';position:absolute;inset:0;background:rgba(5,7,8,.12);pointer-events:none}
         .home-world-copy{display:flex;flex-direction:column;justify-content:center;padding:clamp(72px,8vw,124px) clamp(42px,6vw,96px)}
         .home-world-copy h2{margin:18px 0 0;font:400 clamp(48px,5.2vw,78px)/.96 var(--font-serif);letter-spacing:-.04em;max-width:9ch}
@@ -124,6 +125,9 @@
         .home-rfq-line span:not(:last-child)::after{content:'·';margin-left:16px;color:#686f71}
         .home-commercial__links{display:flex;flex-wrap:wrap;gap:12px}
         .home-commercial__links a{display:inline-flex;align-items:center;justify-content:center;min-height:48px;padding:0 18px;border:1px solid rgba(255,255,255,.36);font:700 10px/1.2 var(--font-sans);letter-spacing:.1em;text-transform:uppercase}.home-commercial__links a:first-child{border-color:var(--color-accent)}
+        .home-commercial__media{grid-column:1/-1;position:relative;height:clamp(280px,31vw,470px);margin:clamp(8px,1vw,18px) 0 0;overflow:hidden;background:#111516}
+        .home-commercial__media img{width:100%;height:100%;display:block;object-fit:cover;object-position:50% 54%}
+        .home-commercial__media::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,rgba(5,6,6,.14),transparent 48%,rgba(5,6,6,.08));pointer-events:none}
 
         .home-routes{padding:clamp(90px,9vw,138px) max(32px,calc((100vw - var(--layout-max))/2));background:#f2eee6;color:#111415}
         .home-routes__head{display:grid;grid-template-columns:.55fr 1.45fr;gap:48px;align-items:start}.home-routes h2{margin:0;font:400 clamp(44px,5.2vw,80px)/.96 var(--font-serif);letter-spacing:-.04em;max-width:13ch}
@@ -149,6 +153,7 @@
           .home-mindset,.home-proof,.home-commercial,.home-routes{padding-top:82px;padding-bottom:82px}.home-mindset h2{font-size:52px}.home-sequence{margin-top:48px}
           .home-proof{gap:44px}.home-proof__row{grid-template-columns:1fr;gap:8px}.home-proof__row b{font-size:24px}
           .home-commercial h2{font-size:58px}.home-commercial__brief{margin-top:4px}.home-rfq-line span:not(:last-child)::after{display:none}
+          .home-commercial__media{height:68vw;min-height:250px;margin-top:0}.home-commercial__media img{object-position:58% 52%}
           .home-routes__head{gap:22px}.home-routes h2{font-size:48px}.home-route-list{margin-top:42px}.home-route-list a{grid-template-columns:1fr auto;gap:8px 18px;padding:22px 0}.home-route-list a>span:first-child{grid-column:1/-1}.home-route-list a b{font-size:27px}
           .home-close{padding-top:104px;padding-bottom:112px}.home-close h2{font-size:58px}
         }
@@ -239,7 +244,8 @@
           <a class="ea-public-sample__link" href="https://evidenceaxis.com/sample-report/" target="_blank" rel="noopener">Open the public sample ↗</a>
         </div>
       </div>
-      <figure class="home-world-media"><img src="assets/phase04/film-still-intelligence.webp" width="800" height="450" loading="lazy" decoding="async" alt="Illustrative corporate-film still showing intelligence and research work"></figure>
+      <!-- Generated illustrative asset: anonymous architectural abstraction; not documentary evidence of Unique Holding facilities, staff or infrastructure. -->
+      <figure class="home-world-media home-world-media--technology"><img src="assets/homepage/technology-precision-illustrative.webp" width="1254" height="1254" loading="lazy" decoding="async" alt="Illustrative architectural study in glass and dark metal"></figure>
     </section>
 
     <section class="home-mindset" aria-labelledby="home-mindset-title">
@@ -269,6 +275,8 @@
         <div class="home-rfq-line" aria-label="Industrial RFQ fields"><span>Product</span><span>Grade</span><span>Quantity</span><span>Destination</span><span>Timing</span></div>
         <div class="home-commercial__links"><a href="sales.html">Industrial Sales</a><a href="products.html">View Products</a></div>
       </div>
+      <!-- Generated illustrative asset: category-level studio material study; not documentary evidence of a Unique Holding facility, shipment or product lot. -->
+      <figure class="home-commercial__media"><img src="assets/homepage/materials-resin-illustrative.webp" width="1536" height="1024" loading="lazy" decoding="async" alt="Illustrative studio study of polymer resin granules and sampling tools"></figure>
     </section>
 
     <section class="home-routes" aria-labelledby="home-routes-title">
