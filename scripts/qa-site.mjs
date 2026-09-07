@@ -176,21 +176,45 @@ const homepageFooter=footerStart>=0&&footerEnd>=0?index.slice(footerStart,footer
 if(sha256(homepageHeader)!=='42d6bee4ef6d7c4abfd4216dbbb17fc11a6aa4ad43b6aa89c7c0a46d8c82aed9')errors.push('index.html: protected Phase 03 static header changed');
 if(sha256(homepageFooter)!=='3f8d790b9d3b82a7ac05634b4c7b6ce968989cd809fd587c8ab13f6818ae5dc3')errors.push('index.html: protected Phase 03 static footer changed');
 
-const phase04Required=['home-thesis','home-operating-world--trade','home-operating-world--tech','home-mindset','home-proof','home-commercial','home-routes','home-close','Two operating worlds. One execution mindset.','Intelligence</em> to understand.','Technology to build.','Commerce to execute.','Physical markets. Commercial execution.','Research that informs. Products that move into build.','Understand → Build → Execute','Since<br>2020','Start with the requirement.','For partners, teams and new opportunities.','From intelligence to <em>execution.</em>','assets/phase08/film-still-physical-trade.webp','assets/phase04/film-still-intelligence.webp','Intercom vs Zendesk','9</b> checked sources','Checked 19 August 2026'];
+const phase04Required=['home-thesis','home-operating-world--trade','home-operating-world--tech','home-mindset','home-proof','home-commercial','home-routes','home-close','Two operating worlds. One execution mindset.','Intelligence</em> to understand.','Technology to build.','Commerce to execute.','Physical markets. Commercial execution.','Research that informs. Products that move into build.','Understand → Build → Execute','Since<br>2020','Start with the requirement.','For partners, teams and new opportunities.','From intelligence to <em>execution.</em>','assets/homepage/centerm-night-trade.webp','assets/phase04/film-still-intelligence.webp','Intercom vs Zendesk','9</b> checked sources','Checked 19 August 2026'];
 for(const token of phase04Required)if(!index.includes(token))errors.push(`index.html: Phase 04 homepage regression -> ${token}`);
 for(const removed of ['<section class="worlds"','<section class="relationships"','<section class="industrial gateway"','<section class="technology-preview"','<section class="corporate-gateway"'])if(index.includes(removed))errors.push(`index.html: legacy homepage section returned -> ${removed}`);
 const postHero=heroEnd>=0?index.slice(heroEnd,index.indexOf('  </main>',heroEnd)):'';
 if(/images\.unsplash\.com/i.test(postHero))errors.push('index.html: Phase 04 below-film narrative must not add remote Unsplash imagery');
-for(const asset of ['assets/phase08/film-still-physical-trade.webp','assets/phase04/film-still-intelligence.webp']){
-  if(!files.includes(asset))errors.push(`Phase 04 asset missing -> ${asset}`);
-  else if(fs.statSync(path.join(root,asset)).size>120000)errors.push(`Phase 04 asset exceeds 120 KB -> ${asset}`);
+const homepageTradeAsset='assets/homepage/centerm-night-trade.webp';
+if(!files.includes(homepageTradeAsset))errors.push(`Homepage trade asset missing -> ${homepageTradeAsset}`);
+else{
+  const homepageTradeBytes=fs.statSync(path.join(root,homepageTradeAsset)).size;
+  if(homepageTradeBytes>394588)errors.push(`Homepage trade asset exceeds approved 394,588-byte maximum -> ${homepageTradeAsset}: ${homepageTradeBytes}`);
+  const homepageTradeDims=webpDimensions(homepageTradeAsset);
+  if(!homepageTradeDims)errors.push(`Homepage trade asset dimensions unreadable -> ${homepageTradeAsset}`);
+  else if(homepageTradeDims.width!==2400||homepageTradeDims.height!==1350)errors.push(`Homepage trade intrinsic dimensions changed -> ${homepageTradeAsset}: ${homepageTradeDims.width}x${homepageTradeDims.height}`);
+  const homepageTradeHash=sha256(fs.readFileSync(path.join(root,homepageTradeAsset)));
+  if(homepageTradeHash!=='e3cdb7cfcb56f6945c67edcf15a970e6d0728fc8364eb66925baf88c3c0434cb')errors.push(`Homepage trade asset SHA-256 mismatch -> ${homepageTradeAsset}`);
 }
-const phase04ImageExpectations=[
-  ['assets/phase08/film-still-physical-trade.webp',960,540],
-  ['assets/phase04/film-still-intelligence.webp',800,450]
-];
+const homepageTradeEscaped=homepageTradeAsset.replaceAll('.','\\.');
+const homepageTradeTag=index.match(new RegExp(`<img\\b[^>]*src=["']${homepageTradeEscaped}["'][^>]*>`,'i'))?.[0]||'';
+if(!homepageTradeTag)errors.push(`index.html: homepage trade image tag missing -> ${homepageTradeAsset}`);
+else if(Number(attr(homepageTradeTag,'width'))!==960||Number(attr(homepageTradeTag,'height'))!==540)errors.push(`index.html: homepage trade image layout attributes must remain 960x540 -> ${homepageTradeAsset}`);
+
+const phase08EnergyAsset='assets/phase08/film-still-physical-trade.webp';
+if(!files.includes(phase08EnergyAsset))errors.push(`Phase 08 energy asset missing -> ${phase08EnergyAsset}`);
+else{
+  if(fs.statSync(path.join(root,phase08EnergyAsset)).size>120000)errors.push(`Phase 08 energy asset exceeds 120 KB -> ${phase08EnergyAsset}`);
+  const phase08EnergyDims=webpDimensions(phase08EnergyAsset);
+  if(!phase08EnergyDims)errors.push(`Phase 08 energy asset dimensions unreadable -> ${phase08EnergyAsset}`);
+  else if(phase08EnergyDims.width!==960||phase08EnergyDims.height!==540)errors.push(`Phase 08 energy intrinsic dimensions changed -> ${phase08EnergyAsset}: ${phase08EnergyDims.width}x${phase08EnergyDims.height}`);
+}
+const phase08EnergyHtml=read('energy.html');
+const phase08EnergyEscaped=phase08EnergyAsset.replaceAll('.','\\.');
+const phase08EnergyTag=phase08EnergyHtml.match(new RegExp(`<img\\b[^>]*src=["']${phase08EnergyEscaped}["'][^>]*>`,'i'))?.[0]||'';
+if(!phase08EnergyTag)errors.push(`energy.html: Phase 08 image tag missing -> ${phase08EnergyAsset}`);
+else if(Number(attr(phase08EnergyTag,'width'))!==960||Number(attr(phase08EnergyTag,'height'))!==540)errors.push(`energy.html: Phase 08 image attributes must remain 960x540 -> ${phase08EnergyAsset}`);
+
+const phase04ImageExpectations=[['assets/phase04/film-still-intelligence.webp',800,450]];
 for(const [asset,expectedWidth,expectedHeight] of phase04ImageExpectations){
-  if(!files.includes(asset))continue;
+  if(!files.includes(asset)){errors.push(`Phase 04 asset missing -> ${asset}`);continue}
+  if(fs.statSync(path.join(root,asset)).size>120000)errors.push(`Phase 04 asset exceeds 120 KB -> ${asset}`);
   const dims=webpDimensions(asset);
   if(!dims)errors.push(`Phase 04 asset dimensions unreadable -> ${asset}`);
   else if(dims.width!==expectedWidth||dims.height!==expectedHeight)errors.push(`Phase 04 intrinsic dimensions changed -> ${asset}: ${dims.width}x${dims.height}`);
@@ -199,7 +223,6 @@ for(const [asset,expectedWidth,expectedHeight] of phase04ImageExpectations){
   if(!tag)errors.push(`index.html: Phase 04 image tag missing -> ${asset}`);
   else if(Number(attr(tag,'width'))!==expectedWidth||Number(attr(tag,'height'))!==expectedHeight)errors.push(`index.html: Phase 04 image attributes must match intrinsic ${expectedWidth}x${expectedHeight} -> ${asset}`);
 }
-
 
 const corporate=read('corporate.html');
 const corporateMain=corporate.match(/<main\b[\s\S]*?<\/main>/i)?.[0]||'';
